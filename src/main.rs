@@ -15,6 +15,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+mod logging;
+
 use std::fs::read_to_string;
 use crossterm::event::{self, Event};
 use std::time::Duration;
@@ -28,8 +30,6 @@ use openssl::sign::Verifier;
 use openssl::hash::MessageDigest;
 
 const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
-const ROOTED_FILE: &str = "/.rooted";
-const ROOTED_DIGEST_FILE: &str = "/.rooted.dgst";
 
 fn main() {
     // Decoding public key embedded in kernel command line
@@ -41,14 +41,14 @@ fn main() {
             pubkey_vector
         }
         Err(e) => {
-            eprintln!("Base64 decode error: {}", e);
+            logging::info("Base64 decode error: {e}", &logging::MessageType::Error);
             return;
         }
     };
     let pubkey_pem = match PKey::public_key_from_pem(&pubkey) {
         Ok(pkey) => pkey,
         Err(e) => {
-            eprintln!("Failed to parse PEM public key: {}", e);
+            logging::info("Failed to parse PEM public key: {e}", &logging::MessageType::Error);
             return;
         }
     };
@@ -70,7 +70,7 @@ fn main() {
     }
     println!();
 
-    is_rooted_kernel(&pubkey_pem);
+
 }
 
 fn read_file_string(file_path: &str) -> Result<String, String> {
@@ -84,18 +84,7 @@ fn read_file_string(file_path: &str) -> Result<String, String> {
     }
 }
 
-fn is_rooted_kernel(pubkey_pem: &PKey<Public>) -> bool {
-    println!();
-    if fs::exists(ROOTED_FILE).expect("Failed to check for rooted kernel file existence") && fs::exists(ROOTED_DIGEST_FILE).expect("Failed to check for rooted kernel digest file existence") && sig_pass(pubkey_pem, ROOTED_FILE, ROOTED_DIGEST_FILE).expect("Failed to verify rooted kernel signature") {
-        println!("Kernel root status verification: PASS");
-    } else {
-        println!("Kernel root status verification: FAIL");
-        println!("Enforcing security policy");
-    }
-    return true
-}
-
-fn sig_pass(pubkey_pem: &PKey<Public>, file: &str, digest_file: &str) -> Result<bool, Box<dyn std::error::Error>> {
+fn check_signature(pubkey_pem: &PKey<Public>, file: &str, digest_file: &str) -> Result<bool, Box<dyn std::error::Error>> {
     let data = fs::read(file)?;
     let signature = fs::read(digest_file)?;
     let mut verifier = Verifier::new(MessageDigest::sha256(), &pubkey_pem)?;
