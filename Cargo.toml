@@ -6,4 +6,8 @@ edition = "2024"
 [dependencies]
 base64 = "0.22.1"
 crossterm = "0.29.0"
+network-interface = "2.0.1"
 openssl = "0.10.73"
+
+[features]
+debug = []
