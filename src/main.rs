@@ -17,7 +17,6 @@
 
 mod functions;
 mod debug;
-mod logging;
 
 use crossterm::event::{self, Event};
 use std::time::Duration;
@@ -26,12 +25,13 @@ use std::fs;
 use base64::engine::general_purpose;
 use base64::Engine;
 use openssl::pkey::PKey;
+use log::{info, warn, error};
 
 const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
 
 fn main() {
     #[cfg(feature = "debug")]
-    debug::start_debug_framework();
+    let _ = debug::start_debug_framework(); // We don't care if this fails, probably
 
     // Decoding public key embedded in kernel command line
     let mut cmdline = functions::read_file_string("/proc/cmdline").unwrap_or_else(|e| e);
@@ -42,14 +42,14 @@ fn main() {
             pubkey_vector
         }
         Err(e) => {
-            logging::info(&format!("Base64 decode error: {e}"), &logging::MessageType::Error);
+            error!("Base64 decode error: {e}");
             return;
         }
     };
     let pubkey_pem = match PKey::public_key_from_pem(&pubkey) {
         Ok(pkey) => pkey,
         Err(e) => {
-            logging::info(&format!("Failed to parse PEM public key: {e}"), &logging::MessageType::Error);
+            error!("Failed to parse PEM public key: {e}");
             return;
         }
     };

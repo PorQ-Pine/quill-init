@@ -5,9 +5,8 @@ use std::fs::read_to_string;
 use openssl::pkey::PKey;
 use std::fs;
 use std::process::{Command, ExitStatus};
-use std::io;
-
-use crate::logging;
+use std::io::{self, Error, ErrorKind};
+use log::{info, warn, error};
 
 pub fn read_file_string(file_path: &str) -> Result<String, String> {
     let maybe_name = read_to_string(file_path);
@@ -29,29 +28,19 @@ pub fn check_signature(pubkey_pem: &PKey<Public>, file: &str, digest_file: &str)
     Ok(pass)
 }
 
-pub fn run_command_core(command: &str, args: &[&str]) -> io::Result<ExitStatus> {
-    Command::new(command)
-        .args(args)
-        .status()
-}
-
-pub fn run_command(command: &str, args: &[&str], context: &str) -> Result<i32, io::Error> {
+pub fn run_command(command: &str, args: &[&str], context: &str) -> Result<(), io::Error> {
     match Command::new(command).args(args).status() {
         Ok(status) => {
-            let code = status.code().unwrap_or(-1);
-            if !status.success() {
-                logging::info(
-                    &format!("{context}: exited with status {code}"),
-                    &logging::MessageType::Error,
-                );
+            if status.success() {
+                Ok(())
             }
-            Ok(code)
+            else {
+                let msg = format!("{context}: command exited with status {status}");
+                Err(Error::new(ErrorKind::Other, msg))
+            }
         }
         Err(e) => {
-            logging::info(
-                &format!("{context}: failed to execute: {e}"),
-                &logging::MessageType::Error,
-            );
+            error!("{context}: failed to execute: {e}");
             Err(e)
         }
     }
