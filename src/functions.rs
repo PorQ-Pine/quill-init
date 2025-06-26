@@ -36,6 +36,7 @@ pub fn run_command(command: &str, args: &[&str], context: &str) -> Result<(), io
             }
             else {
                 let msg = format!("{context}: command exited with status {status}");
+                error!("{context}");
                 Err(Error::new(ErrorKind::Other, msg))
             }
         }

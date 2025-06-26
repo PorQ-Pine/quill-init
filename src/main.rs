@@ -27,6 +27,7 @@ use base64::Engine;
 use openssl::pkey::PKey;
 use log::{info, warn, error};
 
+const PUBKEY_DIR: &str = "/opt/key/";
 const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
 
 fn main() {
@@ -38,6 +39,8 @@ fn main() {
     let pubkey_base64 = cmdline.split_off(cmdline.len() - 604);
     let pubkey = match general_purpose::STANDARD.decode(pubkey_base64) {
         Ok(pubkey_vector) => {
+            // If the following fails, it's bad enough to trigger a panic
+            fs::create_dir_all(PUBKEY_DIR).expect("Unable to create public key file directory in init ramdisk");
             fs::write(PUBKEY_LOCATION, &pubkey_vector).expect("Unable to write public key to file");
             pubkey_vector
         }
