@@ -11,6 +11,8 @@ const IP_POOL_END: &str = "192.168.2.254";
 const UDHCPD_CONF_PATH: &str = "/etc/udhcpd.conf";
 
 pub fn start_debug_framework() -> Result<(), io::Error> {
+    env_logger::init();
+
     warn!("Setting up USB networking and Telnet server");
     let phy_mod = "phy-rockchip-inno-usb2";
     let ether_mod = "g_ether";
@@ -43,7 +45,7 @@ pub fn start_debug_framework() -> Result<(), io::Error> {
     functions::run_command("ifconfig", &[&iface_name, &IP], &format!("Failed to set IP for {iface_name}"))?;
     fs::write(UDHCPD_CONF_PATH, format!("start {IP}\nend {IP_POOL_END}\ninterface {iface_name}\n"))?;
     functions::run_command("udhcpd", &[&UDHCPD_CONF_PATH], &format!("Failed to start DHCP server"))?;
-    functions::run_command("telnetd", &[], &format!("Failed to start telnet server"))?;
+    functions::run_command("telnetd", &["-l", "/bin/sh"], &format!("Failed to start telnet server"))?;
 
     Ok(())
 }
