@@ -1,23 +1,10 @@
 use openssl::pkey::Public;
 use openssl::sign::Verifier;
 use openssl::hash::MessageDigest;
-use std::fs::read_to_string;
 use openssl::pkey::PKey;
-use std::fs;
-use std::process::{Command, ExitStatus};
-use std::io::{self, Error, ErrorKind};
+use std::{fs, process::Command, thread, time::Duration};
 use log::{info, warn, error};
-
-pub fn read_file_string(file_path: &str) -> Result<String, String> {
-    let maybe_name = read_to_string(file_path);
-    match maybe_name {
-        Ok(mut x) => {
-            x.pop();
-            Ok(x)
-        },
-        Err(x) => Ok(x.to_string()),
-    }
-}
+use anyhow::{Context, Result, Error};
 
 pub fn check_signature(pubkey_pem: &PKey<Public>, file: &str, digest_file: &str) -> Result<bool, Box<dyn std::error::Error>> {
     let data = fs::read(file)?;
@@ -28,21 +15,21 @@ pub fn check_signature(pubkey_pem: &PKey<Public>, file: &str, digest_file: &str)
     Ok(pass)
 }
 
-pub fn run_command(command: &str, args: &[&str], context: &str) -> Result<(), io::Error> {
-    match Command::new(command).args(args).status() {
-        Ok(status) => {
-            if status.success() {
-                Ok(())
-            }
-            else {
-                let msg = format!("{context}: command exited with status {status}");
-                error!("{context}");
-                Err(Error::new(ErrorKind::Other, msg))
-            }
-        }
-        Err(e) => {
-            error!("{context}: failed to execute: {e}");
-            Err(e)
-        }
+pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
+    let status = Command::new(command)
+        .args(args)
+        .status()
+        .with_context(|| format!("Failed to execute command: {command}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        return Err(anyhow::anyhow!("Command `{command}` exited with status: {status}"))
+    }
+}
+
+pub fn wait_for_file(file: &str) {
+    while !fs::metadata(file).is_ok() {
+        thread::sleep(Duration::from_millis(100));
     }
 }

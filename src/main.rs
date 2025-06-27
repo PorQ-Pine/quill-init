@@ -22,44 +22,43 @@ use crossterm::event::{self, Event};
 use std::time::Duration;
 use std::process::exit;
 use std::fs;
+use std::io;
 use base64::engine::general_purpose;
 use base64::Engine;
 use openssl::pkey::PKey;
 use log::{info, warn, error};
+use sys_mount::Mount;
+use anyhow::{Context, Result};
 
+const OS_PART: &str = "/dev/mmcblk0p6";
+const OS_PART_MOUNTPOINT: &str = "/boot/";
+const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
+const WAVEFORM_FILE: &str = "ebc.wbf";
+const WAVEFORM_DIR: &str = "/usr/lib/firmware/rockchip/";
 const PUBKEY_DIR: &str = "/opt/key/";
 const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
 
-fn main() {
+fn main() -> Result<()> {
+    // Mounting boot partition
+    info!("Mounting boot partition");
+    fs::create_dir_all(crate::OS_PART_MOUNTPOINT)?;
+    functions::wait_for_file(OS_PART);
+    Mount::builder().fstype("ext4").data("rw").mount(crate::OS_PART, crate::OS_PART_MOUNTPOINT)?;
     #[cfg(feature = "debug")]
-    let _ = debug::start_debug_framework(); // We don't care if this fails, probably
+    debug::start_debug_framework()?;
 
     // Decoding public key embedded in kernel command line
-    let mut cmdline = functions::read_file_string("/proc/cmdline").unwrap_or_else(|e| e);
+    info!("Decoding embedded kernel public key");
+    let mut cmdline = fs::read_to_string("/proc/cmdline").with_context(|| "Failed to read kernel command line")?; cmdline.pop();
     let pubkey_base64 = cmdline.split_off(cmdline.len() - 604);
-    let pubkey = match general_purpose::STANDARD.decode(pubkey_base64) {
-        Ok(pubkey_vector) => {
-            // If the following fails, it's bad enough to trigger a panic
-            fs::create_dir_all(PUBKEY_DIR).expect("Unable to create public key file directory in init ramdisk");
-            fs::write(PUBKEY_LOCATION, &pubkey_vector).expect("Unable to write public key to file");
-            pubkey_vector
-        }
-        Err(e) => {
-            error!("Base64 decode error: {e}");
-            return;
-        }
-    };
-    let pubkey_pem = match PKey::public_key_from_pem(&pubkey) {
-        Ok(pkey) => pkey,
-        Err(e) => {
-            error!("Failed to parse PEM public key: {e}");
-            return;
-        }
-    };
+    let pubkey_vector = general_purpose::STANDARD.decode(pubkey_base64).with_context(|| "Failed to decode base64 from kernel command line")?;
+    fs::create_dir_all(PUBKEY_DIR).with_context(|| "Unable to create public key file directory in init ramdisk")?;
+    fs::write(PUBKEY_LOCATION, &pubkey_vector).with_context(|| "Unable to write public key to file")?;
+    let pubkey_pem = PKey::public_key_from_pem(&pubkey_vector).with_context(|| "Failed to read public key to PEM format")?;
 
     // Boot info
-    let version = functions::read_file_string("/proc/version").unwrap_or_else(|e| e);
-    let commit = functions::read_file_string("/.commit").unwrap_or_else(|e| e);
+    let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
+    let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
 
     println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
 
@@ -73,4 +72,13 @@ fn main() {
         }
     }
     println!();
+
+    // Loading waveform from MMC
+    info!("Loading waveform from MMC");
+    let waveform_path = WAVEFORM_DIR.to_owned() + WAVEFORM_FILE;
+    let waveform = fs::read(&WAVEFORM_PART).with_context(|| "Failed to read eInk waveform")?;
+    fs::create_dir_all(&WAVEFORM_DIR).with_context(|| "Failed to create waveform's directory")?;
+    fs::write(waveform_path, &waveform).with_context(|| "Failed to write waveform to file")?;
+
+    Ok(())
 }
