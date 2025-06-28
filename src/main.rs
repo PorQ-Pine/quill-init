@@ -15,7 +15,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod functions;
+mod system;
+mod signing;
+mod eink;
 mod debug;
 
 use crossterm::event::{self, Event};
@@ -23,42 +25,45 @@ use std::time::Duration;
 use std::process::exit;
 use std::fs;
 use std::io;
-use base64::engine::general_purpose;
-use base64::Engine;
-use openssl::pkey::PKey;
 use log::{info, warn, error};
-use sys_mount::Mount;
 use anyhow::{Context, Result};
 
-const OS_PART: &str = "/dev/mmcblk0p6";
-const OS_PART_MOUNTPOINT: &str = "/boot/";
-const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
-const WAVEFORM_FILE: &str = "ebc.wbf";
-const WAVEFORM_DIR: &str = "/usr/lib/firmware/rockchip/";
-const PUBKEY_DIR: &str = "/opt/key/";
-const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
+const DATA_PART: &str = "/dev/mmcblk0p6";
+const DATA_PART_MOUNTPOINT: &str = "/data/";
+const BOOT_DIR: &str = "boot/";
+const DEFAULT_MOUNTPOINT: &str = "/mnt/";
+const GENERIC_DIGEST_EXT: &str = ".dgst";
 
 fn main() -> Result<()> {
-    // Mounting boot partition
-    info!("Mounting boot partition");
-    fs::create_dir_all(crate::OS_PART_MOUNTPOINT)?;
-    functions::wait_for_file(OS_PART);
-    Mount::builder().fstype("ext4").data("rw").mount(crate::OS_PART, crate::OS_PART_MOUNTPOINT)?;
+    system::set_workdir("/")?;
+    fs::create_dir_all(DEFAULT_MOUNTPOINT)?;
+
+    // Mount data partition
+    info!("Mounting data partition");
+    system::mount_data_partition()?;
+
     #[cfg(feature = "debug")]
     debug::start_debug_framework()?;
 
-    // Decoding public key embedded in kernel command line
+    // Decode public key embedded in kernel command line
     info!("Decoding embedded kernel public key");
-    let mut cmdline = fs::read_to_string("/proc/cmdline").with_context(|| "Failed to read kernel command line")?; cmdline.pop();
-    let pubkey_base64 = cmdline.split_off(cmdline.len() - 604);
-    let pubkey_vector = general_purpose::STANDARD.decode(pubkey_base64).with_context(|| "Failed to decode base64 from kernel command line")?;
-    fs::create_dir_all(PUBKEY_DIR).with_context(|| "Unable to create public key file directory in init ramdisk")?;
-    fs::write(PUBKEY_LOCATION, &pubkey_vector).with_context(|| "Unable to write public key to file")?;
-    let pubkey_pem = PKey::public_key_from_pem(&pubkey_vector).with_context(|| "Failed to read public key to PEM format")?;
+    let pubkey_pem = signing::decode_public_key_from_cmdline()?;
 
     // Boot info
     let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
     let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
+
+    // Install external libraries which would have been too big for the compressed init ramdisk
+    info!("Installing additional libraries from local storage");
+    system::install_external_libraries(&pubkey_pem)?;
+
+    // Load waveform from MMC
+    info!("Loading waveform from MMC");
+    eink::load_waveform()?;
+
+    // Load eInk modules
+    info!("Loading eInk display modules and activating EPDC");
+    eink::load_modules()?;
 
     println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
 
@@ -72,13 +77,6 @@ fn main() -> Result<()> {
         }
     }
     println!();
-
-    // Loading waveform from MMC
-    info!("Loading waveform from MMC");
-    let waveform_path = WAVEFORM_DIR.to_owned() + WAVEFORM_FILE;
-    let waveform = fs::read(&WAVEFORM_PART).with_context(|| "Failed to read eInk waveform")?;
-    fs::create_dir_all(&WAVEFORM_DIR).with_context(|| "Failed to create waveform's directory")?;
-    fs::write(waveform_path, &waveform).with_context(|| "Failed to write waveform to file")?;
 
     Ok(())
 }

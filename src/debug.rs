@@ -2,27 +2,23 @@ use std::fs;
 use network_interface::NetworkInterface;
 use network_interface::NetworkInterfaceConfig;
 use log::{info, warn, error};
-use sys_mount::Mount;
 use std::io;
 use anyhow::{Context, Result};
 
-use crate::functions;
+use crate::system;
 
 const IP: &str = "192.168.2.3";
 const IP_POOL_END: &str = "192.168.2.254";
 const UDHCPD_CONF_PATH: &str = "/etc/udhcpd.conf";
-const DROPBEAR_RSA_KEY_FILE: &str = "/boot/rsa_hkey";
+const DROPBEAR_RSA_KEY_FILE: &str = "rsa_hkey";
 
 pub fn start_debug_framework() -> Result<()> {
     env_logger::init();
 
     warn!("Setting up USB networking and Telnet server");
-    let phy_mod = "phy-rockchip-inno-usb2";
-    let ether_mod = "g_ether";
-
     // liblmod is not able to load g_ether properly, it seems
-    functions::run_command("modprobe", &[phy_mod]).with_context(|| "Failed to load {phy_mod}")?;
-    functions::run_command("modprobe", &[ether_mod]).with_context(|| "Failed to load {ether_mod}")?;
+    system::modprobe(&["phy-rockchip-inno-usb2"])?;
+    system::modprobe(&["g_ether"])?;
 
     let network_interfaces = NetworkInterface::show().with_context(|| "Failed to retrieve network interfaces")?;
 
@@ -34,16 +30,16 @@ pub fn start_debug_framework() -> Result<()> {
         .with_context(|| "No USB ethernet interface found")?;
 
     // USB networking
-    functions::run_command("ifconfig", &[&iface_name, "up"]).with_context(|| "Failed to activate {iface_name}")?;
-    functions::run_command("ifconfig", &[&iface_name, &IP]).with_context(|| "Failed to set IP for {iface_name}")?;
+    system::run_command("ifconfig", &[&iface_name, "up"]).with_context(|| "Failed to activate {iface_name}")?;
+    system::run_command("ifconfig", &[&iface_name, &IP]).with_context(|| "Failed to set IP for {iface_name}")?;
     fs::write(UDHCPD_CONF_PATH, format!("start {IP}\nend {IP_POOL_END}\ninterface {iface_name}\n"))?;
-    functions::run_command("udhcpd", &[&UDHCPD_CONF_PATH]).with_context(|| "Failed to start DHCP server")?;
+    system::run_command("udhcpd", &[&UDHCPD_CONF_PATH]).with_context(|| "Failed to start DHCP server")?;
 
-    let dropbear_rsa_key_path = crate::OS_PART_MOUNTPOINT.to_owned() + DROPBEAR_RSA_KEY_FILE;
+    let dropbear_rsa_key_path = crate::DATA_PART_MOUNTPOINT.to_owned() + crate::BOOT_DIR + DROPBEAR_RSA_KEY_FILE;
     if !fs::exists(&dropbear_rsa_key_path)? {
-        functions::run_command("dropbearkey", &["-t", "rsa", "-f", &dropbear_rsa_key_path]).with_context(|| "Failed to generate SSH keys")?;
+        system::run_command("dropbearkey", &["-t", "rsa", "-f", &dropbear_rsa_key_path]).with_context(|| "Failed to generate SSH keys")?;
     }
-    functions::run_command("dropbear", &["-r", &dropbear_rsa_key_path, "-B"]).with_context(|| "Failed to start Dropbear SSH server")?;
+    system::run_command("dropbear", &["-r", &dropbear_rsa_key_path, "-B"]).with_context(|| "Failed to start Dropbear SSH server")?;
 
     Ok(())
 }
