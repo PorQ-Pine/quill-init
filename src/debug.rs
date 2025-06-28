@@ -2,7 +2,6 @@ use std::fs;
 use network_interface::NetworkInterface;
 use network_interface::NetworkInterfaceConfig;
 use log::{info, warn, error};
-use std::io;
 use anyhow::{Context, Result};
 
 use crate::system;
