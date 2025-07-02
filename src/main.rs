@@ -19,6 +19,7 @@ mod system;
 mod signing;
 mod eink;
 mod debug;
+mod gui;
 
 use crossterm::event::{self, Event};
 use std::time::Duration;
@@ -36,45 +37,50 @@ const GENERIC_DIGEST_EXT: &str = ".dgst";
 const HOME_DIR: &str = "/root/";
 
 fn main() -> Result<()> {
-    // Decode public key embedded in kernel command line
-    info!("Decoding embedded kernel public key");
-    let pubkey_pem = signing::decode_public_key_from_cmdline()?;
+    env_logger::init();
+    #[cfg(not(feature = "gui_only"))]
+    {
+        // Decode public key embedded in kernel command line
+        let pubkey_pem = signing::decode_public_key_from_cmdline()?;
 
-    system::set_workdir("/")?;
-    fs::create_dir_all(&DEFAULT_MOUNTPOINT)?;
+        system::set_workdir("/")?;
+        fs::create_dir_all(&DEFAULT_MOUNTPOINT)?;
 
-    // Mount data partition
-    info!("Mounting data partition");
-    system::mount_data_partition()?;
+        // Mount data partition
+        system::mount_data_partition()?;
 
-    #[cfg(feature = "debug")]
-    debug::start_debug_framework(&pubkey_pem)?;
+        #[cfg(feature = "debug")]
+        debug::start_debug_framework(&pubkey_pem)?;
 
-    // Boot info
-    let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
-    let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
+        // Boot info
+        let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
+        let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
 
-    // Install external libraries which would have been too big for the compressed init ramdisk
-    system::install_external_libraries(&pubkey_pem)?;
+        // Install external libraries which would have been too big for the compressed init ramdisk
+        system::install_external_libraries(&pubkey_pem)?;
 
-    // Load waveform from MMC
-    eink::load_waveform()?;
+        // Load waveform from MMC
+        eink::load_waveform()?;
 
-    // Load eInk modules
-    eink::load_modules()?;
+        // Load eInk modules
+        eink::load_modules()?;
 
-    println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
+        println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
 
-    print!("(initrd) Hit any key to stop auto-boot ... ");
-    // Flush stdout to ensure prompt is shown before waiting
-    std::io::Write::flush(&mut std::io::stdout()).unwrap();
+        print!("(initrd) Hit any key to stop auto-boot ... ");
 
-    if event::poll(Duration::from_secs(5)).unwrap() {
-        if let Event::Key(_) = event::read().unwrap() {
-            exit(0);
+        // Flush stdout to ensure prompt is shown before waiting
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+
+        if event::poll(Duration::from_secs(3)).unwrap() {
+            if let Event::Key(_) = event::read().unwrap() {
+                exit(0);
+            }
         }
+        println!();
     }
-    println!();
+
+    gui::setup_gui()?;
 
     Ok(())
 }

@@ -17,8 +17,6 @@ const DEBUG_SETUP_SCRIPT: &str = "debug-setup.sh";
 const COPIED_DEBUG_SCRIPT: &str = ".profile";
 
 pub fn start_debug_framework(pubkey: &PKey<Public>) -> Result<()> {
-    env_logger::init();
-
     start_usbnet()?;
     start_sshd()?;
     prepare_script_login(&pubkey)?;
@@ -66,7 +64,7 @@ pub fn prepare_script_login(pubkey: &PKey<Public>) -> Result<()> {
     let script_path = format!("{}{}{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &DEBUG_SETUP_SCRIPT);
     let script_signature_path = format!("{}.dgst", &script_path);
     if fs::exists(&script_path)? && signing::check_signature(&pubkey, &script_path, &script_signature_path)? {
-        warn!("Found valid script to run upon console login");
+        warn!("Found valid script to run upon console login: copying it");
         let copied_debug_script_path = format!("{}{}", &crate::HOME_DIR, &COPIED_DEBUG_SCRIPT);
         fs::copy(&script_path, &copied_debug_script_path).with_context(|| "Failed to copy debug setup script to home directory")?;
     } else {

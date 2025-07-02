@@ -12,6 +12,7 @@ const PUBKEY_DIR: &str = "/opt/key/";
 const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
 
 pub fn decode_public_key_from_cmdline() -> Result<PKey<Public>> {
+    info!("Decoding embedded kernel public key");
     let mut cmdline = fs::read_to_string("/proc/cmdline").with_context(|| "Failed to read kernel command line")?; cmdline.pop();
     let pubkey_base64 = cmdline.split_off(cmdline.len() - 604);
     let pubkey_vector = general_purpose::STANDARD.decode(&pubkey_base64).with_context(|| "Failed to decode base64 from kernel command line")?;

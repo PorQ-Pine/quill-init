@@ -37,6 +37,7 @@ pub fn wait_for_file(file: &str) {
 }
 
 pub fn mount_data_partition() -> Result<()> {
+    info!("Mounting data partition");
     fs::create_dir_all(&crate::DATA_PART_MOUNTPOINT)?;
     wait_for_file(&crate::DATA_PART);
     Mount::builder().fstype("ext4").data("rw").mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)?;
