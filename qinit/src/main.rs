@@ -50,11 +50,9 @@ fn main() -> Result<()> {
         let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
         let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
 
-        // Load waveform from MMC
         eink::load_waveform()?;
-
-        // Load eInk modules
         eink::load_modules()?;
+        eink::setup_touchscreen()?;
 
         println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
         print!("(initrd) Hit any key to stop auto-boot ... ");

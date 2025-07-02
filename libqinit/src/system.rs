@@ -45,3 +45,21 @@ pub fn mount_data_partition() -> Result<()> {
 
     Ok(())
 }
+
+pub fn start_service(service: &str) -> Result<()> {
+    run_command("rc-service", &[&service, "start"])?;
+
+    Ok(())
+}
+
+pub fn stop_service(service: &str) -> Result<()> {
+    run_command("rc-service", &[&service, "stop"])?;
+
+    Ok(())
+}
+
+pub fn restart_service(service: &str) -> Result<()> {
+    run_command("rc-service", &[&service, "restart"])?;
+
+    Ok(())
+}

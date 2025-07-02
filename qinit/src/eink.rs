@@ -1,7 +1,8 @@
 use std::fs;
+use std::fs::File;
 use anyhow::{Context, Result};
 use log::{info, warn, error};
-use libqinit::system::{run_command, modprobe, set_workdir};
+use libqinit::system::{run_command, modprobe, set_workdir, start_service};
 
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";
@@ -64,6 +65,18 @@ pub fn backup_waveform_files(waveform_backup_dir_path: &str, waveform_backup_ebc
     fs::write(&waveform_backup_ebcwbf_path, &waveform).with_context(|| "Failed to write waveform to file")?;
     info!("Creating custom waveform: this could take a while");
     create_custom_waveform(&waveform_backup_ebcwbf_path, &waveform_backup_dir_path)?;
+
+    Ok(())
+}
+
+pub fn setup_touchscreen() -> Result<()> {
+    info!("Setting up touchscreen input");
+
+    run_command("openrc", &[])?;
+    File::create("/run/openrc/softlevel")?;
+    start_service("udev")?;
+    start_service("udev-trigger")?;
+    start_service("udev-settle")?;
 
     Ok(())
 }

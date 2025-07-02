@@ -1,9 +1,8 @@
-import "/usr/share/fonts/u001-reg.ttf";
-import "/usr/share/fonts/u001-bol.ttf";
 import { Button, VerticalBox } from "std-widgets.slint";
 
 export component AppWindow inherits Window {
-    callback request-increase-value();
+    default-font-family: "u001";
+    default-font-size: 80px;
     VerticalBox {
         Button {
             text: "Test";
