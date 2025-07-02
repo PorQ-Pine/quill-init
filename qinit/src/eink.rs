@@ -1,7 +1,7 @@
 use std::fs;
 use anyhow::{Context, Result};
-use crate::{system, BOOT_DIR, DATA_PART_MOUNTPOINT};
 use log::{info, warn, error};
+use libqinit::system::{run_command, modprobe, set_workdir};
 
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";
@@ -14,7 +14,7 @@ pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");
     let waveform_path = format!("{}{}", &WAVEFORM_DIR_PATH, &WAVEFORM_FILE);
     let waveform_customwf_path = format!("{}{}", &WAVEFORM_DIR_PATH, &CUSTOMWF_FILE);
-    let waveform_backup_dir_path = format!("{}{}{}", &DATA_PART_MOUNTPOINT, &BOOT_DIR, &FIRMWARE_DIR);
+    let waveform_backup_dir_path = format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &FIRMWARE_DIR);
     let waveform_backup_ebcwbf_path = format!("{}{}", &waveform_backup_dir_path, &WAVEFORM_FILE);
     let waveform_backup_customwf_path = format!("{}{}", &waveform_backup_dir_path, &CUSTOMWF_FILE);
 
@@ -44,16 +44,16 @@ pub fn load_modules() -> Result<()> {
     ];
 
     for module in &modules {
-        system::modprobe(&[module])?;
+        modprobe(&[module])?;
     }
 
     Ok(())
 }
 
 pub fn create_custom_waveform(waveform_path: &str, workdir: &str) -> Result<()> {
-    system::set_workdir(&workdir)?;
-    system::run_command("python3", &[&format!("{}{}", &PYTHON_SCRIPTS_PATH, "wbf_to_custom.py"), &waveform_path]).with_context(|| "Failed to create custom waveform")?;
-    system::set_workdir("/")?;
+    set_workdir(&workdir)?;
+    run_command("python3", &[&format!("{}{}", &PYTHON_SCRIPTS_PATH, "wbf_to_custom.py"), &waveform_path]).with_context(|| "Failed to create custom waveform")?;
+    set_workdir("/")?;
 
     Ok(())
 }

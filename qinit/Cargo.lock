@@ -2175,6 +2175,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
+name = "libqinit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "cfg-if",
+ "env_logger",
+ "log",
+ "openssl",
+ "sys-mount",
+]
+
+[[package]]
 name = "libredox"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3186,6 +3199,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qinit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cfg-if",
+ "crossterm",
+ "env_logger",
+ "libqinit",
+ "log",
+ "network-interface",
+ "openssl",
+ "slint",
+ "slint-build",
+ "sys-mount",
+]
+
+[[package]]
 name = "qoi"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3199,22 +3229,6 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
-
-[[package]]
-name = "quill-init"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "crossterm",
- "env_logger",
- "log",
- "network-interface",
- "openssl",
- "slint",
- "slint-build",
- "sys-mount",
-]
 
 [[package]]
 name = "quote"

@@ -15,39 +15,33 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-mod system;
-mod signing;
-mod eink;
+#[cfg(feature = "debug")]
 mod debug;
+
+mod eink;
 mod gui;
 
 use crossterm::event::{self, Event};
 use std::time::Duration;
 use std::process::exit;
 use std::fs;
-use std::io;
 use log::{info, warn, error};
 use anyhow::{Context, Result};
-
-const DATA_PART: &str = "/dev/mmcblk0p6";
-const DATA_PART_MOUNTPOINT: &str = "/data/";
-const BOOT_DIR: &str = "boot/";
-const DEFAULT_MOUNTPOINT: &str = "/mnt/";
-const GENERIC_DIGEST_EXT: &str = ".dgst";
-const HOME_DIR: &str = "/root/";
+use libqinit::system::{mount_data_partition, set_workdir};
+use libqinit::signing::{decode_public_key_from_cmdline};
 
 fn main() -> Result<()> {
     env_logger::init();
     #[cfg(not(feature = "gui_only"))]
     {
         // Decode public key embedded in kernel command line
-        let pubkey_pem = signing::decode_public_key_from_cmdline()?;
+        let pubkey_pem = decode_public_key_from_cmdline()?;
 
-        system::set_workdir("/")?;
-        fs::create_dir_all(&DEFAULT_MOUNTPOINT)?;
+        set_workdir("/")?;
+        fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)?;
 
         // Mount data partition
-        system::mount_data_partition()?;
+        mount_data_partition()?;
 
         #[cfg(feature = "debug")]
         debug::start_debug_framework(&pubkey_pem)?;
@@ -56,9 +50,6 @@ fn main() -> Result<()> {
         let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
         let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
 
-        // Install external libraries which would have been too big for the compressed init ramdisk
-        system::install_external_libraries(&pubkey_pem)?;
-
         // Load waveform from MMC
         eink::load_waveform()?;
 
@@ -66,7 +57,6 @@ fn main() -> Result<()> {
         eink::load_modules()?;
 
         println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
-
         print!("(initrd) Hit any key to stop auto-boot ... ");
 
         // Flush stdout to ensure prompt is shown before waiting

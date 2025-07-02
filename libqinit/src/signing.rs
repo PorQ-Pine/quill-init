@@ -24,22 +24,23 @@ pub fn decode_public_key_from_cmdline() -> Result<PKey<Public>> {
 }
 
 pub fn check_signature(pubkey_pem: &PKey<Public>, file: &str, digest_file: &str) -> Result<bool> {
-    #[cfg(feature = "free_roam")]
-    {
-        warn!("Free roam mode: signature of file '{}' was not verified", &file);
-        return Ok(true);
-    }
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "free_roam")] {
+            warn!("Free roam mode: signature of file '{}' was not verified", &file);
+            return Ok(true);
+        } else {
+            let data = fs::read(&file).with_context(|| format!("Could not read file '{}' for signature verification", &file))?;
+            let signature = fs::read(&digest_file).with_context(|| format!("Could not read digest file '{}' for signature verification", &digest_file))?;
+            let mut verifier = Verifier::new(MessageDigest::sha256(), &pubkey_pem)?;
+            verifier.update(&data)?;
+            let pass = verifier.verify(&signature)?;
+            if pass {
+                info!("File '{}': signature verified successfully", &file);
+            } else {
+                error!("File '{}': invalid signature", &file);
+            }
 
-    let data = fs::read(&file).with_context(|| format!("Could not read file '{}' for signature verification", &file))?;
-    let signature = fs::read(&digest_file).with_context(|| format!("Could not read digest file '{}' for signature verification", &digest_file))?;
-    let mut verifier = Verifier::new(MessageDigest::sha256(), &pubkey_pem)?;
-    verifier.update(&data)?;
-    let pass = verifier.verify(&signature)?;
-    if pass {
-        info!("File '{}': signature verified successfully", &file);
-    } else {
-        error!("File '{}': invalid signature", &file);
+            Ok(pass)
+        }
     }
-
-    Ok(pass)
 }
