@@ -11,6 +11,7 @@ const FIRMWARE_DIR: &str = "firmware/";
 const PYTHON_SCRIPTS_PATH: &str = "/etc/init.d/ebc/";
 
 pub fn load_waveform() -> Result<()> {
+    info!("Loading waveform from MMC");
     let waveform_path = format!("{}{}", &WAVEFORM_DIR_PATH, &WAVEFORM_FILE);
     let waveform_customwf_path = format!("{}{}", &WAVEFORM_DIR_PATH, &CUSTOMWF_FILE);
     let waveform_backup_dir_path = format!("{}{}{}", &DATA_PART_MOUNTPOINT, &BOOT_DIR, &FIRMWARE_DIR);
@@ -33,6 +34,7 @@ pub fn load_waveform() -> Result<()> {
 }
 
 pub fn load_modules() -> Result<()> {
+    info!("Loading eInk display modules and activating EPDC");
     let modules = [
         "tps65185_regulator",
         "industrialio_triggered_event",

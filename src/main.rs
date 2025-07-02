@@ -33,36 +33,34 @@ const DATA_PART_MOUNTPOINT: &str = "/data/";
 const BOOT_DIR: &str = "boot/";
 const DEFAULT_MOUNTPOINT: &str = "/mnt/";
 const GENERIC_DIGEST_EXT: &str = ".dgst";
+const HOME_DIR: &str = "/root/";
 
 fn main() -> Result<()> {
+    // Decode public key embedded in kernel command line
+    info!("Decoding embedded kernel public key");
+    let pubkey_pem = signing::decode_public_key_from_cmdline()?;
+
     system::set_workdir("/")?;
-    fs::create_dir_all(DEFAULT_MOUNTPOINT)?;
+    fs::create_dir_all(&DEFAULT_MOUNTPOINT)?;
 
     // Mount data partition
     info!("Mounting data partition");
     system::mount_data_partition()?;
 
     #[cfg(feature = "debug")]
-    debug::start_debug_framework()?;
-
-    // Decode public key embedded in kernel command line
-    info!("Decoding embedded kernel public key");
-    let pubkey_pem = signing::decode_public_key_from_cmdline()?;
+    debug::start_debug_framework(&pubkey_pem)?;
 
     // Boot info
     let mut version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; version.pop();
     let mut commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; commit.pop();
 
     // Install external libraries which would have been too big for the compressed init ramdisk
-    info!("Installing additional libraries from local storage");
     system::install_external_libraries(&pubkey_pem)?;
 
     // Load waveform from MMC
-    info!("Loading waveform from MMC");
     eink::load_waveform()?;
 
     // Load eInk modules
-    info!("Loading eInk display modules and activating EPDC");
     eink::load_modules()?;
 
     println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", version, commit);
