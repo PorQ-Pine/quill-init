@@ -1,0 +1,29 @@
+// Code partially copied from https://github.com/slint-ui/slint/blob/master/internal/compiler/widgets/fluent/progressindicator.slint
+export component ProgressBar {
+    in property <float> progress;
+    in property <bool> indeterminate;
+    min-height: 3px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    accessible-role: progress-indicator;
+    accessible-value: !root.indeterminate ? root.progress : "";
+    accessible-value-minimum: 0.0;
+    accessible-value-maximum: 1.0;
+
+    Rectangle {
+        clip: true;
+        i-rail := Rectangle {
+            height: 100%;
+            border-color: #000000;
+            border-width: 3px;
+            border-radius: 1px;
+        }
+        i-track := Rectangle {
+            width: !root.indeterminate ?  parent.width * min(1, max(0, root.progress)) : parent.width;
+            height: 100%;
+            x: !root.indeterminate ? 0px : -parent.width + (parent.width * mod(animation-tick(), 2s) / 1s);
+            border-radius: 1px;
+            background: #000000;
+        }
+    }
+}

@@ -1,11 +1,32 @@
-import { Button, VerticalBox } from "std-widgets.slint";
+import { ProgressBar } from "../../ui-common/progressbar.slint";
 
 export component AppWindow inherits Window {
-    default-font-family: "u001";
+    default-font-family: "U001";
     default-font-size: 80px;
-    VerticalBox {
-        Button {
-            text: "Test";
+
+    VerticalLayout {
+        Rectangle {}
+
+        HorizontalLayout {
+            Rectangle {}
+            Image {
+                source: @image-url("../../branding/quillos.svg");
+                width: 45%;
+                height: 45%;
+            }
+            Rectangle {}
         }
+
+        HorizontalLayout {
+            Rectangle {}
+            ProgressBar {
+                progress: 50%;
+                width: 37.5%;
+                height: 2%;
+            }
+            Rectangle {}
+        }
+
+        Rectangle {}
     }
 }
