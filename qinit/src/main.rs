@@ -22,16 +22,40 @@ mod eink;
 mod gui;
 
 use crossterm::event::{self, Event};
-use std::time::Duration;
+use slint::{Weak, ComponentHandle};
+use gui::AppWindow;
 use std::process::exit;
 use std::fs;
 use log::{info, warn, error};
 use anyhow::{Context, Result};
 use libqinit::system::{mount_data_partition, set_workdir};
 use libqinit::signing::{decode_public_key_from_cmdline};
+use tokio::time::{sleep, Duration};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Pre-GUI setup
     env_logger::init();
+    first_stage()?;
+
+    // GUI setup
+    let gui = gui::create_gui()?;
+    let gui_weak = gui.as_weak();
+
+    // Post-GUI setup
+    tokio::spawn(async move {
+        if let Err(e) = second_stage(&gui_weak).await {
+            error!("{:?}", e);
+            exit(1);
+        }
+    });
+
+    gui.run()?;
+
+    Ok(())
+}
+
+fn first_stage() -> Result<()> {
     #[cfg(not(feature = "gui_only"))]
     {
         // Decode public key embedded in kernel command line
@@ -68,7 +92,11 @@ fn main() -> Result<()> {
         println!();
     }
 
-    gui::setup_gui()?;
+    Ok(())
+}
+
+async fn second_stage(gui_weak: &Weak<AppWindow>) -> Result<()> {
+    gui::set_progress(&gui_weak, 50).await?;
 
     Ok(())
 }

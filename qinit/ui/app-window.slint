@@ -4,6 +4,8 @@ export component AppWindow inherits Window {
     default-font-family: "U001";
     default-font-size: 80px;
 
+    in-out property<float> boot_progress: 0;
+
     VerticalLayout {
         Rectangle {}
 
@@ -20,7 +22,7 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             Rectangle {}
             ProgressBar {
-                progress: 50%;
+                progress: root.boot_progress;
                 width: 37.5%;
                 height: 2%;
             }
