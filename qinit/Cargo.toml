@@ -15,7 +15,6 @@ sys-mount = "3.0.1"
 libqinit = { path = "../libqinit" }
 openssl = "0.10.73"
 embed-file = "0.2.0"
-tokio = { version = "1.46.0", features = ["full"] }
 
 [build-dependencies]
 slint-build = "1.12.1"
