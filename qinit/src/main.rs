@@ -21,14 +21,17 @@ mod debug;
 mod eink;
 mod gui;
 
+use anyhow::Error;
 use crossterm::event::{self, Event};
 use std::time::Duration;
 use std::process::exit;
+use std::thread;
 use std::fs;
 use log::{info, warn, error};
 use anyhow::{Context, Result};
 use libqinit::system::{mount_data_partition, set_workdir};
 use libqinit::signing::{decode_public_key_from_cmdline};
+use std::sync::mpsc::{channel, Sender, Receiver};
 
 fn main() -> Result<()> {
     env_logger::init();
@@ -68,7 +71,14 @@ fn main() -> Result<()> {
         println!();
     }
 
-    gui::setup_gui()?;
+    // Setting up GUI
+    let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
+    let handle = thread::spawn(move || gui::setup_gui(progress_receiver));
+
+    // Continuing boot
+
+    // Handling GUI thread issues if there are some
+    handle.join().map_err(|e| anyhow::anyhow!("Thread panicked: {:?}", e))??;
 
     Ok(())
 }
