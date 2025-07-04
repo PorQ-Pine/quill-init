@@ -4,6 +4,32 @@ use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use log::{info, warn, error};
 use sys_mount::Mount;
+use regex::Regex;
+
+pub fn get_cmdline_bool(property: &str) -> Result<bool> {
+    info!("Trying to extract boolean value for property '{}' in kernel command line", &property);
+    let cmdline = fs::read_to_string("/proc/cmdline")?;
+    let re_str = format!(r"{}=(\w+)", regex::escape(&property));
+    let re = Regex::new(&re_str)?;
+    if let Some(captures) = re.captures(&cmdline) {
+        if let Some(value_match) = captures.get(1) {
+            let value = value_match.as_str();
+            if value == "1" || value == "true" {
+                info!("Property is true");
+                return Ok(true)
+            } else {
+                info!("Property is false");
+                return Ok(false)
+            }
+        } else {
+            info!("Error getting capture group: returning false");
+            return Ok(false)
+        }
+    } else {
+        info!("Error capturing property: returning false");
+        return Ok(false)
+    }
+}
 
 pub fn set_workdir(path: &str) -> Result<()> {
     let root = Path::new(path);

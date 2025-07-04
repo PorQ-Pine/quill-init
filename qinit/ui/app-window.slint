@@ -1,34 +1,107 @@
 import { ProgressBar } from "../../ui-common/progressbar.slint";
+import { Button } from "std-widgets.slint";
+
+export enum Page { QuillBoot, VersionInfo, BootSplash }
 
 export component AppWindow inherits Window {
     default-font-family: "U001";
-    default-font-size: 80px;
+    default-font-size: 40px;
 
+    in-out property<string> version_string;
     in-out property<float> boot_progress;
+    in-out property<Page> page;
+    // Generic multipliers for default-size buttons
+    property<float> wmultiplier: 0.25;
+    property<float> hmultiplier: 0.1;
 
-    VerticalLayout {
+    if (page == Page.QuillBoot) : VerticalLayout {
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                // Displaying the same image but with the SVG file gave terrible results, for some reason
+                source: @image-url("../../branding/quill-banner.png");
+                width: 50%;
+                height: 50%;
+            }
+        }
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                text: "QuillBoot";
+                font-size: 80px;
+            }
+        }
+        HorizontalLayout {
+            Rectangle {}
+            Button {
+                text: "Recovery";
+                width: root.width * wmultiplier;
+                height: root.height * hmultiplier;
+            }
+            Rectangle {}
+            Button {
+                text: "Main";
+                width: root.width * wmultiplier;
+                height: root.height * hmultiplier;
+            }
+            Rectangle {}
+            Button {
+                text: "Version info";
+                width: root.width * wmultiplier;
+                height: root.height * hmultiplier;
+                clicked => {
+                    root.page = Page.VersionInfo;
+                }
+            }
+            Rectangle {}
+        }
+    }
+
+    if (page == Page.BootSplash) : VerticalLayout {
         Rectangle {}
 
         HorizontalLayout {
-            Rectangle {}
+            alignment: center;
             Image {
                 source: @image-url("../../branding/quillos.svg");
                 width: 45%;
                 height: 45%;
             }
-            Rectangle {}
         }
 
         HorizontalLayout {
-            Rectangle {}
+            alignment: center;
             ProgressBar {
                 progress: root.boot_progress;
                 width: 37.5%;
                 height: 2%;
             }
-            Rectangle {}
         }
 
         Rectangle {}
+    }
+
+    if (page == Page.VersionInfo) : VerticalLayout {
+        VerticalLayout{
+            alignment: center;
+            HorizontalLayout {
+                alignment: center;
+                Text {
+                    text: root.version_string;
+                    wrap: word-wrap;
+                }
+            }
+            HorizontalLayout{
+                alignment: center;
+                Button {
+                    text: "Back";
+                    width: root.width * wmultiplier;
+                    height: root.height * hmultiplier;
+                    clicked => {
+                        root.page = Page.QuillBoot;
+                    }
+                }
+            }
+        }
     }
 }

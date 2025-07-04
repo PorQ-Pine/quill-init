@@ -2,23 +2,16 @@ use openssl::pkey::Public;
 use openssl::pkey::PKey;
 use openssl::sign::Verifier;
 use openssl::hash::MessageDigest;
-use base64::Engine;
-use base64::engine::general_purpose;
 use anyhow::{Result, Context};
 use std::fs;
 use log::{info, warn, error};
 
-const PUBKEY_DIR: &str = "/opt/key/";
 const PUBKEY_LOCATION: &str = "/opt/key/public.pem";
 
-pub fn decode_public_key_from_cmdline() -> Result<PKey<Public>> {
-    info!("Decoding embedded kernel public key");
-    let mut cmdline = fs::read_to_string("/proc/cmdline").with_context(|| "Failed to read kernel command line")?; cmdline.pop();
-    let pubkey_base64 = cmdline.split_off(cmdline.len() - 604);
-    let pubkey_vector = general_purpose::STANDARD.decode(&pubkey_base64).with_context(|| "Failed to decode base64 from kernel command line")?;
-    fs::create_dir_all(&PUBKEY_DIR).with_context(|| "Unable to create public key file directory in init ramdisk")?;
-    fs::write(&PUBKEY_LOCATION, &pubkey_vector).with_context(|| "Unable to write public key to file")?;
-    let pubkey_pem = PKey::public_key_from_pem(&pubkey_vector).with_context(|| "Failed to read public key to PEM format")?;
+pub fn read_public_key() -> Result<PKey<Public>> {
+    info!("Reading embedded kernel public key");
+    let pubkey_bytes = fs::read(&PUBKEY_LOCATION)?;
+    let pubkey_pem = PKey::public_key_from_pem(&pubkey_bytes)?;
 
     Ok(pubkey_pem)
 }

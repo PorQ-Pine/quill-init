@@ -10,6 +10,7 @@ cfg-if = "1.0.1"
 env_logger = "0.11.8"
 log = "0.4.27"
 openssl = "0.10.73"
+regex = "1.11.1"
 sys-mount = "3.0.1"
 
 [features]
