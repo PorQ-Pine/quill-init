@@ -50,6 +50,9 @@ fn main() -> Result<()> {
         // Mount data partition
         mount_data_partition()?;
 
+        // Create boot flags directory
+        fs::create_dir_all(format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &libqinit::FLAGS_DIR))?;
+
         #[cfg(feature = "debug")]
         debug::start_debug_framework(&pubkey_pem)?;
 

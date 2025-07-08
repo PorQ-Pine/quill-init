@@ -1,0 +1,27 @@
+export component Button inherits TouchArea {
+    in property <string> text <=> i-text.text;
+
+    i-container := Rectangle {
+        border-radius: 10px;
+        border-width: 3px;
+        border-color: #000000;
+        background: #f0f0f0;
+
+        HorizontalLayout {  
+            padding: 4px;
+
+            i-text := Text {
+                color: #000000;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    states [  
+        pressed when root.pressed: {
+            i-container.background: #000000;
+            i-text.color: #ffffff;
+        }
+    ]
+}

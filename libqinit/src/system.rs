@@ -15,10 +15,10 @@ pub fn get_cmdline_bool(property: &str) -> Result<bool> {
         if let Some(value_match) = captures.get(1) {
             let value = value_match.as_str();
             if value == "1" || value == "true" {
-                info!("Property is true");
+                info!("Property '{}' is true", &property);
                 return Ok(true)
             } else {
-                info!("Property is false");
+                info!("Property '{}' is false", &property);
                 return Ok(false)
             }
         } else {
@@ -26,7 +26,7 @@ pub fn get_cmdline_bool(property: &str) -> Result<bool> {
             return Ok(false)
         }
     } else {
-        info!("Error capturing property: returning false");
+        info!("Could not find property: returning false");
         return Ok(false)
     }
 }

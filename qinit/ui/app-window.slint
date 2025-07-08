@@ -1,5 +1,6 @@
 import { ProgressBar } from "../../ui-common/progressbar.slint";
-import { Button } from "std-widgets.slint";
+import { Button } from "../../ui-common/button.slint";
+import { MinorButton } from "../../ui-common/minorbutton.slint";
 
 export enum Page { QuillBoot, VersionInfo, BootSplash }
 
@@ -10,56 +11,81 @@ export component AppWindow inherits Window {
     in-out property<string> version_string;
     in-out property<float> boot_progress;
     in-out property<Page> page;
-    // Generic multipliers for default-size buttons
+    // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
-    property<float> hmultiplier: 0.1;
+    property<float> hmultiplier: 0.05;
+    property<float> swmultiplier: 0.25;
+    property<float> shmultiplier: 0.03;
+    // Sizes
+    property<int> header_font_size: 80;
+    property<int> layout_padding: 60;
 
     if (page == Page.QuillBoot) : VerticalLayout {
+        padding: layout_padding * 1px;
+        Rectangle {}
         HorizontalLayout {
             alignment: center;
             Image {
                 // Displaying the same image but with the SVG file gave terrible results, for some reason
                 source: @image-url("../../branding/quill-banner.png");
-                width: 50%;
-                height: 50%;
+                width: 768px;
+                height: 330.5625px;
+            }
+        }
+        Rectangle {}
+        HorizontalLayout {
+            Text {
+                text: "QuillBoot";
+                horizontal-alignment: center;
+                font-size: header_font_size * 1px;
+                font-weight: 800;
             }
         }
         HorizontalLayout {
             alignment: center;
             Text {
-                text: "QuillBoot";
-                font-size: 80px;
+                text: "Diagnostics & Recovery";
+                font-size: 40px;
             }
         }
+        Rectangle {}
         HorizontalLayout {
             Rectangle {}
             Button {
-                text: "Recovery";
+                text: "Recovery GUI";
                 width: root.width * wmultiplier;
                 height: root.height * hmultiplier;
             }
             Rectangle {}
             Button {
-                text: "Main";
+                text: "Quill OS";
                 width: root.width * wmultiplier;
                 height: root.height * hmultiplier;
             }
             Rectangle {}
             Button {
-                text: "Version info";
+                text: "Power off";
+                width: root.width * wmultiplier;
+                height: root.height * hmultiplier;
+            }
+            Rectangle {}
+        }
+        Rectangle {}
+        HorizontalLayout {
+            alignment: center;
+            Button {
+                text: "Device details";
                 width: root.width * wmultiplier;
                 height: root.height * hmultiplier;
                 clicked => {
                     root.page = Page.VersionInfo;
                 }
             }
-            Rectangle {}
         }
     }
 
     if (page == Page.BootSplash) : VerticalLayout {
         Rectangle {}
-
         HorizontalLayout {
             alignment: center;
             Image {
@@ -77,20 +103,38 @@ export component AppWindow inherits Window {
                 height: 2%;
             }
         }
-
         Rectangle {}
     }
 
     if (page == Page.VersionInfo) : VerticalLayout {
         VerticalLayout{
-            alignment: center;
+            padding: layout_padding * 1px;
+            Rectangle {}
             HorizontalLayout {
                 alignment: center;
-                Text {
-                    text: root.version_string;
-                    wrap: word-wrap;
+                Image {
+                    source: @image-url("../../branding/quillos.svg");
+                    width: 25%;
+                    height: 25%;
                 }
             }
+            Rectangle { vertical-stretch: 0.25; }
+            Text {
+                text: "Copyright (C) 2021-2025";
+                horizontal-alignment: center;
+                font-weight: 800;
+            }
+            Text {
+                text: "Nicolas Mailloux <nicolecrivain@gmail.com>\nSzybet <https://github.com/Szybet>";
+                horizontal-alignment: center;
+            }
+            Rectangle {}
+            Text {
+                text: root.version_string;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            Rectangle {}
             HorizontalLayout{
                 alignment: center;
                 Button {

@@ -7,3 +7,4 @@ pub const BOOT_DIR: &str = "boot/";
 pub const DEFAULT_MOUNTPOINT: &str = "/mnt/";
 pub const GENERIC_DIGEST_EXT: &str = ".dgst";
 pub const HOME_DIR: &str = "/root/";
+pub const FLAGS_DIR: &str = "flags/";
