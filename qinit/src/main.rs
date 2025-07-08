@@ -29,7 +29,7 @@ use std::thread;
 use std::fs;
 use log::{info, warn, error};
 use anyhow::{Context, Result};
-use libqinit::system::{mount_data_partition, set_workdir};
+use libqinit::system::{mount_data_partition, set_workdir, generate_version_string};
 use libqinit::signing::{read_public_key};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
@@ -38,6 +38,7 @@ fn main() -> Result<()> {
     // Boot info
     let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
     let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
+    let version_string = generate_version_string(&kernel_commit);
 
     #[cfg(not(feature = "gui_only"))]
     {
@@ -76,7 +77,7 @@ fn main() -> Result<()> {
 
     // Setting up GUI
     let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-    let handle = thread::spawn(move || gui::setup_gui(progress_receiver, &kernel_commit));
+    let handle = thread::spawn(move || gui::setup_gui(progress_receiver, &version_string));
 
     // Continuing boot
 

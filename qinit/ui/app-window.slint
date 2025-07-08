@@ -1,35 +1,46 @@
 import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { MinorButton } from "../../ui-common/minorbutton.slint";
+import { Switch } from "../../ui-common/switch.slint";
+import { ScrollView } from "std-widgets.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash }
 export enum Dialog { None, Toast, ConfirmationDialog }
 
 export component AppWindow inherits Window {
+    // Scaling
+    in-out property<int> scaling_factor: 1;
+    // Root properties
     default-font-family: "U001";
-    default-font-size: 40px;
-
+    default-font-size: 40px * scaling_factor;
     // Callbacks
     callback power_off();
-
+    callback toggle_ui_scale();
+    // In-out properties
     in-out property<string> version_string;
     in-out property<float> boot_progress;
     in-out property<Page> page;
     in-out property<Dialog> dialog;
     in-out property<string> dialog_message;
     in-out property<int> dialog_millis_count;
+    in-out property<float> button_scaling_multiplier: 1;
     // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
     property<float> hmultiplier: 0.05;
     property<float> swmultiplier: 0.25;
     property<float> shmultiplier: 0.03;
-    // Sizes
-    property<int> header_font_size: 80;
-    property<int> layout_padding: 60;
+    // Default sizes/radii; there may be elements that don't enforce them for various reasons
+    property<relative-font-size> header_font_size: 2rem;
+    property<length> layout_padding: 60px;
+    property<length> button_width: root.width * wmultiplier * scaling_factor * button_scaling_multiplier;
+    property<length> button_height: root.height * hmultiplier * scaling_factor * button_scaling_multiplier;
+    property<length> switch_width: button_width * 0.45;
+    property<length> switch_height: button_height * 0.7;
+    property<length> radius: 10px;
 
     // Main UI
     if (page == Page.QuillBoot) : VerticalLayout {
-        padding: layout_padding * 1px;
+        padding: layout_padding;
         Rectangle {}
         HorizontalLayout {
             alignment: center;
@@ -46,7 +57,7 @@ export component AppWindow inherits Window {
                 text: "QuillBoot";
                 horizontal-alignment: center;
                 font-family: "Inter";
-                font-size: header_font_size * 1px;
+                font-size: header_font_size;
                 font-weight: 800;
             }
         }
@@ -54,43 +65,60 @@ export component AppWindow inherits Window {
             alignment: center;
             Text {
                 text: "Diagnostics & Recovery";
-                font-size: 40px;
+                font-size: 1rem;
             }
         }
         Rectangle {}
         HorizontalLayout {
-            Rectangle {}
             Button {
-                text: "Recovery GUI";
-                width: root.width * wmultiplier;
-                height: root.height * hmultiplier;
+                text: "Recovery";
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
             }
             Rectangle {}
             Button {
                 text: "Quill OS";
-                width: root.width * wmultiplier;
-                height: root.height * hmultiplier;
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
             }
             Rectangle {}
             Button {
                 text: "Power off";
-                width: root.width * wmultiplier;
-                height: root.height * hmultiplier;
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
                 clicked => {
                     root.power_off();
                 }
             }
-            Rectangle {}
         }
         Rectangle {}
         HorizontalLayout {
-            alignment: center;
             Button {
-                text: "Device details";
-                width: root.width * wmultiplier;
-                height: root.height * hmultiplier;
+                text: "About";
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
                 clicked => {
                     root.page = Page.VersionInfo;
+                }
+            }
+            Rectangle {}
+            Text {
+                vertical-alignment: center;
+                text: "Scale UI";
+            }
+            Rectangle { horizontal-stretch: 0.05; }
+            Switch {
+                y: (parent.height - self.height) / 2;
+                width: switch_width;
+                height: switch_height;
+                border-radius: radius;
+                activated: scaling_factor > 1 ? true : false;
+                toggled => {
+                    root.toggle_ui_scale();
                 }
             }
         }
@@ -119,57 +147,62 @@ export component AppWindow inherits Window {
     }
 
     if (page == Page.VersionInfo) : VerticalLayout {
-        VerticalLayout{
-            padding: layout_padding * 1px;
-            Rectangle {}
-            HorizontalLayout {
-                alignment: center;
-                Image {
-                    source: @image-url("../../branding/quillos.svg");
-                    width: 25%;
-                    height: 25%;
-                }
+        padding: layout_padding;
+        Rectangle {}
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../branding/quillos.svg");
+                width: 25%;
+                height: 25%;
             }
-            Rectangle { vertical-stretch: 0.25; }
-            Text {
-                text: "Copyright © 2021-2025";
-                horizontal-alignment: center;
-                font-family: "Inter";
-                font-weight: 800;
-            }
-            Text {
-                text: "Nicolas Mailloux <nicolecrivain@gmail.com>\nSzybet <https://github.com/Szybet>";
-                horizontal-alignment: center;
-            }
-            Rectangle {}
-            Text {
-                text: root.version_string;
-                horizontal-alignment: center;
-                wrap: word-wrap;
-            }
-            Rectangle {}
-            HorizontalLayout{
-                alignment: center;
-                Button {
-                    text: "Back";
-                    width: root.width * wmultiplier;
-                    height: root.height * hmultiplier;
-                    clicked => {
-                        root.page = Page.QuillBoot;
-                    }
+        }
+        Rectangle { vertical-stretch: 0.25; }
+        Text {
+            text: "Copyright © 2021-2025";
+            horizontal-alignment: center;
+            font-family: "Inter";
+            font-weight: 800;
+        }
+        Text {
+            text: "Nicolas Mailloux\n<nicolecrivain@gmail.com>\nSzybet\n<https://github.com/Szybet>";
+            horizontal-alignment: center;
+        }
+        Rectangle {}
+        Text {
+            text: "Software information";
+            horizontal-alignment: center;
+            font-family: "Inter";
+            font-weight: 800;
+        }
+        Text {
+            text: root.version_string;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Rectangle {}
+        HorizontalLayout{
+            alignment: center;
+            Button {
+                text: "Back";
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
+                clicked => {
+                    root.page = Page.QuillBoot;
                 }
             }
         }
     }
 
-    // Toast/dialogs
+    // Toasts/dialogs
     if (dialog == Dialog.Toast) : Rectangle {
         width: 40%;
         height: 7%;
         x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
         border-color: black;
         border-width: 6px;
-        border-radius: 10px;
+        border-radius: radius;
         background: white;
         Text {
             text: root.dialog_message;

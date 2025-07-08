@@ -1,8 +1,8 @@
 export component Button inherits TouchArea {
-    in property <string> text <=> i-text.text;
+    in property<string> text <=> i-text.text;
+    in property<length> border-radius <=> i-container.border-radius;
 
     i-container := Rectangle {
-        border-radius: 10px;
         border-width: 3px;
         border-color: #000000;
         background: #f0f0f0;
@@ -14,6 +14,8 @@ export component Button inherits TouchArea {
                 color: #000000;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+                font-family: "Inter";
+                font-weight: 800;
             }
         }
     }

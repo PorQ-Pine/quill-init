@@ -104,3 +104,23 @@ pub fn power_off() -> Result<()> {
 
     Ok(())
 }
+
+pub fn generate_version_string(kernel_commit: &str) -> String {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "free_roam")] {
+            let signing_state = "Package signing protection: disabled";
+        } else {
+            let signing_state = "Package signing protection: enabled";
+        }
+    }
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "debug")] {
+            let debug_state = "Debug mode: enabled";
+        } else {
+            let debug_state = "Debug mode: disabled";
+        }
+    }
+    let version_string = format!("Kernel commit: {}\n{}\n{}", &kernel_commit, &signing_state, &debug_state);
+
+    return version_string;
+}
