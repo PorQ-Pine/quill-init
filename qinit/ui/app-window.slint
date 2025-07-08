@@ -2,15 +2,22 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { MinorButton } from "../../ui-common/minorbutton.slint";
 
-export enum Page { QuillBoot, VersionInfo, BootSplash }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash }
+export enum Dialog { None, Toast, ConfirmationDialog }
 
 export component AppWindow inherits Window {
     default-font-family: "U001";
     default-font-size: 40px;
 
+    // Callbacks
+    callback power_off();
+
     in-out property<string> version_string;
     in-out property<float> boot_progress;
     in-out property<Page> page;
+    in-out property<Dialog> dialog;
+    in-out property<string> dialog_message;
+    in-out property<int> dialog_millis_count;
     // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
     property<float> hmultiplier: 0.05;
@@ -20,6 +27,7 @@ export component AppWindow inherits Window {
     property<int> header_font_size: 80;
     property<int> layout_padding: 60;
 
+    // Main UI
     if (page == Page.QuillBoot) : VerticalLayout {
         padding: layout_padding * 1px;
         Rectangle {}
@@ -37,6 +45,7 @@ export component AppWindow inherits Window {
             Text {
                 text: "QuillBoot";
                 horizontal-alignment: center;
+                font-family: "Inter";
                 font-size: header_font_size * 1px;
                 font-weight: 800;
             }
@@ -67,6 +76,9 @@ export component AppWindow inherits Window {
                 text: "Power off";
                 width: root.width * wmultiplier;
                 height: root.height * hmultiplier;
+                clicked => {
+                    root.power_off();
+                }
             }
             Rectangle {}
         }
@@ -120,8 +132,9 @@ export component AppWindow inherits Window {
             }
             Rectangle { vertical-stretch: 0.25; }
             Text {
-                text: "Copyright (C) 2021-2025";
+                text: "Copyright © 2021-2025";
                 horizontal-alignment: center;
+                font-family: "Inter";
                 font-weight: 800;
             }
             Text {
@@ -146,6 +159,22 @@ export component AppWindow inherits Window {
                     }
                 }
             }
+        }
+    }
+
+    // Toast/dialogs
+    if (dialog == Dialog.Toast) : Rectangle {
+        width: 40%;
+        height: 7%;
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        border-color: black;
+        border-width: 6px;
+        border-radius: 10px;
+        background: white;
+        Text {
+            text: root.dialog_message;
+            font-family: "Inter";
+            font-weight: 800;
         }
     }
 }

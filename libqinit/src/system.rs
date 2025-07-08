@@ -3,7 +3,7 @@ use std::env;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use log::{info, warn, error};
-use sys_mount::Mount;
+use sys_mount::{unmount, Mount, UnmountFlags};
 use regex::Regex;
 
 pub fn get_cmdline_bool(property: &str) -> Result<bool> {
@@ -72,6 +72,13 @@ pub fn mount_data_partition() -> Result<()> {
     Ok(())
 }
 
+pub fn unmount_data_partition() -> Result<()> {
+    info!("Unmounting data partition");
+    unmount(&crate::DATA_PART_MOUNTPOINT, UnmountFlags::empty())?;
+
+    Ok(())
+}
+
 pub fn start_service(service: &str) -> Result<()> {
     run_command("rc-service", &[&service, "start"])?;
 
@@ -86,6 +93,14 @@ pub fn stop_service(service: &str) -> Result<()> {
 
 pub fn restart_service(service: &str) -> Result<()> {
     run_command("rc-service", &[&service, "restart"])?;
+
+    Ok(())
+}
+
+pub fn power_off() -> Result<()> {
+    warn!("Powering off");
+    unmount_data_partition()?;
+    run_command("poweroff", &[])?;
 
     Ok(())
 }
