@@ -1,4 +1,4 @@
-use std::{sync::mpsc::Receiver};
+use std::{sync::mpsc::{Sender, Receiver}};
 
 use anyhow::{Context, Result};
 use slint::{SharedString, Timer, TimerMode};
@@ -8,7 +8,7 @@ slint::include_modules!();
 
 const TOAST_DURATION_MILLIS: i32 = 5000;
 
-pub fn setup_gui(progress_receiver: Receiver<f32>, version_string: &str) -> Result<()> {
+pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool>, version_string: &str) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
 
@@ -62,8 +62,10 @@ pub fn setup_gui(progress_receiver: Receiver<f32>, version_string: &str) -> Resu
         move || {
             if let Err(e) = power_off() {
                 if let Some(gui) = gui_weak.upgrade() {
-                    gui.set_dialog_message(SharedString::from("Failed to power off"));
+                    let err_msg = "Failed to power off";
+                    gui.set_dialog_message(SharedString::from(err_msg));
                     gui.set_dialog(Dialog::Toast);
+                    error!("{}: {}", &err_msg, e);
                 }
             }
         }
@@ -79,6 +81,19 @@ pub fn setup_gui(progress_receiver: Receiver<f32>, version_string: &str) -> Resu
                 } else {
                     gui.set_button_scaling_multiplier(1.0);
                     gui.set_scaling_factor(1);
+                }
+            }
+        }
+    });
+
+    gui.on_boot_default({
+        move || {
+            if let Err(e) = init_boot_sender.send(true) {
+                if let Some(gui) = gui_weak.upgrade() {
+                    let err_msg = "Failed to send boot command";
+                    gui.set_dialog_message(SharedString::from(err_msg));
+                    gui.set_dialog(Dialog::Toast);
+                    error!("{}: {}", &err_msg, e);
                 }
             }
         }

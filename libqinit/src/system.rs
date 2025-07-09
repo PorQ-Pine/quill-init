@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::env;
 use std::path::Path;
-use std::{fs, process::Command, thread, time::Duration};
+use std::{fs, process::Command, thread, time::Duration, process::exit};
 use log::{info, warn, error};
 use sys_mount::{unmount, Mount, UnmountFlags};
 use regex::Regex;
@@ -100,9 +100,8 @@ pub fn restart_service(service: &str) -> Result<()> {
 pub fn power_off() -> Result<()> {
     warn!("Powering off");
     unmount_data_partition()?;
-    run_command("poweroff", &[])?;
-
-    Ok(())
+    // Telling init script to power off since we seemingly can't do that by ourselves
+    exit(255);
 }
 
 pub fn generate_version_string(kernel_commit: &str) -> String {

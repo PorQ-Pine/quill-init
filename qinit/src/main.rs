@@ -21,7 +21,6 @@ mod debug;
 mod eink;
 mod gui;
 
-use anyhow::Error;
 use crossterm::event::{self, Event};
 use std::time::Duration;
 use std::process::exit;
@@ -77,9 +76,13 @@ fn main() -> Result<()> {
 
     // Setting up GUI
     let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-    let handle = thread::spawn(move || gui::setup_gui(progress_receiver, &version_string));
+    let (init_boot_sender, init_boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
+    let handle = thread::spawn(move || gui::setup_gui(progress_receiver, init_boot_sender, &version_string));
 
-    // Continuing boot
+    // Blocking this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
+    init_boot_receiver.recv()?;
+
+    // Resuming boot
 
     // Handling GUI thread issues if there are some
     handle.join().map_err(|e| anyhow::anyhow!("Thread panicked: {:?}", e))??;

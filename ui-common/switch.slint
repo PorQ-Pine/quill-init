@@ -1,0 +1,33 @@
+export component Switch {
+    in property<length> border-radius <=> i-container.border-radius;
+    in-out property<bool> activated;
+    property<float> handle_width_multiplier: 0.85;
+    property<float> handle_height_multiplier: 0.8 * handle_width_multiplier;
+    callback toggled;
+
+    touch-area := TouchArea {
+        i-container := Rectangle {
+            border-width: 3px;
+            border-color: #000000;
+            background: #000000;
+            Rectangle {
+                //x: activated ? parent.width * handle_width_multiplier : parent.width * (0.5 + handle_width_multiplier); y: (parent.height - self.height) / 2;
+                border-radius: parent.border-radius;
+                width: parent.width * handle_width_multiplier;
+                height: parent.height * handle_height_multiplier;
+                Rectangle {
+                    width: parent.width * 0.5;
+                    x: activated ? parent.width * 0.5 : 0;
+                    border-radius: parent.border-radius;
+                    border-width: 3px;
+                    border-color: #000000;
+                    background: #ffffff;
+                }
+            }
+        }
+        clicked => {
+            activated = !activated;
+            toggled();
+        }
+    }
+}
