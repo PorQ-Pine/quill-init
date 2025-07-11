@@ -15,6 +15,7 @@ sys-mount = "3.0.1"
 libqinit = { path = "../libqinit" }
 openssl = "0.10.73"
 embed-file = "0.2.0"
+regex = "1.11.1"
 
 [build-dependencies]
 slint-build = "1.12.1"

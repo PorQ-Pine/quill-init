@@ -4,7 +4,7 @@ import { MinorButton } from "../../ui-common/minorbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
 import { ScrollView } from "std-widgets.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery }
 export enum Dialog { None, Toast, ConfirmationDialog }
 
 export component AppWindow inherits Window {
@@ -76,6 +76,9 @@ export component AppWindow inherits Window {
                 width: button_width;
                 height: button_height;
                 border-radius: radius;
+                clicked => {
+                    root.page = Page.Recovery;
+                }
             }
             Rectangle {}
             Button {
@@ -198,6 +201,9 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
+
+    if (page == Page.Recovery) : VerticalLayout {
     }
 
     // Toasts/dialogs
