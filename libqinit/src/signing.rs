@@ -22,7 +22,7 @@ pub fn check_signature(pubkey_pem: &PKey<Public>, file: &str) -> Result<bool> {
             warn!("Free roam mode: signature of file '{}' was not verified", &file);
             return Ok(true);
         } else {
-            let digest_file = format!("{}.dgst", &file);
+            let digest_file = format!("{}{}", &file, &crate::GENERIC_DIGEST_EXT);
             let data = fs::read(&file).with_context(|| format!("Could not read file '{}' for signature verification", &file))?;
             let signature = fs::read(&digest_file).with_context(|| format!("Could not read digest file '{}' for signature verification", &digest_file))?;
             let mut verifier = Verifier::new(MessageDigest::sha256(), &pubkey_pem)?;

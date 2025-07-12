@@ -19,6 +19,8 @@ pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool
     }
     else {
         gui.set_page(Page::BootSplash);
+        // Trigger normal boot automatically
+        init_boot_sender.send(true)?;
     }
 
     // Setup boot progress bar timer

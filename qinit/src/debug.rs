@@ -32,6 +32,7 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
     modprobe(&["g_ether"])?;
 
     let network_interfaces = NetworkInterface::show().with_context(|| "Failed to retrieve network interfaces")?;
+    // To extract base device IP from custom udhcpd configuration (if present)
     let ip_regex = Regex::new(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")?;
     let user_udhcpd_conf_path = format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &USER_UDHCPD_CONF_FILE);
 
@@ -50,7 +51,7 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
     } else {
         fs::write(&UDHCPD_CONF_PATH, format!("start {}\nend {}\ninterface {}\n", &IP_ADDR, &IP_POOL_END, &iface_name))?;
     }
-
+    // udhcpd configuration
     let udhcpd_config = fs::read_to_string(&UDHCPD_CONF_PATH)?;
     if let Some(custom_ip_addr_r) = ip_regex.find(&udhcpd_config) {
         let custom_ip_addr = custom_ip_addr_r.as_str();

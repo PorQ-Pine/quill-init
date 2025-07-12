@@ -5,6 +5,10 @@ use std::{fs, process::Command, thread, time::Duration, process::exit};
 use log::{info, warn, error};
 use sys_mount::{unmount, Mount, UnmountFlags};
 use regex::Regex;
+use openssl::pkey::Public;
+use openssl::pkey::PKey;
+
+use crate::signing::check_signature;
 
 pub fn get_cmdline_bool(property: &str) -> Result<bool> {
     info!("Trying to extract boolean value for property '{}' in kernel command line", &property);
@@ -100,7 +104,7 @@ pub fn restart_service(service: &str) -> Result<()> {
 pub fn power_off() -> Result<()> {
     warn!("Powering off");
     unmount_data_partition()?;
-    // Telling init script to power off since we seemingly can't do that by ourselves
+    // Tell init script to power off since we seemingly can't do that by ourselves
     exit(255);
 }
 
@@ -122,4 +126,24 @@ pub fn generate_version_string(kernel_commit: &str) -> String {
     let version_string = format!("Kernel commit: {}\n{}\n{}", &kernel_commit, &signing_state, &debug_state);
 
     return version_string;
+}
+
+pub fn mount_rootfs(pubkey: &PKey<Public>) -> Result<()> {
+    info!("Mounting root filesystem SquashFS archive");
+    let rootfs_file_path = format!("{}{}{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &crate::ROOTFS_FILE);
+    if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
+        let ro_mountpoint = format!("{}{}", &crate::OVERLAY_WORKDIR, "read");
+        let rw_workdir = format!("{}{}", &crate::OVERLAY_WORKDIR, "write");
+        fs::create_dir_all(&ro_mountpoint)?;
+        fs::create_dir_all(&rw_workdir)?;
+        fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)?;
+
+        Mount::builder().fstype("squashfs").data("").mount(&rootfs_file_path, &ro_mountpoint)?;
+        info!("Setting up UnionFS overlay");
+        run_command("unionfs", &[&format!("{}=RO:{}=RW", &ro_mountpoint, &rw_workdir), &crate::OVERLAY_MOUNTPOINT])?;
+    } else {
+        return Err(anyhow::anyhow!("Either root filesystem SquashFS archive was not found, either its signature was invalid"))
+    }
+
+    Ok(())
 }

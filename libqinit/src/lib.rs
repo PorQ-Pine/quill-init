@@ -8,3 +8,6 @@ pub const DEFAULT_MOUNTPOINT: &str = "/mnt/";
 pub const GENERIC_DIGEST_EXT: &str = ".dgst";
 pub const HOME_DIR: &str = "/root/";
 pub const FLAGS_DIR: &str = "flags/";
+pub const ROOTFS_FILE: &str = "rootfs.squashfs";
+pub const OVERLAY_WORKDIR: &str = "/.overlay/";
+pub const OVERLAY_MOUNTPOINT: &str = "/overlay/";

@@ -28,7 +28,7 @@ use std::thread;
 use std::fs;
 use log::{info, warn, error};
 use anyhow::{Context, Result};
-use libqinit::system::{mount_data_partition, set_workdir, generate_version_string};
+use libqinit::system::{mount_data_partition, mount_rootfs, set_workdir, generate_version_string};
 use libqinit::signing::{read_public_key};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
@@ -39,11 +39,11 @@ fn main() -> Result<()> {
     let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
     let version_string = generate_version_string(&kernel_commit);
 
+    // Decode public key embedded in kernel command line
+    let pubkey_pem =  read_public_key()?;
+
     #[cfg(not(feature = "gui_only"))]
     {
-        // Decode public key embedded in kernel command line
-        let pubkey_pem =  read_public_key()?;
-
         set_workdir("/")?;
         fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)?;
 
@@ -83,6 +83,8 @@ fn main() -> Result<()> {
     init_boot_receiver.recv()?;
 
     // Resuming boot
+    mount_rootfs(&pubkey_pem)?;
+    progress_sender.send(0.1)?;
 
     // Handling GUI thread issues if there are some
     handle.join().map_err(|e| anyhow::anyhow!("Thread panicked: {:?}", e))??;
