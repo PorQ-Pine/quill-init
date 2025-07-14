@@ -53,9 +53,6 @@ pub fn load_modules() -> Result<()> {
 
 pub fn create_custom_waveform(waveform_path: &str, workdir: &str) -> Result<()> {
     // TODO: Decide what we do with this
-    set_workdir(&workdir)?;
-    run_command("python3", &[&format!("{}{}", &PYTHON_SCRIPTS_PATH, "wbf_to_custom.py"), &waveform_path]).with_context(|| "Failed to create custom waveform")?;
-    set_workdir("/")?;
 
     Ok(())
 }
@@ -73,7 +70,7 @@ pub fn backup_waveform_files(waveform_backup_dir_path: &str, waveform_backup_ebc
 pub fn setup_touchscreen() -> Result<()> {
     info!("Setting up touchscreen input");
 
-    run_command("openrc", &[])?;
+    run_command("/sbin/openrc", &[])?;
     File::create("/run/openrc/softlevel")?;
     start_service("udev")?;
     start_service("udev-trigger")?;

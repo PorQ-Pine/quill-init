@@ -3217,6 +3217,7 @@ dependencies = [
  "libqinit",
  "log",
  "network-interface",
+ "nix",
  "openssl",
  "regex",
  "slint",
@@ -3232,10 +3233,6 @@ checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
 dependencies = [
  "bytemuck",
 ]
-
-[[package]]
-name = "qrecovery"
-version = "0.1.0"
 
 [[package]]
 name = "quick-error"

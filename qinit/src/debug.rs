@@ -44,7 +44,7 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
         .with_context(|| "No USB ethernet interface found")?;
 
     // USB networking
-    run_command("ifconfig", &[&iface_name, "up"]).with_context(|| format!("Failed to activate {}", &iface_name))?;
+    run_command("/sbin/ifconfig", &[&iface_name, "up"]).with_context(|| format!("Failed to activate {}", &iface_name))?;
     if fs::exists(&user_udhcpd_conf_path)? && check_signature(&pubkey, &user_udhcpd_conf_path)? {
         warn!("Found valid udhcpd user configuration file: copying it");
         fs::copy(&user_udhcpd_conf_path, &UDHCPD_CONF_PATH)?;
@@ -55,11 +55,11 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
     let udhcpd_config = fs::read_to_string(&UDHCPD_CONF_PATH)?;
     if let Some(custom_ip_addr_r) = ip_regex.find(&udhcpd_config) {
         let custom_ip_addr = custom_ip_addr_r.as_str();
-        run_command("ifconfig", &[&iface_name, &custom_ip_addr]).with_context(|| format!("Failed to set custom IP address {} for {}", &custom_ip_addr, &iface_name))?;
+        run_command("/sbin/ifconfig", &[&iface_name, &custom_ip_addr]).with_context(|| format!("Failed to set custom IP address {} for {}", &custom_ip_addr, &iface_name))?;
     } else {
-        run_command("ifconfig", &[&iface_name, &IP_ADDR]).with_context(|| format!("Failed to set IP address {} for {}", &IP_ADDR, &iface_name))?;
+        run_command("/sbin/ifconfig", &[&iface_name, &IP_ADDR]).with_context(|| format!("Failed to set IP address {} for {}", &IP_ADDR, &iface_name))?;
     }
-    run_command("udhcpd", &[&UDHCPD_CONF_PATH]).with_context(|| "Failed to start DHCP server")?;
+    run_command("/usr/sbin/udhcpd", &[&UDHCPD_CONF_PATH]).with_context(|| "Failed to start DHCP server")?;
 
     Ok(())
 }
@@ -68,9 +68,9 @@ pub fn start_sshd() -> Result<()> {
     warn!("Starting SSH server");
     let dropbear_rsa_key_path = format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &DROPBEAR_RSA_KEY_FILE);
     if !fs::exists(&dropbear_rsa_key_path)? {
-        run_command("dropbearkey", &["-t", "rsa", "-f", &dropbear_rsa_key_path]).with_context(|| "Failed to generate SSH keys")?;
+        run_command("/usr/bin/dropbearkey", &["-t", "rsa", "-f", &dropbear_rsa_key_path]).with_context(|| "Failed to generate SSH keys")?;
     }
-    run_command("dropbear", &["-r", &dropbear_rsa_key_path, "-B"]).with_context(|| "Failed to start Dropbear SSH server")?;
+    run_command("/usr/sbin/dropbear", &["-r", &dropbear_rsa_key_path, "-B"]).with_context(|| "Failed to start Dropbear SSH server")?;
 
     Ok(())
 }

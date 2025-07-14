@@ -10,6 +10,18 @@ use openssl::pkey::PKey;
 
 use crate::signing::check_signature;
 
+pub fn mount_base_filesystems() -> Result<()> {
+    Mount::builder().fstype("proc").mount("proc", "/proc")?;
+    Mount::builder().fstype("sysfs").mount("sysfs", "/sys")?;
+    Mount::builder().fstype("devtmpfs").mount("devtmpfs", "/dev")?;
+    fs::create_dir_all("/dev/pts")?;
+    Mount::builder().fstype("devpts").mount("devpts", "/dev/pts")?;
+    Mount::builder().fstype("tmpfs").mount("tmpfs", "/tmp")?;
+    Mount::builder().fstype("tmpfs").mount("tmpfs", "/run")?;
+
+    Ok(())
+}
+
 pub fn get_cmdline_bool(property: &str) -> Result<bool> {
     info!("Trying to extract boolean value for property '{}' in kernel command line", &property);
     let cmdline = fs::read_to_string("/proc/cmdline")?;
@@ -62,7 +74,7 @@ pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
 }
 
 pub fn modprobe(args: &[&str]) -> Result<()> {
-    run_command("modprobe", &args).with_context(|| format!("Failed to load module; modprobe arguments: {:?}", &args))?;
+    run_command("/sbin/modprobe", &args).with_context(|| format!("Failed to load module; modprobe arguments: {:?}", &args))?;
 
     Ok(())
 }
@@ -84,19 +96,19 @@ pub fn unmount_data_partition() -> Result<()> {
 }
 
 pub fn start_service(service: &str) -> Result<()> {
-    run_command("rc-service", &[&service, "start"])?;
+    run_command("/sbin/rc-service", &[&service, "start"])?;
 
     Ok(())
 }
 
 pub fn stop_service(service: &str) -> Result<()> {
-    run_command("rc-service", &[&service, "stop"])?;
+    run_command("/sbin/rc-service", &[&service, "stop"])?;
 
     Ok(())
 }
 
 pub fn restart_service(service: &str) -> Result<()> {
-    run_command("rc-service", &[&service, "restart"])?;
+    run_command("/sbin/rc-service", &[&service, "restart"])?;
 
     Ok(())
 }
@@ -138,12 +150,24 @@ pub fn mount_rootfs(pubkey: &PKey<Public>) -> Result<()> {
         fs::create_dir_all(&rw_workdir)?;
         fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)?;
 
-        Mount::builder().fstype("squashfs").data("").mount(&rootfs_file_path, &ro_mountpoint)?;
+        Mount::builder().fstype("squashfs").mount(&rootfs_file_path, &ro_mountpoint)?;
         info!("Setting up UnionFS overlay");
-        run_command("unionfs", &[&format!("{}=RO:{}=RW", &ro_mountpoint, &rw_workdir), &crate::OVERLAY_MOUNTPOINT])?;
+        run_command("/usr/bin/unionfs", &[&format!("{}=RO:{}=RW", &ro_mountpoint, &rw_workdir), &crate::OVERLAY_MOUNTPOINT])?;
+        setup_rootfs_mounts()?;
     } else {
         return Err(anyhow::anyhow!("Either root filesystem SquashFS archive was not found, either its signature was invalid"))
     }
+
+    Ok(())
+}
+
+pub fn setup_rootfs_mounts() -> Result<()> {
+    info!("Mounting kernel filesystems in UnionFS overlay");
+    Mount::builder().fstype("proc").mount("proc", &format!("{}/proc", &crate::OVERLAY_MOUNTPOINT))?;
+    Mount::builder().fstype("sysfs").mount("sysfs", &format!("{}/sys", &crate::OVERLAY_MOUNTPOINT))?;
+    Mount::builder().fstype("tmpfs").mount("tmpfs", &format!("{}/tmp", &crate::OVERLAY_MOUNTPOINT))?;
+    Mount::builder().fstype("tmpfs").mount("tmpfs", &format!("{}/run", &crate::OVERLAY_MOUNTPOINT))?;
+    Mount::builder().fstype("devtmpfs").mount("devtmpfs", &format!("{}/dev", &crate::OVERLAY_MOUNTPOINT))?;
 
     Ok(())
 }
