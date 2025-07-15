@@ -70,7 +70,7 @@ pub fn start_sshd() -> Result<()> {
     if !fs::exists(&dropbear_rsa_key_path)? {
         run_command("/usr/bin/dropbearkey", &["-t", "rsa", "-f", &dropbear_rsa_key_path]).with_context(|| "Failed to generate SSH keys")?;
     }
-    run_command("/usr/sbin/dropbear", &["-r", &dropbear_rsa_key_path, "-B"]).with_context(|| "Failed to start Dropbear SSH server")?;
+    run_command("/usr/sbin/dropbear", &["-p", "2222", "-r", &dropbear_rsa_key_path, "-B"]).with_context(|| "Failed to start Dropbear SSH server")?;
 
     Ok(())
 }

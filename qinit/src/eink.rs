@@ -9,7 +9,6 @@ const WAVEFORM_FILE: &str = "ebc.wbf";
 const CUSTOMWF_FILE: &str = "custom_wf.bin";
 const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 const FIRMWARE_DIR: &str = "firmware/";
-const PYTHON_SCRIPTS_PATH: &str = "/etc/init.d/ebc/";
 
 pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");

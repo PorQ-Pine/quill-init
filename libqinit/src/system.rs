@@ -61,6 +61,7 @@ pub fn wait_for_file(file: &str) {
 }
 
 pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
+    // info!("Running command '{}' with arguments '{}'", &command, &args.join(" "));
     let status = Command::new(&command)
         .args(args)
         .status()
@@ -145,14 +146,16 @@ pub fn mount_rootfs(pubkey: &PKey<Public>) -> Result<()> {
     let rootfs_file_path = format!("{}{}{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &crate::ROOTFS_FILE);
     if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
         let ro_mountpoint = format!("{}{}", &crate::OVERLAY_WORKDIR, "read");
-        let rw_workdir = format!("{}{}", &crate::OVERLAY_WORKDIR, "write");
+        let rw_writedir = format!("{}{}", &crate::OVERLAY_WORKDIR, "write");
+        let rw_workdir = format!("{}{}", &crate::OVERLAY_WORKDIR, "work");
         fs::create_dir_all(&ro_mountpoint)?;
+        fs::create_dir_all(&rw_writedir)?;
         fs::create_dir_all(&rw_workdir)?;
         fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)?;
 
         Mount::builder().fstype("squashfs").mount(&rootfs_file_path, &ro_mountpoint)?;
-        info!("Setting up UnionFS overlay");
-        run_command("/usr/bin/unionfs", &[&format!("{}=RO:{}=RW", &ro_mountpoint, &rw_workdir), &crate::OVERLAY_MOUNTPOINT])?;
+        info!("Setting up fuse-overlayfs overlay");
+        run_command("/usr/bin/fuse-overlayfs", &["-o", &format!("allow_other,lowerdir={},upperdir={},workdir={}", &ro_mountpoint, &rw_writedir, &rw_workdir), &crate::OVERLAY_MOUNTPOINT])?;
         setup_rootfs_mounts()?;
     } else {
         return Err(anyhow::anyhow!("Either root filesystem SquashFS archive was not found, either its signature was invalid"))
@@ -162,7 +165,7 @@ pub fn mount_rootfs(pubkey: &PKey<Public>) -> Result<()> {
 }
 
 pub fn setup_rootfs_mounts() -> Result<()> {
-    info!("Mounting kernel filesystems in UnionFS overlay");
+    info!("Mounting filesystems in fuse-overlayfs overlay");
     Mount::builder().fstype("proc").mount("proc", &format!("{}/proc", &crate::OVERLAY_MOUNTPOINT))?;
     Mount::builder().fstype("sysfs").mount("sysfs", &format!("{}/sys", &crate::OVERLAY_MOUNTPOINT))?;
     Mount::builder().fstype("tmpfs").mount("tmpfs", &format!("{}/tmp", &crate::OVERLAY_MOUNTPOINT))?;

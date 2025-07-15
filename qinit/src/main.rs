@@ -15,89 +15,133 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#[cfg(feature = "debug")]
-mod debug;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "init_wrapper")] {
+        use libqinit::OVERLAY_MOUNTPOINT;
+        use exec;
+        use fork::{daemon, Fork};
+        use std::process::Command;
+        use std::io::Read;
+        const QINIT_PATH: &str = "/etc/init.d/qinit";
+    } else {
+        mod eink;
+        mod gui;
+        #[cfg(feature = "debug")]
+        mod debug;
+        
+        use crossterm::event::{self, Event};
+        use std::time::Duration;
+        use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_rootfs, set_workdir, generate_version_string, run_command};
+        use libqinit::signing::{read_public_key};
+        use std::sync::mpsc::{channel, Sender, Receiver};
+        use nix::unistd::sethostname;
+        use std::io::Write;
+    }
+}
 
-mod eink;
-mod gui;
-
-use crossterm::event::{self, Event};
-use std::time::Duration;
-use std::process::exit;
-use std::thread;
-use std::fs;
-use log::{info, warn, error};
 use anyhow::{Context, Result};
-use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_rootfs, set_workdir, generate_version_string, run_command};
-use libqinit::signing::{read_public_key};
-use std::sync::mpsc::{channel, Sender, Receiver};
-use nix::unistd::sethostname;
+use log::{info, warn, error};
+use std::thread;
+use std::os::unix;
+use std::fs;
+const QINIT_SOCKET_PATH: &str = "/qinit.sock";
 
 fn main() -> Result<()> {
     env_logger::init();
-    // System initialization
-    #[cfg(not(feature = "gui_only"))]
-    {
-        mount_base_filesystems()?;
-        sethostname("pinenote")?;
-        run_command("/sbin/ifconfig", &["lo", "up"])?;
-    }
-    // Boot info
-    let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
-    let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
-    let version_string = generate_version_string(&kernel_commit);
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "init_wrapper")] {
+            first_stage_info("qinit binary starting");
+            let unix_listener = unix::net::UnixListener::bind(&QINIT_SOCKET_PATH).with_context(|| "Could not create qinit UNIX socket")?;
+            
+            Command::new(&QINIT_PATH).spawn().with_context(|| "Failed to spawn second-stage qinit binary")?;
 
-    // Decode public key embedded in kernel command line
-    let pubkey = read_public_key()?;
+            let (mut unix_stream, _socket_address) = unix_listener.accept().with_context(|| "Failed to accept connection on qinit UNIX socket")?;
+            let mut message = String::new();
+            unix_stream.read_to_string(&mut message).with_context(|| "Failed to read from qinit UNIX socket")?;
+            fs::remove_file(&QINIT_SOCKET_PATH)?;
 
-    #[cfg(not(feature = "gui_only"))]
-    {
-        set_workdir("/")?;
-        fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)?;
-
-        // Mount data partition
-        mount_data_partition()?;
-
-        // Create boot flags directory
-        fs::create_dir_all(format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &libqinit::FLAGS_DIR))?;
-
-        #[cfg(feature = "debug")]
-        debug::start_debug_framework(&pubkey)?;
-
-        eink::load_waveform()?;
-        eink::load_modules()?;
-        eink::setup_touchscreen()?;
-
-        println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", &kernel_version, &kernel_commit);
-        print!("(initrd) Hit any key to stop auto-boot ... ");
-
-        // Flush stdout to ensure prompt is shown before waiting
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
-
-        if event::poll(Duration::from_secs(3)).unwrap() {
-            if let Event::Key(_) = event::read().unwrap() {
-                loop {
-                    let _ = run_command("/sbin/getty", &["-L", "ttyS2", "1500000", "linux"]);
-                }
+            first_stage_info("Entering rootfs chroot");
+            unix::fs::chroot(&OVERLAY_MOUNTPOINT)?;
+            std::env::set_current_dir("/")?;
+            let _ = exec::Command::new("/sbin/init").exec();
+        } else {
+            // System initialization
+            info!("(Second stage) qinit binary starting");
+            #[cfg(not(feature = "gui_only"))]
+            {
+                mount_base_filesystems()?;
+                sethostname("pinenote")?;
+                run_command("/sbin/ifconfig", &["lo", "up"])?;
             }
+
+            // Boot info
+            let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
+            let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
+            let version_string = generate_version_string(&kernel_commit);
+
+            // Decode public key embedded in kernel command line
+            let pubkey = read_public_key()?;
+
+            #[cfg(not(feature = "gui_only"))]
+            {
+                set_workdir("/")?;
+                fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)?;
+
+                // Mount data partition
+                mount_data_partition()?;
+
+                // Create boot flags directory
+                fs::create_dir_all(format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &libqinit::FLAGS_DIR))?;
+
+                #[cfg(feature = "debug")]
+                debug::start_debug_framework(&pubkey)?;
+
+                eink::load_waveform()?;
+                eink::load_modules()?;
+                eink::setup_touchscreen()?;
+
+                println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", &kernel_version, &kernel_commit);
+                print!("(initrd) Hit any key to stop auto-boot ... ");
+
+                // Flush stdout to ensure prompt is shown before waiting
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+
+                if event::poll(Duration::from_secs(3)).unwrap() {
+                    if let Event::Key(_) = event::read().unwrap() {
+                        loop {
+                            let _ = run_command("/sbin/getty", &["-L", "ttyS2", "1500000", "linux"]);
+                        }
+                    }
+                }
+                println!();
+            }
+
+            // Setting up GUI
+            let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
+            let (init_boot_sender, init_boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
+            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, init_boot_sender, &version_string));
+
+            // Blocking this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
+            init_boot_receiver.recv()?;
+
+            // Resuming boot
+            #[cfg(not(feature = "gui_only"))]
+            {
+                mount_rootfs(&pubkey)?;
+                let mut unix_stream = unix::net::UnixStream::connect(&QINIT_SOCKET_PATH).with_context(|| "Could not connect to qinit UNIX socket")?;
+                unix_stream.write(b"Ready")?;
+                progress_sender.send(0.1)?;
+            }
+
+            // Handling GUI thread issues if there are some
+            gui_handle.join().map_err(|e| anyhow::anyhow!("Thread panicked: {:?}", e))??;
         }
-        println!();
     }
-
-    // Setting up GUI
-    let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-    let (init_boot_sender, init_boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
-    let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, init_boot_sender, &version_string));
-
-    // Blocking this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
-    init_boot_receiver.recv()?;
-
-    // Resuming boot
-    mount_rootfs(&pubkey)?;
-    progress_sender.send(0.1)?;
-
-    // Handling GUI thread issues if there are some
-    gui_handle.join().map_err(|e| anyhow::anyhow!("Thread panicked: {:?}", e))??;
 
     Ok(())
+}
+
+#[cfg(feature = "init_wrapper")]
+fn first_stage_info(message: &str) {
+    info!("(First stage) {}", &message);
 }
