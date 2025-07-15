@@ -1,5 +1,6 @@
 pub mod signing;
 pub mod system;
+pub mod socket;
 
 pub const DATA_PART: &str = "/dev/mmcblk0p6";
 pub const DATA_PART_MOUNTPOINT: &str = "/data/";

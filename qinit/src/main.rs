@@ -22,6 +22,9 @@ cfg_if::cfg_if! {
         use fork::{daemon, Fork};
         use std::process::Command;
         use std::io::Read;
+        use postcard::{from_bytes};
+        use core::ops::Deref;
+        use std::os::unix;
         const QINIT_PATH: &str = "/etc/init.d/qinit";
     } else {
         mod eink;
@@ -36,34 +39,44 @@ cfg_if::cfg_if! {
         use std::sync::mpsc::{channel, Sender, Receiver};
         use nix::unistd::sethostname;
         use std::io::Write;
+        use postcard::{to_allocvec};
     }
 }
 
 use anyhow::{Context, Result};
 use log::{info, warn, error};
-use std::thread;
-use std::os::unix;
+use std::{thread};
 use std::fs;
+use serde::{Serialize, Deserialize};
+use libqinit::socket;
 const QINIT_SOCKET_PATH: &str = "/qinit.sock";
+
+#[derive(Serialize, Deserialize)]
+struct OverlayStatus {
+    ready: bool,
+}
 
 fn main() -> Result<()> {
     env_logger::init();
     cfg_if::cfg_if! {
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
-            let unix_listener = unix::net::UnixListener::bind(&QINIT_SOCKET_PATH).with_context(|| "Could not create qinit UNIX socket")?;
+            let unix_listener = socket::bind(&QINIT_SOCKET_PATH)?;
             
+            first_stage_info("Spawning second-stage qinit binary");
             Command::new(&QINIT_PATH).spawn().with_context(|| "Failed to spawn second-stage qinit binary")?;
 
-            let (mut unix_stream, _socket_address) = unix_listener.accept().with_context(|| "Failed to accept connection on qinit UNIX socket")?;
-            let mut message = String::new();
-            unix_stream.read_to_string(&mut message).with_context(|| "Failed to read from qinit UNIX socket")?;
-            fs::remove_file(&QINIT_SOCKET_PATH)?;
+            first_stage_info("Waiting for status message from second stage qinit binary");
+            let status = from_bytes::<OverlayStatus>(socket::read(unix_listener)?.deref())?;
+            if status.ready {
+                first_stage_info("Ready for systemd initialization");
+                fs::remove_file(&QINIT_SOCKET_PATH)?;
 
-            first_stage_info("Entering rootfs chroot");
-            unix::fs::chroot(&OVERLAY_MOUNTPOINT)?;
-            std::env::set_current_dir("/")?;
-            let _ = exec::Command::new("/sbin/init").exec();
+                first_stage_info("Entering rootfs chroot, goodbye");
+                unix::fs::chroot(&OVERLAY_MOUNTPOINT)?;
+                std::env::set_current_dir("/")?;
+                let _ = exec::Command::new("/sbin/init").exec();
+            }
         } else {
             // System initialization
             info!("(Second stage) qinit binary starting");
@@ -128,8 +141,8 @@ fn main() -> Result<()> {
             #[cfg(not(feature = "gui_only"))]
             {
                 mount_rootfs(&pubkey)?;
-                let mut unix_stream = unix::net::UnixStream::connect(&QINIT_SOCKET_PATH).with_context(|| "Could not connect to qinit UNIX socket")?;
-                unix_stream.write(b"Ready")?;
+                let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
+                socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
                 progress_sender.send(0.1)?;
             }
 
