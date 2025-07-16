@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use fs_extra::dir;
 use std::env;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration, process::exit};
@@ -7,8 +8,14 @@ use sys_mount::{unmount, Mount, UnmountFlags};
 use regex::Regex;
 use openssl::pkey::Public;
 use openssl::pkey::PKey;
+use fs_extra::{copy_items};
 
 use crate::signing::check_signature;
+
+pub const MODULES_DIR_PATH: &str = "/lib/modules";
+pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";
+pub const FIRMWARE_ARCHIVE: &str = "firmware.squashfs";
+pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 
 pub fn mount_base_filesystems() -> Result<()> {
     Mount::builder().fstype("proc").mount("proc", "/proc")?;
@@ -89,6 +96,19 @@ pub fn mount_data_partition() -> Result<()> {
     Ok(())
 }
 
+pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
+    info!("Mounting system firmware SquashFS archive");
+    let firmware_archive_path = format!("{}/{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &FIRMWARE_ARCHIVE);
+    if fs::exists(&firmware_archive_path)? && check_signature(&pubkey, &firmware_archive_path)? {
+        Mount::builder().fstype("squashfs").mount(&firmware_archive_path, &FIRMWARE_DIR_PATH)?;
+        Mount::builder().fstype("tmpfs").data("size=32M").mount("tmpfs", &WAVEFORM_DIR_PATH)?;
+    } else {
+        return Err(anyhow::anyhow!("Either system firmware SquashFS archive was not found, either its signature was invalid"))
+    }
+
+    Ok(())
+}
+
 pub fn unmount_data_partition() -> Result<()> {
     info!("Unmounting data partition");
     unmount(&crate::DATA_PART_MOUNTPOINT, UnmountFlags::empty())?;
@@ -141,36 +161,22 @@ pub fn generate_version_string(kernel_commit: &str) -> String {
     return version_string;
 }
 
-pub fn mount_rootfs(pubkey: &PKey<Public>) -> Result<()> {
-    info!("Mounting root filesystem SquashFS archive");
-    let rootfs_file_path = format!("{}{}{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &crate::ROOTFS_FILE);
-    if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
-        let ro_mountpoint = format!("{}{}", &crate::OVERLAY_WORKDIR, "read");
-        let rw_writedir = format!("{}{}", &crate::OVERLAY_WORKDIR, "write");
-        let rw_workdir = format!("{}{}", &crate::OVERLAY_WORKDIR, "work");
-        fs::create_dir_all(&ro_mountpoint)?;
-        fs::create_dir_all(&rw_writedir)?;
-        fs::create_dir_all(&rw_workdir)?;
-        fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)?;
-
-        Mount::builder().fstype("squashfs").mount(&rootfs_file_path, &ro_mountpoint)?;
-        info!("Setting up fuse-overlayfs overlay");
-        run_command("/usr/bin/fuse-overlayfs", &["-o", &format!("allow_other,lowerdir={},upperdir={},workdir={}", &ro_mountpoint, &rw_writedir, &rw_workdir), &crate::OVERLAY_MOUNTPOINT])?;
-        setup_rootfs_mounts()?;
-    } else {
-        return Err(anyhow::anyhow!("Either root filesystem SquashFS archive was not found, either its signature was invalid"))
-    }
+pub fn bind_mount(source: &str, mountpoint: &str) -> Result<()> {
+    // Please figure out why Mount::builder() does not work for this kind of mount
+    run_command("mount", &["--rbind", &source, &mountpoint])?;
 
     Ok(())
 }
 
-pub fn setup_rootfs_mounts() -> Result<()> {
-    info!("Mounting filesystems in fuse-overlayfs overlay");
-    Mount::builder().fstype("proc").mount("proc", &format!("{}/proc", &crate::OVERLAY_MOUNTPOINT))?;
-    Mount::builder().fstype("sysfs").mount("sysfs", &format!("{}/sys", &crate::OVERLAY_MOUNTPOINT))?;
-    Mount::builder().fstype("tmpfs").mount("tmpfs", &format!("{}/tmp", &crate::OVERLAY_MOUNTPOINT))?;
-    Mount::builder().fstype("tmpfs").mount("tmpfs", &format!("{}/run", &crate::OVERLAY_MOUNTPOINT))?;
-    Mount::builder().fstype("devtmpfs").mount("devtmpfs", &format!("{}/dev", &crate::OVERLAY_MOUNTPOINT))?;
+pub fn clean_copy_dir_recursively(source: &str, target: &str) -> Result<()> {
+    info!("Recursively copying directory '{}' to '{}'", &source, &target);
+    fs::remove_dir_all(&target)?;
+    run_command("/bin/cp", &["-r", &source, &target])?;
+    // This does not seem to work with /overlay/etc/ssh directory (permission issues?)
+    /* fs::create_dir_all(&target)?;
+    let mut path = Vec::new();
+    path.push(&source);
+    copy_items(&path, &target, &dir::CopyOptions::new())?; */
 
     Ok(())
 }

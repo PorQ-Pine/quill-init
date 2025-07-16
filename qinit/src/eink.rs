@@ -7,16 +7,15 @@ use libqinit::system::{run_command, modprobe, set_workdir, start_service};
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";
 const CUSTOMWF_FILE: &str = "custom_wf.bin";
-const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 const FIRMWARE_DIR: &str = "firmware/";
 
 pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");
-    let waveform_path = format!("{}{}", &WAVEFORM_DIR_PATH, &WAVEFORM_FILE);
-    let waveform_customwf_path = format!("{}{}", &WAVEFORM_DIR_PATH, &CUSTOMWF_FILE);
-    let waveform_backup_dir_path = format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &FIRMWARE_DIR);
-    let waveform_backup_ebcwbf_path = format!("{}{}", &waveform_backup_dir_path, &WAVEFORM_FILE);
-    let waveform_backup_customwf_path = format!("{}{}", &waveform_backup_dir_path, &CUSTOMWF_FILE);
+    let waveform_path = format!("{}/{}", &libqinit::system::WAVEFORM_DIR_PATH, &WAVEFORM_FILE);
+    let waveform_customwf_path = format!("{}/{}", &libqinit::system::WAVEFORM_DIR_PATH, &CUSTOMWF_FILE);
+    let waveform_backup_dir_path = format!("{}/{}/{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &FIRMWARE_DIR);
+    let waveform_backup_ebcwbf_path = format!("{}/{}", &waveform_backup_dir_path, &WAVEFORM_FILE);
+    let waveform_backup_customwf_path = format!("{}/{}", &waveform_backup_dir_path, &CUSTOMWF_FILE);
 
     if !fs::exists(&waveform_backup_ebcwbf_path)? || !fs::exists(&waveform_backup_customwf_path)? {
         info!("Backing waveform file up to data partition");
@@ -26,7 +25,6 @@ pub fn load_waveform() -> Result<()> {
     }
 
     info!("Copying backup waveform files to live system");
-    fs::create_dir_all(&WAVEFORM_DIR_PATH).with_context(|| "Failed to create waveform's directory")?;
     fs::copy(&waveform_backup_ebcwbf_path, &waveform_path)?;
     fs::copy(&waveform_backup_customwf_path, &waveform_customwf_path)?;
 

@@ -34,12 +34,13 @@ cfg_if::cfg_if! {
         
         use crossterm::event::{self, Event};
         use std::time::Duration;
-        use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_rootfs, set_workdir, generate_version_string, run_command};
+        use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, generate_version_string, run_command};
+        use libqinit::rootfs;
         use libqinit::signing::{read_public_key};
         use std::sync::mpsc::{channel, Sender, Receiver};
         use nix::unistd::sethostname;
-        use std::io::Write;
         use postcard::{to_allocvec};
+        use libqinit::flag;
     }
 }
 
@@ -100,11 +101,11 @@ fn main() -> Result<()> {
                 set_workdir("/")?;
                 fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)?;
 
-                // Mount data partition
                 mount_data_partition()?;
+                mount_firmware(&pubkey)?;
 
                 // Create boot flags directory
-                fs::create_dir_all(format!("{}{}{}", &libqinit::DATA_PART_MOUNTPOINT, &libqinit::BOOT_DIR, &libqinit::FLAGS_DIR))?;
+                flag::create_flags_dir()?;
 
                 #[cfg(feature = "debug")]
                 debug::start_debug_framework(&pubkey)?;
@@ -140,7 +141,7 @@ fn main() -> Result<()> {
             // Resuming boot
             #[cfg(not(feature = "gui_only"))]
             {
-                mount_rootfs(&pubkey)?;
+                rootfs::setup(&pubkey)?;
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
                 progress_sender.send(0.1)?;
