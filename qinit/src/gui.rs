@@ -8,7 +8,7 @@ slint::include_modules!();
 
 const TOAST_DURATION_MILLIS: i32 = 5000;
 
-pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool>, version_string: &str) -> Result<()> {
+pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool>, version_string: &str, display_progress_bar: bool) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
 
@@ -18,18 +18,24 @@ pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool
         gui.set_version_string(SharedString::from(version_string));
     }
     else {
+        if display_progress_bar {
+            gui.set_progress_widget(ProgressWidget::ProgressBar);
+        } else {
+            gui.set_progress_widget(ProgressWidget::MovingDots);
+        }
         gui.set_page(Page::BootSplash);
         // Trigger normal boot automatically
         init_boot_sender.send(true)?;
     }
 
-    // Setup boot progress bar timer
+    // Boot progress bar timer
     let progress_timer = Timer::default();
     progress_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(100), {
         let gui_weak = gui_weak.clone();
         move || {
             if let Ok(progress) = progress_receiver.try_recv() {
                 if let Some(gui) = gui_weak.upgrade() {
+                    info!("Setting boot progress bar's value to {} %", (progress * 100.0) as i32);
                     gui.set_boot_progress(progress);
                 }
             }

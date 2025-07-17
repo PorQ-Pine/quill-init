@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use fs_extra::dir;
+use base64::write;
 use std::env;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration, process::exit};
@@ -8,7 +8,7 @@ use sys_mount::{unmount, Mount, UnmountFlags};
 use regex::Regex;
 use openssl::pkey::Public;
 use openssl::pkey::PKey;
-use fs_extra::{copy_items};
+use sha256;
 
 use crate::signing::check_signature;
 
@@ -61,10 +61,12 @@ pub fn set_workdir(path: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn wait_for_file(file: &str) {
-    while !fs::metadata(file).is_ok() {
+pub fn wait_for_path(path: &str) -> Result<()> {
+    while !fs::exists(&path)? {
         thread::sleep(Duration::from_millis(100));
     }
+
+    Ok(())
 }
 
 pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
@@ -90,7 +92,7 @@ pub fn modprobe(args: &[&str]) -> Result<()> {
 pub fn mount_data_partition() -> Result<()> {
     info!("Mounting data partition");
     fs::create_dir_all(&crate::DATA_PART_MOUNTPOINT)?;
-    wait_for_file(&crate::DATA_PART);
+    wait_for_path(&crate::DATA_PART)?;
     Mount::builder().fstype("ext4").data("rw").mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)?;
 
     Ok(())
@@ -179,4 +181,21 @@ pub fn clean_copy_dir_recursively(source: &str, target: &str) -> Result<()> {
     copy_items(&path, &target, &dir::CopyOptions::new())?; */
 
     Ok(())
+}
+
+pub fn sha256_match(path: &str, write_new_checksum: bool) -> Result<bool> {
+    let checksum = sha256::try_digest(Path::new(&path))?;
+    let checksum_file_path = format!("{}.sha256", &path);
+    info!("Checking for sha256sum match for file '{}' at path '{}'", &path, &checksum_file_path);
+    if fs::exists(&checksum_file_path)? && fs::read_to_string(&checksum_file_path)?.trim() == checksum {
+        info!("Checksum matches");
+        return Ok(true)
+    } else {
+        warn!("Checksum does not match");
+        if write_new_checksum {
+            info!("Writing new checksum calculated with current file");
+            fs::write(&checksum_file_path, &checksum)?;
+        }
+        return Ok(false)
+    }
 }

@@ -7,8 +7,10 @@ use log::{info, warn, error};
 use std::fs;
 
 use crate::flag::{self, Flag};
-use crate::system::{self, run_command, bind_mount, clean_copy_dir_recursively};
+use crate::system::{self, run_command, bind_mount};
 use crate::signing::check_signature;
+
+pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 
 pub fn setup(pubkey: &PKey<Public>) -> Result<()> {
     info!("Mounting root filesystem SquashFS archive");

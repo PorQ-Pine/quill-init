@@ -3,7 +3,10 @@ pub mod system;
 pub mod socket;
 pub mod flag;
 pub mod rootfs;
+pub mod systemd;
 
+pub const CONSOLE_TTY: &str = "/dev/ttyS2";
+pub const CONSOLE_BAUDRATE: &str = "1500000"
 pub const DATA_PART: &str = "/dev/mmcblk0p6";
 pub const DATA_PART_MOUNTPOINT: &str = "/data/";
 pub const BOOT_DIR: &str = "boot/";

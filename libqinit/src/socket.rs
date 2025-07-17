@@ -20,7 +20,7 @@ pub fn read(unix_listener: UnixListener) -> Result<Vec<u8>> {
 }
 
 pub fn write(path: &str, contents: &Vec<u8>) -> Result<()> {
-    info!("Writing {:?} to UNIX socket at path '{}'git", &contents, &path);
+    info!("Writing {:?} to UNIX socket at path '{}'", &contents, &path);
     connect(&path)?.write(&contents)?;
 
     Ok(())

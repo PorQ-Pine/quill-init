@@ -41,15 +41,16 @@ cfg_if::cfg_if! {
         use nix::unistd::sethostname;
         use postcard::{to_allocvec};
         use libqinit::flag;
+        use std::thread;
     }
 }
 
 use anyhow::{Context, Result};
 use log::{info, warn, error};
-use std::{thread};
 use std::fs;
 use serde::{Serialize, Deserialize};
 use libqinit::socket;
+use libqinit::systemd;
 const QINIT_SOCKET_PATH: &str = "/qinit.sock";
 
 #[derive(Serialize, Deserialize)]
@@ -131,9 +132,10 @@ fn main() -> Result<()> {
             }
 
             // Setting up GUI
+            let display_progress_bar = systemd::can_display_boot_progress_bar()?;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (init_boot_sender, init_boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
-            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, init_boot_sender, &version_string));
+            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, init_boot_sender, &version_string, display_progress_bar));
 
             // Blocking this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
             init_boot_receiver.recv()?;
@@ -144,7 +146,12 @@ fn main() -> Result<()> {
                 rootfs::setup(&pubkey)?;
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
-                progress_sender.send(0.1)?;
+                if display_progress_bar {
+                    progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
+                    thread::spawn(move || systemd::wait_for_targets(progress_sender));
+                } else {
+                    thread::spawn(move || systemd::wait_and_count_targets());
+                }
             }
 
             // Handling GUI thread issues if there are some

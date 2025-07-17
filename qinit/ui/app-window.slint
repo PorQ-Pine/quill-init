@@ -5,6 +5,7 @@ import { Switch } from "../../ui-common/switch.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery }
+export enum ProgressWidget { ProgressBar, MovingDots }
 export enum Dialog { None, Toast, ConfirmationDialog }
 
 export component AppWindow inherits Window {
@@ -21,6 +22,7 @@ export component AppWindow inherits Window {
     in-out property<string> version_string;
     in-out property<float> boot_progress;
     in-out property<Page> page;
+    in-out property<ProgressWidget> progress_widget;
     in-out property<Dialog> dialog;
     in-out property<string> dialog_message;
     in-out property<int> dialog_millis_count;
@@ -145,10 +147,13 @@ export component AppWindow inherits Window {
 
         HorizontalLayout {
             alignment: center;
-            ProgressBar {
+            if (progress_widget == ProgressWidget.ProgressBar) : ProgressBar {
                 progress: root.boot_progress;
                 width: 37.5%;
                 height: 2%;
+            }
+            if (progress_widget == ProgressWidget.MovingDots) : HorizontalLayout {
+
             }
         }
         Rectangle {}
