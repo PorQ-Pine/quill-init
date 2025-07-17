@@ -1,0 +1,58 @@
+export component MovingDots inherits HorizontalLayout {
+    property<color> r1-bg: #000000;
+    property<color> r2-bg: #ffffff;
+    property<color> r3-bg: #ffffff;
+    property<length> r-bg-width: 3.5px;
+    in property<bool> ready: false;
+
+    timer := Timer {
+        interval: 1s;
+        running: true;
+        triggered() => {
+            if (ready == true) {
+                r1-bg = #000000;
+                r2-bg = #000000;
+                r3-bg = #000000;
+            }
+            else if (r1-bg == #000000) {
+                r1-bg = #ffffff;
+                r2-bg = #000000;
+                r3-bg = #ffffff;
+            }
+            else if (r2-bg == #000000) {
+                r1-bg = #ffffff;
+                r2-bg = #ffffff;
+                r3-bg = #000000;
+            }
+            else if (r3-bg == #000000) {
+                r1-bg = #000000;
+                r2-bg = #ffffff;
+                r3-bg = #ffffff;
+            }
+        }
+    }
+
+    Rectangle {
+        border-width: r-bg-width;
+        border-color: #000000;
+        border-radius: self.width / 2;
+        height: self.width;
+        background: r1-bg;
+    }
+    Rectangle { horizontal-stretch: 1; }
+    Rectangle {
+        border-width: r-bg-width;
+        border-color: #000000;
+        border-radius: self.width / 2;
+        height: self.width;
+        background: r2-bg;
+    }
+    Rectangle { horizontal-stretch: 1; }
+    Rectangle {
+        border-width: r-bg-width;
+        border-color: #000000;
+        border-radius: self.width / 2;
+        height: self.width;
+        background: r3-bg;
+    }
+}
