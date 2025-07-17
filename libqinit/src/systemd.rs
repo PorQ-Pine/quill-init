@@ -9,7 +9,7 @@ use log::{info};
 const REACHED_TARGET_MAGIC: &str = "systemd[1]: Reached target";
 const STARTUP_COMPLETE_MAGIC: &str = "systemd[1]: Startup finished in";
 
-pub fn wait_and_count_targets() -> Result<()> {
+pub fn wait_and_count_targets(progress_sender: Sender<f32>) -> Result<()> {
     info!("Waiting for systemd 'Reached target' messages");
     let mut targets_count = 0;
     for maybe_entry in rmesg::logs_iter(rmesg::Backend::Default, false, false)? {
@@ -22,6 +22,7 @@ pub fn wait_and_count_targets() -> Result<()> {
     }
     info!("Counted {} systemd targets", &targets_count);
     flag::write_string(Flag::SYSTEMD_TARGETS_TOTAL, &targets_count.to_string())?;
+    progress_sender.send(crate::READY_PROGRESS_VALUE)?;
 
     Ok(())
 }

@@ -3,6 +3,7 @@ import { Button } from "../../ui-common/button.slint";
 import { MinorButton } from "../../ui-common/minorbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
 import { ScrollView } from "std-widgets.slint";
+import { MovingDots } from "../../ui-common/moving-dots.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery }
 export enum ProgressWidget { ProgressBar, MovingDots }
@@ -27,6 +28,7 @@ export component AppWindow inherits Window {
     in-out property<string> dialog_message;
     in-out property<int> dialog_millis_count;
     in-out property<float> button_scaling_multiplier: 1;
+    in-out property<bool> startup_finished: false;
     // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
     property<float> hmultiplier: 0.05;
@@ -135,16 +137,17 @@ export component AppWindow inherits Window {
     }
 
     if (page == Page.BootSplash) : VerticalLayout {
-        Rectangle {}
+        padding-top: 550px;
+        padding-bottom: self.padding-top;
         HorizontalLayout {
             alignment: center;
             Image {
+                width: 0.45 * root.width;
+                height: self.width;
                 source: @image-url("../../branding/quillos.svg");
-                width: 45%;
-                height: 45%;
             }
         }
-
+        Rectangle {}
         HorizontalLayout {
             alignment: center;
             if (progress_widget == ProgressWidget.ProgressBar) : ProgressBar {
@@ -152,11 +155,11 @@ export component AppWindow inherits Window {
                 width: 37.5%;
                 height: 2%;
             }
-            if (progress_widget == ProgressWidget.MovingDots) : HorizontalLayout {
-
+            if (progress_widget == ProgressWidget.MovingDots) : Rectangle {
+                width: 14%;
+                MovingDots { ready: startup_finished; }
             }
         }
-        Rectangle {}
     }
 
     if (page == Page.VersionInfo) : VerticalLayout {

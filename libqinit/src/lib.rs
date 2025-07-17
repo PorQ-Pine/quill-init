@@ -14,3 +14,4 @@ pub const HOME_DIR: &str = "/root/";
 pub const ROOTFS_FILE: &str = "rootfs.squashfs";
 pub const OVERLAY_WORKDIR: &str = "/.overlay/";
 pub const OVERLAY_MOUNTPOINT: &str = "/overlay/";
+pub const READY_PROGRESS_VALUE: f32 = 1.0;

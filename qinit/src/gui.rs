@@ -21,6 +21,7 @@ pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool
         if display_progress_bar {
             gui.set_progress_widget(ProgressWidget::ProgressBar);
         } else {
+            info!("Showing moving dots animation");
             gui.set_progress_widget(ProgressWidget::MovingDots);
         }
         gui.set_page(Page::BootSplash);
@@ -35,8 +36,12 @@ pub fn setup_gui(progress_receiver: Receiver<f32>, init_boot_sender: Sender<bool
         move || {
             if let Ok(progress) = progress_receiver.try_recv() {
                 if let Some(gui) = gui_weak.upgrade() {
-                    info!("Setting boot progress bar's value to {} %", (progress * 100.0) as i32);
-                    gui.set_boot_progress(progress);
+                    if display_progress_bar {
+                        info!("Setting boot progress bar's value to {} %", (progress * 100.0) as i32);
+                        gui.set_boot_progress(progress);
+                    } else if progress == libqinit::READY_PROGRESS_VALUE {
+                        gui.set_startup_finished(true);
+                    }
                 }
             }
         }

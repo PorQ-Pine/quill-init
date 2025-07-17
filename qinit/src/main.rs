@@ -150,7 +150,7 @@ fn main() -> Result<()> {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
                     thread::spawn(move || systemd::wait_for_targets(progress_sender));
                 } else {
-                    thread::spawn(move || systemd::wait_and_count_targets());
+                    thread::spawn(move || systemd::wait_and_count_targets(progress_sender));
                 }
             }
 
