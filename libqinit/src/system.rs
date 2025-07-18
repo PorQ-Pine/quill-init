@@ -1,14 +1,14 @@
 use anyhow::{Context, Result};
 use base64::write;
+use log::{error, info, warn};
+use openssl::pkey::PKey;
+use openssl::pkey::Public;
+use regex::Regex;
+use sha256;
 use std::env;
 use std::path::Path;
-use std::{fs, process::Command, thread, time::Duration, process::exit};
-use log::{info, warn, error};
-use sys_mount::{unmount, Mount, UnmountFlags};
-use regex::Regex;
-use openssl::pkey::Public;
-use openssl::pkey::PKey;
-use sha256;
+use std::{fs, process::Command, process::exit, thread, time::Duration};
+use sys_mount::{Mount, UnmountFlags, unmount};
 
 use crate::signing::check_signature;
 
@@ -20,9 +20,13 @@ pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 pub fn mount_base_filesystems() -> Result<()> {
     Mount::builder().fstype("proc").mount("proc", "/proc")?;
     Mount::builder().fstype("sysfs").mount("sysfs", "/sys")?;
-    Mount::builder().fstype("devtmpfs").mount("devtmpfs", "/dev")?;
+    Mount::builder()
+        .fstype("devtmpfs")
+        .mount("devtmpfs", "/dev")?;
     fs::create_dir_all("/dev/pts")?;
-    Mount::builder().fstype("devpts").mount("devpts", "/dev/pts")?;
+    Mount::builder()
+        .fstype("devpts")
+        .mount("devpts", "/dev/pts")?;
     Mount::builder().fstype("tmpfs").mount("tmpfs", "/tmp")?;
     Mount::builder().fstype("tmpfs").mount("tmpfs", "/run")?;
 
@@ -30,7 +34,10 @@ pub fn mount_base_filesystems() -> Result<()> {
 }
 
 pub fn get_cmdline_bool(property: &str) -> Result<bool> {
-    info!("Trying to extract boolean value for property '{}' in kernel command line", &property);
+    info!(
+        "Trying to extract boolean value for property '{}' in kernel command line",
+        &property
+    );
     let cmdline = fs::read_to_string("/proc/cmdline")?;
     let re_str = format!(r"{}=(\w+)", regex::escape(&property));
     let re = Regex::new(&re_str)?;
@@ -39,18 +46,18 @@ pub fn get_cmdline_bool(property: &str) -> Result<bool> {
             let value = value_match.as_str();
             if value == "1" || value == "true" {
                 info!("Property '{}' is true", &property);
-                return Ok(true)
+                return Ok(true);
             } else {
                 info!("Property '{}' is false", &property);
-                return Ok(false)
+                return Ok(false);
             }
         } else {
             info!("Error getting capture group: returning false");
-            return Ok(false)
+            return Ok(false);
         }
     } else {
         info!("Could not find property: returning false");
-        return Ok(false)
+        return Ok(false);
     }
 }
 
@@ -79,12 +86,17 @@ pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
     if status.success() {
         Ok(())
     } else {
-        return Err(anyhow::anyhow!("Command `{}` exited with status: {}", &command, &status))
+        return Err(anyhow::anyhow!(
+            "Command `{}` exited with status: {}",
+            &command,
+            &status
+        ));
     }
 }
 
 pub fn modprobe(args: &[&str]) -> Result<()> {
-    run_command("/sbin/modprobe", &args).with_context(|| format!("Failed to load module; modprobe arguments: {:?}", &args))?;
+    run_command("/sbin/modprobe", &args)
+        .with_context(|| format!("Failed to load module; modprobe arguments: {:?}", &args))?;
 
     Ok(())
 }
@@ -93,19 +105,34 @@ pub fn mount_data_partition() -> Result<()> {
     info!("Mounting data partition");
     fs::create_dir_all(&crate::DATA_PART_MOUNTPOINT)?;
     wait_for_path(&crate::DATA_PART)?;
-    Mount::builder().fstype("ext4").data("rw").mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)?;
+    Mount::builder()
+        .fstype("ext4")
+        .data("rw")
+        .mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)?;
 
     Ok(())
 }
 
 pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
     info!("Mounting system firmware SquashFS archive");
-    let firmware_archive_path = format!("{}/{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &FIRMWARE_ARCHIVE);
+    let firmware_archive_path = format!(
+        "{}/{}/{}",
+        &crate::DATA_PART_MOUNTPOINT,
+        &crate::BOOT_DIR,
+        &FIRMWARE_ARCHIVE
+    );
     if fs::exists(&firmware_archive_path)? && check_signature(&pubkey, &firmware_archive_path)? {
-        Mount::builder().fstype("squashfs").mount(&firmware_archive_path, &FIRMWARE_DIR_PATH)?;
-        Mount::builder().fstype("tmpfs").data("size=32M").mount("tmpfs", &WAVEFORM_DIR_PATH)?;
+        Mount::builder()
+            .fstype("squashfs")
+            .mount(&firmware_archive_path, &FIRMWARE_DIR_PATH)?;
+        Mount::builder()
+            .fstype("tmpfs")
+            .data("size=32M")
+            .mount("tmpfs", &WAVEFORM_DIR_PATH)?;
     } else {
-        return Err(anyhow::anyhow!("Either system firmware SquashFS archive was not found, either its signature was invalid"))
+        return Err(anyhow::anyhow!(
+            "Either system firmware SquashFS archive was not found, either its signature was invalid"
+        ));
     }
 
     Ok(())
@@ -158,7 +185,10 @@ pub fn generate_version_string(kernel_commit: &str) -> String {
             let debug_state = "Debug mode: disabled";
         }
     }
-    let version_string = format!("Kernel commit: {}\n{}\n{}", &kernel_commit, &signing_state, &debug_state);
+    let version_string = format!(
+        "Kernel commit: {}\n{}\n{}",
+        &kernel_commit, &signing_state, &debug_state
+    );
 
     return version_string;
 }
@@ -171,7 +201,10 @@ pub fn bind_mount(source: &str, mountpoint: &str) -> Result<()> {
 }
 
 pub fn clean_copy_dir_recursively(source: &str, target: &str) -> Result<()> {
-    info!("Recursively copying directory '{}' to '{}'", &source, &target);
+    info!(
+        "Recursively copying directory '{}' to '{}'",
+        &source, &target
+    );
     fs::remove_dir_all(&target)?;
     run_command("/bin/cp", &["-r", &source, &target])?;
     // This does not seem to work with /overlay/etc/ssh directory (permission issues?)
@@ -186,16 +219,21 @@ pub fn clean_copy_dir_recursively(source: &str, target: &str) -> Result<()> {
 pub fn sha256_match(path: &str, write_new_checksum: bool) -> Result<bool> {
     let checksum = sha256::try_digest(Path::new(&path))?;
     let checksum_file_path = format!("{}.sha256", &path);
-    info!("Checking for sha256sum match for file '{}' at path '{}'", &path, &checksum_file_path);
-    if fs::exists(&checksum_file_path)? && fs::read_to_string(&checksum_file_path)?.trim() == checksum {
+    info!(
+        "Checking for sha256sum match for file '{}' at path '{}'",
+        &path, &checksum_file_path
+    );
+    if fs::exists(&checksum_file_path)?
+        && fs::read_to_string(&checksum_file_path)?.trim() == checksum
+    {
         info!("Checksum matches");
-        return Ok(true)
+        return Ok(true);
     } else {
         warn!("Checksum does not match");
         if write_new_checksum {
             info!("Writing new checksum calculated with current file");
             fs::write(&checksum_file_path, &checksum)?;
         }
-        return Ok(false)
+        return Ok(false);
     }
 }

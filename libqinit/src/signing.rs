@@ -1,10 +1,10 @@
-use openssl::pkey::Public;
-use openssl::pkey::PKey;
-use openssl::sign::Verifier;
+use anyhow::{Context, Result};
+use log::{error, info, warn};
 use openssl::hash::MessageDigest;
-use anyhow::{Result, Context};
+use openssl::pkey::PKey;
+use openssl::pkey::Public;
+use openssl::sign::Verifier;
 use std::fs;
-use log::{info, warn, error};
 
 const PUBKEY_PATH: &str = "/opt/key/public.pem";
 

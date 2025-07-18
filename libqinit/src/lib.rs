@@ -1,8 +1,8 @@
-pub mod signing;
-pub mod system;
-pub mod socket;
-pub mod flag;
+pub mod flags;
 pub mod rootfs;
+pub mod signing;
+pub mod socket;
+pub mod system;
 pub mod systemd;
 
 pub const DATA_PART: &str = "/dev/mmcblk0p6";

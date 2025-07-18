@@ -31,7 +31,7 @@ cfg_if::cfg_if! {
         mod gui;
         #[cfg(feature = "debug")]
         mod debug;
-        
+
         use crossterm::event::{self, Event};
         use std::time::Duration;
         use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, generate_version_string, run_command};
@@ -40,18 +40,19 @@ cfg_if::cfg_if! {
         use std::sync::mpsc::{channel, Sender, Receiver};
         use nix::unistd::sethostname;
         use postcard::{to_allocvec};
-        use libqinit::flag;
         use std::thread;
     }
 }
 
 use anyhow::{Context, Result};
-use log::{info, warn, error};
-use std::fs;
-use serde::{Serialize, Deserialize};
+use libqinit::flags::Flags;
 use libqinit::socket;
 use libqinit::systemd;
+use log::{error, info, warn};
+use serde::{Deserialize, Serialize};
+use std::fs;
 const QINIT_SOCKET_PATH: &str = "/qinit.sock";
+const SYSTEMD_NO_TARGETS: i32 = -1;
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
@@ -64,7 +65,7 @@ fn main() -> Result<()> {
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
             let unix_listener = socket::bind(&QINIT_SOCKET_PATH)?;
-            
+
             first_stage_info("Spawning second-stage qinit binary");
             Command::new(&QINIT_PATH).spawn().with_context(|| "Failed to spawn second-stage qinit binary")?;
 
@@ -105,9 +106,6 @@ fn main() -> Result<()> {
                 mount_data_partition()?;
                 mount_firmware(&pubkey)?;
 
-                // Create boot flags directory
-                flag::create_flags_dir()?;
-
                 #[cfg(feature = "debug")]
                 debug::start_debug_framework(&pubkey)?;
 
@@ -131,27 +129,39 @@ fn main() -> Result<()> {
                 println!();
             }
 
-            // Setting up GUI
-            let display_progress_bar = systemd::can_display_boot_progress_bar()?;
-            let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-            let (init_boot_sender, init_boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
-            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, init_boot_sender, &version_string, display_progress_bar));
+            // Read boot flags
+            let mut flags = Flags::read()?;
 
-            // Blocking this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
-            init_boot_receiver.recv()?;
+            // Setup GUI
+            let mut systemd_targets_total = SYSTEMD_NO_TARGETS;
+            if let Some(targets_total) = systemd::get_targets_total(&mut flags)? {
+                systemd_targets_total = targets_total;
+            }
+            let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
+            let (boot_sender, boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
+            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, &version_string, systemd_targets_total != SYSTEMD_NO_TARGETS));
+
+            // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
+            boot_receiver.recv()?;
 
             // Resuming boot
             #[cfg(not(feature = "gui_only"))]
             {
-                rootfs::setup(&pubkey)?;
+                rootfs::setup(&pubkey, &mut flags)?;
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
-                if display_progress_bar {
+                if systemd_targets_total != SYSTEMD_NO_TARGETS {
+                    // Display progress bar
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
-                    thread::spawn(move || systemd::wait_for_targets(progress_sender));
+                    systemd::wait_for_targets(systemd_targets_total, progress_sender)?;
                 } else {
-                    thread::spawn(move || systemd::wait_and_count_targets(progress_sender));
+                    systemd::wait_and_count_targets(&mut flags, progress_sender)?;
                 }
+
+                // Wait until systemd startup has completed
+                boot_receiver.recv()?;
+                info!("systemd startup complete");
+                Flags::write(&mut flags)?;
             }
 
             // Handling GUI thread issues if there are some
