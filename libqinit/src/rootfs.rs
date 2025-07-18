@@ -15,7 +15,7 @@ pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 pub fn setup(pubkey: &PKey<Public>, flags: &mut Flags) -> Result<()> {
     info!("Mounting root filesystem SquashFS archive");
     let rootfs_file_path = format!(
-        "{}{}{}",
+        "{}/{}/{}",
         &crate::DATA_PART_MOUNTPOINT,
         &crate::BOOT_DIR,
         &crate::ROOTFS_FILE
@@ -27,9 +27,9 @@ pub fn setup(pubkey: &PKey<Public>, flags: &mut Flags) -> Result<()> {
             .fstype("tmpfs")
             .mount("tmpfs", &crate::OVERLAY_WORKDIR)?;
 
-        let ro_mountpoint = format!("{}{}", &crate::OVERLAY_WORKDIR, "read");
-        let rw_writedir = format!("{}{}", &crate::OVERLAY_WORKDIR, "write");
-        let rw_workdir = format!("{}{}", &crate::OVERLAY_WORKDIR, "work");
+        let ro_mountpoint = format!("{}/{}", &crate::OVERLAY_WORKDIR, "read");
+        let rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
+        let rw_workdir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");
         fs::create_dir_all(&ro_mountpoint)?;
         fs::create_dir_all(&rw_writedir)?;
         fs::create_dir_all(&rw_workdir)?;
@@ -80,8 +80,8 @@ pub fn setup_mounts() -> Result<()> {
         .fstype("devtmpfs")
         .mount("devtmpfs", &format!("{}/dev", &crate::OVERLAY_MOUNTPOINT))?;
     bind_mount(
-        &format!("{}{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR),
-        &format!("{}{}", &crate::OVERLAY_MOUNTPOINT, &crate::BOOT_DIR),
+        &format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR),
+        &format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::BOOT_DIR),
     )?;
     bind_mount(
         &system::MODULES_DIR_PATH,

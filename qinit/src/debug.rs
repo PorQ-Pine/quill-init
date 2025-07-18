@@ -36,7 +36,7 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
     // To extract base device IP from custom udhcpd configuration (if present)
     let ip_regex = Regex::new(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")?;
     let user_udhcpd_conf_path = format!(
-        "{}{}{}",
+        "{}/{}/{}",
         &libqinit::DATA_PART_MOUNTPOINT,
         &libqinit::BOOT_DIR,
         &USER_UDHCPD_CONF_FILE
@@ -88,7 +88,7 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
 pub fn start_sshd() -> Result<()> {
     warn!("Starting SSH server");
     let dropbear_rsa_key_path = format!(
-        "{}{}{}",
+        "{}/{}/{}",
         &libqinit::DATA_PART_MOUNTPOINT,
         &libqinit::BOOT_DIR,
         &DROPBEAR_RSA_KEY_FILE
@@ -112,14 +112,14 @@ pub fn start_sshd() -> Result<()> {
 pub fn prepare_script_login(pubkey: &PKey<Public>) -> Result<()> {
     warn!("Looking for script to run upon console login");
     let script_path = format!(
-        "{}{}{}",
+        "{}/{}/{}",
         &libqinit::DATA_PART_MOUNTPOINT,
         &libqinit::BOOT_DIR,
         &DEBUG_SETUP_SCRIPT
     );
     if fs::exists(&script_path)? && check_signature(&pubkey, &script_path)? {
         warn!("Found valid script to run upon console login: copying it");
-        let copied_debug_script_path = format!("{}{}", &libqinit::HOME_DIR, &COPIED_DEBUG_SCRIPT);
+        let copied_debug_script_path = format!("{}/{}", &libqinit::HOME_DIR, &COPIED_DEBUG_SCRIPT);
         fs::copy(&script_path, &copied_debug_script_path)
             .with_context(|| "Failed to copy debug setup script to home directory")?;
     } else {

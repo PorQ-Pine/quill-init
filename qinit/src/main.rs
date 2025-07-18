@@ -137,9 +137,10 @@ fn main() -> Result<()> {
             if let Some(targets_total) = systemd::get_targets_total(&mut flags)? {
                 systemd_targets_total = targets_total;
             }
+            let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
-            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, &version_string, systemd_targets_total != SYSTEMD_NO_TARGETS));
+            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, &version_string, display_progress_bar));
 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
             boot_receiver.recv()?;
@@ -150,8 +151,7 @@ fn main() -> Result<()> {
                 rootfs::setup(&pubkey, &mut flags)?;
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
-                if systemd_targets_total != SYSTEMD_NO_TARGETS {
-                    // Display progress bar
+                if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
                     systemd::wait_for_targets(systemd_targets_total, progress_sender)?;
                 } else {
