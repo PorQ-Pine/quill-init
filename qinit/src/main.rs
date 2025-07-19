@@ -145,9 +145,9 @@ fn main() -> Result<()> {
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
             boot_receiver.recv()?;
 
-            // Resuming boot
             #[cfg(not(feature = "gui_only"))]
             {
+                // Resume boot
                 rootfs::setup(&pubkey, &mut flags)?;
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
