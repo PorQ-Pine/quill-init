@@ -173,7 +173,7 @@ pub fn restart_service(service: &str) -> Result<()> {
 pub fn power_off() -> Result<()> {
     warn!("Powering off");
     unmount_data_partition()?;
-    run_command("/sbin/poweroff", &[])?;
+    run_command("/sbin/poweroff", &["-f"])?;
 
     Ok(())
 }
