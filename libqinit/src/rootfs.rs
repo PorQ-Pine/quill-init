@@ -5,13 +5,13 @@ use openssl::pkey::Public;
 use std::fs;
 use sys_mount::Mount;
 
-use crate::flags::Flags;
+use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
 use crate::system::{self, bind_mount, run_command};
 
 pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 
-pub fn setup(pubkey: &PKey<Public>, flags: &mut Flags) -> Result<()> {
+pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> {
     info!("Mounting root filesystem SquashFS archive");
     let rootfs_file_path = format!(
         "{}/{}/{}",
@@ -64,7 +64,7 @@ pub fn setup(pubkey: &PKey<Public>, flags: &mut Flags) -> Result<()> {
             ],
         )?;
         setup_mounts()?;
-        setup_misc(flags)?;
+        setup_misc(boot_config)?;
     } else {
         return Err(anyhow::anyhow!(
             "Either root filesystem SquashFS archive was not found, either its signature was invalid"
@@ -116,11 +116,11 @@ pub fn setup_mounts() -> Result<()> {
     Ok(())
 }
 
-pub fn setup_misc(flags: &mut Flags) -> Result<()> {
-    let first_boot_done = flags.first_boot_done;
+pub fn setup_misc(boot_config: &mut BootConfig) -> Result<()> {
+    let first_boot_done = boot_config.first_boot_done;
     if !first_boot_done {
         info!("Running first boot setup commands, if any");
-        flags.first_boot_done = true;
+        boot_config.first_boot_done = true;
     }
 
     Ok(())

@@ -36,7 +36,7 @@ cfg_if::cfg_if! {
         use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, generate_version_string, run_command};
         use libqinit::rootfs;
         use libqinit::signing::{read_public_key};
-        use libqinit::flags::Flags;
+        use libqinit::boot_config::BootConfig;
         use libqinit::systemd;
         use std::sync::mpsc::{channel, Sender, Receiver};
         use nix::unistd::sethostname;
@@ -129,15 +129,15 @@ fn main() -> Result<()> {
                 println!();
             }
 
-            // Read boot flags
-            let original_flags = Flags::read()?;
-            let mut flags = original_flags.clone();
+            // Read boot configuration
+            let original_boot_config = BootConfig::read()?;
+            let mut boot_config = original_boot_config.clone();
 
             // Setup GUI
             let mut systemd_targets_total = SYSTEMD_NO_TARGETS;
             #[cfg(not(feature = "gui_only"))]
             {
-                if let Some(targets_total) = systemd::get_targets_total(&mut flags)? {
+                if let Some(targets_total) = systemd::get_targets_total(&mut boot_config)? {
                     systemd_targets_total = targets_total;
                 }
             }
@@ -152,21 +152,21 @@ fn main() -> Result<()> {
             #[cfg(not(feature = "gui_only"))]
             {
                 // Resume boot
-                rootfs::setup(&pubkey, &mut flags)?;
+                rootfs::setup(&pubkey, &mut boot_config)?;
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
                     systemd::wait_for_targets(systemd_targets_total, progress_sender)?;
                 } else {
-                    systemd::wait_and_count_targets(&mut flags, progress_sender)?;
+                    systemd::wait_and_count_targets(&mut boot_config, progress_sender)?;
                 }
 
                 // Wait until systemd startup has completed
                 boot_receiver.recv()?;
                 info!("systemd startup complete");
-                if flags != original_flags {
-                    Flags::write(&mut flags)?;
+                if boot_config != original_boot_config {
+                    BootConfig::write(&mut boot_config)?;
                 }
             }
 

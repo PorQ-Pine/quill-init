@@ -1,4 +1,4 @@
-pub mod flags;
+pub mod boot_config;
 pub mod rootfs;
 pub mod signing;
 pub mod socket;
