@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use libqinit::signing::check_signature;
 use libqinit::system::{modprobe, run_command};
-use log::{error, info, warn};
+use log::warn;
 use network_interface::NetworkInterface;
 use network_interface::NetworkInterfaceConfig;
 use openssl::pkey::PKey;

@@ -19,12 +19,11 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "init_wrapper")] {
         use libqinit::OVERLAY_MOUNTPOINT;
         use exec;
-        use fork::{daemon, Fork};
         use std::process::Command;
-        use std::io::Read;
         use postcard::{from_bytes};
         use core::ops::Deref;
         use std::os::unix;
+
         const QINIT_PATH: &str = "/etc/init.d/qinit";
     } else {
         mod eink;
@@ -37,22 +36,23 @@ cfg_if::cfg_if! {
         use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, generate_version_string, run_command};
         use libqinit::rootfs;
         use libqinit::signing::{read_public_key};
+        use libqinit::flags::Flags;
+        use libqinit::systemd;
         use std::sync::mpsc::{channel, Sender, Receiver};
         use nix::unistd::sethostname;
         use postcard::{to_allocvec};
         use std::thread;
+
+        const SYSTEMD_NO_TARGETS: i32 = -1;
     }
 }
 
 use anyhow::{Context, Result};
-use libqinit::flags::Flags;
 use libqinit::socket;
-use libqinit::systemd;
-use log::{error, info, warn};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::fs;
 const QINIT_SOCKET_PATH: &str = "/qinit.sock";
-const SYSTEMD_NO_TARGETS: i32 = -1;
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
@@ -119,7 +119,7 @@ fn main() -> Result<()> {
                 // Flush stdout to ensure prompt is shown before waiting
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
-                if event::poll(Duration::from_secs(3)).unwrap() {
+                if event::poll(Duration::from_secs(1)).unwrap() {
                     if let Event::Key(_) = event::read().unwrap() {
                         loop {
                             let _ = run_command("/sbin/getty", &["-L", "ttyS2", "1500000", "linux"]);
@@ -130,12 +130,16 @@ fn main() -> Result<()> {
             }
 
             // Read boot flags
-            let mut flags = Flags::read()?;
+            let original_flags = Flags::read()?;
+            let mut flags = original_flags.clone();
 
             // Setup GUI
             let mut systemd_targets_total = SYSTEMD_NO_TARGETS;
-            if let Some(targets_total) = systemd::get_targets_total(&mut flags)? {
-                systemd_targets_total = targets_total;
+            #[cfg(not(feature = "gui_only"))]
+            {
+                if let Some(targets_total) = systemd::get_targets_total(&mut flags)? {
+                    systemd_targets_total = targets_total;
+                }
             }
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
@@ -161,7 +165,9 @@ fn main() -> Result<()> {
                 // Wait until systemd startup has completed
                 boot_receiver.recv()?;
                 info!("systemd startup complete");
-                Flags::write(&mut flags)?;
+                if flags != original_flags {
+                    Flags::write(&mut flags)?;
+                }
             }
 
             // Handling GUI thread issues if there are some

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::{error, info, warn};
+use log::info;
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 

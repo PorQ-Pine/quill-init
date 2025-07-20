@@ -1,4 +1,4 @@
-use crate::flags::{self, Flags};
+use crate::flags::Flags;
 use crate::rootfs;
 use crate::system::sha256_match;
 use anyhow::Result;

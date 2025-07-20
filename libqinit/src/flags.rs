@@ -5,7 +5,7 @@ use std::fs;
 
 const FLAGS_FILE: &str = "flags.ron";
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Flags {
     pub first_boot_done: bool,
     pub systemd_targets_total: Option<i32>,

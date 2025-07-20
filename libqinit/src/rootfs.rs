@@ -1,6 +1,5 @@
-use anyhow::{Context, Result};
-use fs_extra::dir;
-use log::{error, info, warn};
+use anyhow::Result;
+use log::info;
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use std::fs;
@@ -38,6 +37,20 @@ pub fn setup(pubkey: &PKey<Public>, flags: &mut Flags) -> Result<()> {
         Mount::builder()
             .fstype("squashfs")
             .mount(&rootfs_file_path, &ro_mountpoint)?;
+
+        let unrestricted_rootfs_file_path = format!("{}/.unrestricted", &ro_mountpoint);
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "debug")] {
+                if !fs::exists(&unrestricted_rootfs_file_path)? {
+                    return Err(anyhow::anyhow!("Root filesystem type has to match the currently-defined 'unrestricted' profile compiled in the kernel"))
+                }
+            } else {
+                if fs::exists(&unrestricted_rootfs_file_path)? {
+                    return Err(anyhow::anyhow!("Root filesystem type has to match the currently-defined 'restricted' profile compiled in the kernel"));
+                }
+            }
+        }
+
         info!("Setting up fuse-overlayfs overlay");
         run_command(
             "/usr/bin/fuse-overlayfs",

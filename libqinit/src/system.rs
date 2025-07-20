@@ -1,13 +1,12 @@
 use anyhow::{Context, Result};
-use base64::write;
-use log::{error, info, warn};
+use log::{info, warn};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use regex::Regex;
 use sha256;
 use std::env;
 use std::path::Path;
-use std::{fs, process::Command, process::exit, thread, time::Duration};
+use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
 
 use crate::signing::check_signature;
@@ -140,7 +139,15 @@ pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
 
 pub fn unmount_data_partition() -> Result<()> {
     info!("Unmounting data partition");
-    unmount(&crate::DATA_PART_MOUNTPOINT, UnmountFlags::empty())?;
+    sync_disks()?;
+    unmount(&crate::DATA_PART_MOUNTPOINT, UnmountFlags::DETACH)?;
+
+    Ok(())
+}
+
+pub fn sync_disks() -> Result<()> {
+    info!("Syncing disks");
+    run_command("/bin/sync", &[])?;
 
     Ok(())
 }
@@ -166,8 +173,9 @@ pub fn restart_service(service: &str) -> Result<()> {
 pub fn power_off() -> Result<()> {
     warn!("Powering off");
     unmount_data_partition()?;
-    // Tell init script to power off since we seemingly can't do that by ourselves
-    exit(255);
+    run_command("/sbin/poweroff", &[])?;
+
+    Ok(())
 }
 
 pub fn generate_version_string(kernel_commit: &str) -> String {

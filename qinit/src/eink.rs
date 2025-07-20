@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use libqinit::system::{modprobe, run_command, set_workdir, start_service};
-use log::{error, info, warn};
+use libqinit::system::{modprobe, run_command, start_service};
+use log::info;
 use std::fs;
 use std::fs::File;
 
@@ -61,7 +61,7 @@ pub fn load_modules() -> Result<()> {
     Ok(())
 }
 
-pub fn create_custom_waveform(waveform_path: &str, workdir: &str) -> Result<()> {
+pub fn create_custom_waveform(_waveform_path: &str, _workdir: &str) -> Result<()> {
     // TODO: Decide what we do with this
 
     Ok(())

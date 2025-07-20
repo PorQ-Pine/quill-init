@@ -1,8 +1,8 @@
 use std::sync::mpsc::{Receiver, Sender};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use libqinit::system::{get_cmdline_bool, power_off};
-use log::{error, info, warn};
+use log::{error, info};
 use slint::{SharedString, Timer, TimerMode};
 slint::include_modules!();
 
