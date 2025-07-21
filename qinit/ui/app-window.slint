@@ -5,7 +5,7 @@ import { Switch } from "../../ui-common/switch.slint";
 import { ScrollView } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery, Error }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum Dialog { None, Toast, ConfirmationDialog }
 
@@ -30,12 +30,13 @@ export component AppWindow inherits Window {
     in-out property<int> dialog_millis_count;
     in-out property<float> button_scaling_multiplier: 1;
     in-out property<bool> startup_finished: false;
+    in-out property<string> error_reason;
     // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
     property<float> hmultiplier: 0.05;
     property<float> swmultiplier: 0.25;
     property<float> shmultiplier: 0.03;
-    // Default sizes/radii; there may be elements that don't enforce them for various reasons
+    // Default sizes/radii/properties; there may be elements that don't enforce them for various reasons
     property<relative-font-size> header_font_size: 2rem;
     property<length> layout_padding: 60px;
     property<length> button_width: root.width * wmultiplier * scaling_factor * button_scaling_multiplier;
@@ -43,6 +44,11 @@ export component AppWindow inherits Window {
     property<length> switch_width: button_width * 0.45;
     property<length> switch_height: button_height * 0.7;
     property<length> radius: 10px;
+    property<length> logo_width: 0.45 * root.width;
+    property<length> logo_height: logo_width;
+    property<string> header_font_family: "Inter";
+    property<string> console_font_family: "Roboto Mono";
+    property<length> console_header_font_size: 0.8 * self.default_font_size;
 
     // Main UI
     if (page == Page.QuillBoot) : VerticalLayout {
@@ -62,7 +68,7 @@ export component AppWindow inherits Window {
             Text {
                 text: "QuillBoot";
                 horizontal-alignment: center;
-                font-family: "Inter";
+                font-family: header_font_family;
                 font-size: header_font_size;
                 font-weight: 800;
             }
@@ -143,8 +149,8 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             alignment: center;
             Image {
-                width: 0.45 * root.width;
-                height: self.width;
+                width: logo_width;
+                height: logo_height;
                 source: @image-url("../../branding/quillos.svg");
             }
         }
@@ -193,7 +199,7 @@ export component AppWindow inherits Window {
                 Text {
                     text: "Software information";
                     horizontal-alignment: center;
-                    font-family: "Inter";
+                    font-family: header_font_family;
                     font-weight: 800;
                 }
                 Text {
@@ -219,6 +225,36 @@ export component AppWindow inherits Window {
     }
 
     if (page == Page.Recovery) : VerticalLayout {
+
+    }
+
+    if (page == Page.Error) : VerticalLayout {
+        padding: layout_padding;
+        Rectangle {}
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../icons/x-alert.svg");
+                width: logo-width;
+                height: logo-height;
+            }
+        }
+        Text {
+            text: "Fatal error";
+            horizontal-alignment: center;
+            font-family: header_font_family;
+            font-size: header_font_size;
+            font-weight: 800;
+        }
+        Rectangle { vertical-stretch: 0.1; }
+        Text {
+            text: error_reason;
+            wrap: word-wrap;
+            font-family: console_font_family;
+            font-size: console_header_font_size;
+            horizontal-alignment: center;
+        }
+        Rectangle {}
     }
 
     // Toasts/dialogs

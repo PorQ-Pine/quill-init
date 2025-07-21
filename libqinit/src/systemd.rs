@@ -8,7 +8,10 @@ use std::{fs, os::unix::fs::MetadataExt, sync::mpsc::Sender};
 const REACHED_TARGET_MAGIC: &str = "systemd[1]: Reached target";
 const STARTUP_COMPLETE_MAGIC: &str = "systemd[1]: Startup finished in";
 
-pub fn wait_and_count_targets(boot_config: &mut BootConfig, progress_sender: Sender<f32>) -> Result<()> {
+pub fn wait_and_count_targets(
+    boot_config: &mut BootConfig,
+    progress_sender: Sender<f32>,
+) -> Result<()> {
     info!("Waiting for systemd 'Reached target' messages");
     let mut targets_count = 0;
     for maybe_entry in rmesg::logs_iter(rmesg::Backend::Default, false, false)? {
@@ -20,7 +23,7 @@ pub fn wait_and_count_targets(boot_config: &mut BootConfig, progress_sender: Sen
         }
     }
     info!("Counted {} systemd targets", &targets_count);
-    boot_config.systemd_targets_total = Some(targets_count);
+    boot_config.rootfs.systemd_targets_total = Some(targets_count);
     progress_sender.send(crate::READY_PROGRESS_VALUE)?;
 
     Ok(())
@@ -48,10 +51,15 @@ pub fn wait_for_targets(targets_total: i32, progress_sender: Sender<f32>) -> Res
 }
 
 pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
-    let rootfs_file_path = format!("{}/{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &crate::ROOTFS_FILE);
+    let rootfs_file_path = format!(
+        "{}/{}/{}",
+        &crate::DATA_PART_MOUNTPOINT,
+        &crate::BOOT_DIR,
+        &crate::ROOTFS_FILE
+    );
     let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)?.mtime();
-    if current_rootfs_timestamp == boot_config.rootfs_timestamp {
-        if let Some(systemd_targets_total) = boot_config.systemd_targets_total {
+    if current_rootfs_timestamp == boot_config.rootfs.timestamp {
+        if let Some(systemd_targets_total) = boot_config.rootfs.systemd_targets_total {
             info!("Displaying boot progress bar");
             return Ok(Some(systemd_targets_total));
         } else {
@@ -61,7 +69,7 @@ pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
             return Ok(None);
         }
     } else {
-        boot_config.rootfs_timestamp = current_rootfs_timestamp;
+        boot_config.rootfs.timestamp = current_rootfs_timestamp;
         info!("Not displaying boot progress bar: number of systemd targets is not yet known");
         return Ok(None);
     }

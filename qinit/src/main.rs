@@ -49,7 +49,7 @@ cfg_if::cfg_if! {
 
 use anyhow::{Context, Result};
 use libqinit::socket;
-use log::info;
+use log::{info, error};
 use serde::{Deserialize, Serialize};
 use std::fs;
 const QINIT_SOCKET_PATH: &str = "/qinit.sock";
@@ -59,25 +59,36 @@ struct OverlayStatus {
     ready: bool,
 }
 
-fn main() -> Result<()> {
+fn main() {
     env_logger::init();
+    let (interrupt_sender, interrupt_receiver): (Sender<String>, Receiver<String>) = channel();
+    if let Err(e) = init(interrupt_receiver) {
+        error!("Function returned early with the following error: {e}");
+        // Sending error contents to GUI (if ever it is alive)
+        let _ = interrupt_sender.send(e.to_string());
+    }
+
+    thread::park();
+}
+
+fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
     cfg_if::cfg_if! {
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
             let unix_listener = socket::bind(&QINIT_SOCKET_PATH)?;
 
-            first_stage_info("Spawning second-stage qinit binary");
-            Command::new(&QINIT_PATH).spawn().with_context(|| "Failed to spawn second-stage qinit binary")?;
+            first_stage_info("Spawning second stage qinit binary");
+            Command::new(&QINIT_PATH).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
 
             first_stage_info("Waiting for status message from second stage qinit binary");
             let status = from_bytes::<OverlayStatus>(socket::read(unix_listener)?.deref())?;
             if status.ready {
                 first_stage_info("Ready for systemd initialization");
-                fs::remove_file(&QINIT_SOCKET_PATH)?;
+                fs::remove_file(&QINIT_SOCKET_PATH).with_context(|| "Failed to remove qinit UNIX socket file")?;
 
                 first_stage_info("Entering rootfs chroot, goodbye");
-                unix::fs::chroot(&OVERLAY_MOUNTPOINT)?;
-                std::env::set_current_dir("/")?;
+                unix::fs::chroot(&OVERLAY_MOUNTPOINT).with_context(|| "Failed to chroot to overlay filesytem's mountpoint")?;
+                std::env::set_current_dir("/").with_context(|| "Failed to set current directory to / (chroot)")?;
                 let _ = exec::Command::new("/sbin/init").exec();
             }
         } else {
@@ -86,8 +97,8 @@ fn main() -> Result<()> {
             #[cfg(not(feature = "gui_only"))]
             {
                 mount_base_filesystems()?;
-                sethostname("pinenote")?;
-                run_command("/sbin/ifconfig", &["lo", "up"])?;
+                sethostname("pinenote").with_context(|| "Failed to set device's hostname")?;
+                run_command("/sbin/ifconfig", &["lo", "up"]).with_context(|| "Failed to set loopback network device up")?;
             }
 
             // Boot info
@@ -100,14 +111,14 @@ fn main() -> Result<()> {
 
             #[cfg(not(feature = "gui_only"))]
             {
-                set_workdir("/")?;
-                fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)?;
+                set_workdir("/").with_context(|| "Failed to set current directory to / (not in chroot)")?;
+                fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT).with_context(|| "Failed to create default mountpoint's directory")?;
 
                 mount_data_partition()?;
                 mount_firmware(&pubkey)?;
 
                 #[cfg(feature = "debug")]
-                debug::start_debug_framework(&pubkey)?;
+                debug::start_debug_framework(&pubkey).with_context(|| "Failed to start debug framework")?;
 
                 eink::load_waveform()?;
                 eink::load_modules()?;
@@ -144,7 +155,7 @@ fn main() -> Result<()> {
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
-            let gui_handle = thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, &version_string, display_progress_bar));
+            thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, &version_string, display_progress_bar));
 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
             boot_receiver.recv()?;
@@ -153,7 +164,7 @@ fn main() -> Result<()> {
             {
                 // Resume boot
                 rootfs::setup(&pubkey, &mut boot_config)?;
-                let overlay_status = to_allocvec(&OverlayStatus { ready: true })?;
+                let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
                 socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
@@ -169,9 +180,6 @@ fn main() -> Result<()> {
                     BootConfig::write(&mut boot_config)?;
                 }
             }
-
-            // Handling GUI thread issues if there are some
-            gui_handle.join().map_err(|e| anyhow::anyhow!("Thread panicked: {:?}", e))??;
         }
     }
 

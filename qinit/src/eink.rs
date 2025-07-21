@@ -32,14 +32,14 @@ pub fn load_waveform() -> Result<()> {
 
     if !fs::exists(&waveform_backup_ebcwbf_path)? || !fs::exists(&waveform_backup_customwf_path)? {
         info!("Backing waveform file up to data partition");
-        backup_waveform_files(&waveform_backup_dir_path, &waveform_backup_ebcwbf_path)?;
+        backup_waveform_files(&waveform_backup_dir_path, &waveform_backup_ebcwbf_path).with_context(|| "Failed to backup waveform files")?;
     } else {
         info!("Found existing waveform backup files");
     }
 
     info!("Copying backup waveform files to live system");
-    fs::copy(&waveform_backup_ebcwbf_path, &waveform_path)?;
-    fs::copy(&waveform_backup_customwf_path, &waveform_customwf_path)?;
+    fs::copy(&waveform_backup_ebcwbf_path, &waveform_path).with_context(|| "Failed to copy backup waveform file to live system")?;
+    fs::copy(&waveform_backup_customwf_path, &waveform_customwf_path).with_context(|| "Failed to copy custom waveform file to live system")?;
 
     Ok(())
 }

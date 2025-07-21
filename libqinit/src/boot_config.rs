@@ -6,16 +6,26 @@ use std::fs;
 const BOOT_CONFIG_FILE: &str = "boot_config.ron";
 
 #[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
-pub struct BootConfig {
+pub struct BootFlags {
     pub first_boot_done: bool,
+}
+
+#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+pub struct RootFS {
     pub systemd_targets_total: Option<i32>,
-    pub rootfs_timestamp: i64,
+    pub timestamp: i64,
+}
+
+#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+pub struct BootConfig {
+    pub flags: BootFlags,
+    pub rootfs: RootFS,
 }
 
 impl BootConfig {
     fn default_boot_config() -> BootConfig {
         let mut boot_config = BootConfig::default();
-        boot_config.first_boot_done = false;
+        boot_config.flags.first_boot_done = false;
 
         return boot_config;
     }
@@ -34,7 +44,7 @@ impl BootConfig {
                 info!(
                     "Found invalid boot configuration (possibly corrupted or incomplete?): returning default configuration, but enabling 'first_boot_done'"
                 );
-                boot_config_to_return.first_boot_done = true;
+                boot_config_to_return.flags.first_boot_done = true;
             }
         } else {
             info!("Did not find a valid boot configuration: returning the default one");
