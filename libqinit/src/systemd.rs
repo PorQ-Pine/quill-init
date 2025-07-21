@@ -1,10 +1,9 @@
 use crate::boot_config::BootConfig;
 use crate::rootfs;
-use crate::system::sha256_match;
 use anyhow::Result;
 use log::{info, warn};
 use rmesg;
-use std::sync::mpsc::Sender;
+use std::{fs, os::unix::fs::MetadataExt, sync::mpsc::Sender};
 
 const REACHED_TARGET_MAGIC: &str = "systemd[1]: Reached target";
 const STARTUP_COMPLETE_MAGIC: &str = "systemd[1]: Startup finished in";
@@ -49,15 +48,9 @@ pub fn wait_for_targets(targets_total: i32, progress_sender: Sender<f32>) -> Res
 }
 
 pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
-    if sha256_match(
-        &format!(
-            "{}/{}/{}",
-            &crate::DATA_PART_MOUNTPOINT,
-            &crate::BOOT_DIR,
-            &crate::ROOTFS_FILE
-        ),
-        true,
-    )? {
+    let rootfs_file_path = format!("{}/{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR, &crate::ROOTFS_FILE);
+    let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)?.mtime();
+    if current_rootfs_timestamp == boot_config.rootfs_timestamp {
         if let Some(systemd_targets_total) = boot_config.systemd_targets_total {
             info!("Displaying boot progress bar");
             return Ok(Some(systemd_targets_total));
@@ -68,6 +61,7 @@ pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
             return Ok(None);
         }
     } else {
+        boot_config.rootfs_timestamp = current_rootfs_timestamp;
         info!("Not displaying boot progress bar: number of systemd targets is not yet known");
         return Ok(None);
     }

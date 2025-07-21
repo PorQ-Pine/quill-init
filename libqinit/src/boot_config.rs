@@ -9,6 +9,7 @@ const BOOT_CONFIG_FILE: &str = "boot_config.ron";
 pub struct BootConfig {
     pub first_boot_done: bool,
     pub systemd_targets_total: Option<i32>,
+    pub rootfs_timestamp: i64,
 }
 
 impl BootConfig {
