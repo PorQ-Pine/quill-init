@@ -54,7 +54,8 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
         .with_context(|| format!("Failed to activate {}", &iface_name))?;
     if fs::exists(&user_udhcpd_conf_path)? && check_signature(&pubkey, &user_udhcpd_conf_path)? {
         warn!("Found valid udhcpd user configuration file: copying it");
-        fs::copy(&user_udhcpd_conf_path, &UDHCPD_CONF_PATH).with_context(|| "Failed to copy user's udhcpd configuration")?;
+        fs::copy(&user_udhcpd_conf_path, &UDHCPD_CONF_PATH)
+            .with_context(|| "Failed to copy user's udhcpd configuration")?;
     } else {
         fs::write(
             &UDHCPD_CONF_PATH,
@@ -62,10 +63,12 @@ pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
                 "start {}\nend {}\ninterface {}\n",
                 &IP_ADDR, &IP_POOL_END, &iface_name
             ),
-        ).with_context(|| "Failed to write udhcpd's configuration")?;
+        )
+        .with_context(|| "Failed to write udhcpd's configuration")?;
     }
     // udhcpd configuration
-    let udhcpd_config = fs::read_to_string(&UDHCPD_CONF_PATH).with_context(|| "Failed to read udhcpd's configuration")?;
+    let udhcpd_config = fs::read_to_string(&UDHCPD_CONF_PATH)
+        .with_context(|| "Failed to read udhcpd's configuration")?;
     if let Some(custom_ip_addr_r) = ip_regex.find(&udhcpd_config) {
         let custom_ip_addr = custom_ip_addr_r.as_str();
         run_command("/sbin/ifconfig", &[&iface_name, &custom_ip_addr]).with_context(|| {

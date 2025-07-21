@@ -17,17 +17,31 @@ pub const FIRMWARE_ARCHIVE: &str = "firmware.squashfs";
 pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 
 pub fn mount_base_filesystems() -> Result<()> {
-    Mount::builder().fstype("proc").mount("proc", "/proc").with_context(|| "Failed to mount proc base filesystem")?;
-    Mount::builder().fstype("sysfs").mount("sysfs", "/sys").with_context(|| "Failed to mount base sysfs")?;
+    Mount::builder()
+        .fstype("proc")
+        .mount("proc", "/proc")
+        .with_context(|| "Failed to mount proc base filesystem")?;
+    Mount::builder()
+        .fstype("sysfs")
+        .mount("sysfs", "/sys")
+        .with_context(|| "Failed to mount base sysfs")?;
     Mount::builder()
         .fstype("devtmpfs")
-        .mount("devtmpfs", "/dev").with_context(|| "Failed to mount base devtmpfs")?;
+        .mount("devtmpfs", "/dev")
+        .with_context(|| "Failed to mount base devtmpfs")?;
     fs::create_dir_all("/dev/pts")?;
     Mount::builder()
         .fstype("devpts")
-        .mount("devpts", "/dev/pts").with_context(|| "Failed to mount devpts base filesystem")?;
-    Mount::builder().fstype("tmpfs").mount("tmpfs", "/tmp").with_context(|| "Failed to mount base tmpfs ('/tmp')")?;
-    Mount::builder().fstype("tmpfs").mount("tmpfs", "/run").with_context(|| "Failed to mount base tmpfs ('/run')")?;
+        .mount("devpts", "/dev/pts")
+        .with_context(|| "Failed to mount devpts base filesystem")?;
+    Mount::builder()
+        .fstype("tmpfs")
+        .mount("tmpfs", "/tmp")
+        .with_context(|| "Failed to mount base tmpfs ('/tmp')")?;
+    Mount::builder()
+        .fstype("tmpfs")
+        .mount("tmpfs", "/run")
+        .with_context(|| "Failed to mount base tmpfs ('/run')")?;
 
     Ok(())
 }
@@ -102,12 +116,14 @@ pub fn modprobe(args: &[&str]) -> Result<()> {
 
 pub fn mount_data_partition() -> Result<()> {
     info!("Mounting data partition");
-    fs::create_dir_all(&crate::DATA_PART_MOUNTPOINT).with_context(|| "Failed to create data partition mountpoint's directory")?;
+    fs::create_dir_all(&crate::DATA_PART_MOUNTPOINT)
+        .with_context(|| "Failed to create data partition mountpoint's directory")?;
     wait_for_path(&crate::DATA_PART)?;
     Mount::builder()
         .fstype("ext4")
         .data("rw")
-        .mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT).with_context(|| "Failed to mount data partition")?;
+        .mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)
+        .with_context(|| "Failed to mount data partition")?;
 
     Ok(())
 }
@@ -123,11 +139,13 @@ pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
     if fs::exists(&firmware_archive_path)? && check_signature(&pubkey, &firmware_archive_path)? {
         Mount::builder()
             .fstype("squashfs")
-            .mount(&firmware_archive_path, &FIRMWARE_DIR_PATH).with_context(|| "Failed to mount device's firmware")?;
+            .mount(&firmware_archive_path, &FIRMWARE_DIR_PATH)
+            .with_context(|| "Failed to mount device's firmware")?;
         Mount::builder()
             .fstype("tmpfs")
             .data("size=32M")
-            .mount("tmpfs", &WAVEFORM_DIR_PATH).with_context(|| "Failed to mount eInk firmware's tmpfs")?;
+            .mount("tmpfs", &WAVEFORM_DIR_PATH)
+            .with_context(|| "Failed to mount eInk firmware's tmpfs")?;
     } else {
         return Err(anyhow::anyhow!(
             "Either system firmware SquashFS archive was not found, either its signature was invalid"
@@ -153,19 +171,22 @@ pub fn sync_disks() -> Result<()> {
 }
 
 pub fn start_service(service: &str) -> Result<()> {
-    run_command("/sbin/rc-service", &[&service, "start"]).with_context(|| format!("Failed to start '{}' service", &service))?;
+    run_command("/sbin/rc-service", &[&service, "start"])
+        .with_context(|| format!("Failed to start '{}' service", &service))?;
 
     Ok(())
 }
 
 pub fn stop_service(service: &str) -> Result<()> {
-    run_command("/sbin/rc-service", &[&service, "stop"]).with_context(|| format!("Failed to stop '{}' service", &service))?;
+    run_command("/sbin/rc-service", &[&service, "stop"])
+        .with_context(|| format!("Failed to stop '{}' service", &service))?;
 
     Ok(())
 }
 
 pub fn restart_service(service: &str) -> Result<()> {
-    run_command("/sbin/rc-service", &[&service, "restart"]).with_context(|| format!("Failed to restart '{}' service", &service))?;
+    run_command("/sbin/rc-service", &[&service, "restart"])
+        .with_context(|| format!("Failed to restart '{}' service", &service))?;
 
     Ok(())
 }

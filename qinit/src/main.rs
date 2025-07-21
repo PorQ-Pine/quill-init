@@ -38,7 +38,6 @@ cfg_if::cfg_if! {
         use libqinit::signing::{read_public_key};
         use libqinit::boot_config::BootConfig;
         use libqinit::systemd;
-        use std::sync::mpsc::{channel, Sender, Receiver};
         use nix::unistd::sethostname;
         use postcard::{to_allocvec};
         use std::thread;
@@ -52,6 +51,7 @@ use libqinit::socket;
 use log::{info, error};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::sync::mpsc::{channel, Sender, Receiver};
 const QINIT_SOCKET_PATH: &str = "/qinit.sock";
 
 #[derive(Serialize, Deserialize)]
@@ -68,7 +68,11 @@ fn main() {
         let _ = interrupt_sender.send(e.to_string());
     }
 
-    thread::park();
+    cfg_if::cfg_if! {
+        if #[cfg(not(feature = "init_wrapper"))] {
+            thread::park();
+        }
+    }
 }
 
 fn init(interrupt_receiver: Receiver<String>) -> Result<()> {

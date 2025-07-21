@@ -2,7 +2,7 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use anyhow::Result;
 use libqinit::system::{get_cmdline_bool, power_off};
-use log::info;
+use log::{error, info};
 use slint::{SharedString, Timer, TimerMode};
 slint::include_modules!();
 
@@ -90,17 +90,24 @@ pub fn setup_gui(
 
     let interrupt_timer = Timer::default();
     let interrupt_timer_delay = 100;
-    interrupt_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(interrupt_timer_delay), {
-        let gui_weak = gui_weak.clone();
-        move || {
-            if let Ok(error_reason) = interrupt_receiver.try_recv() {
-                if let Some(gui) = gui_weak.upgrade() {
-                    gui.set_error_reason(SharedString::from(&format!("Reason provided: {}", &error_reason)));
-                    gui.set_page(Page::Error);
+    interrupt_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(interrupt_timer_delay),
+        {
+            let gui_weak = gui_weak.clone();
+            move || {
+                if let Ok(error_reason) = interrupt_receiver.try_recv() {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        gui.set_error_reason(SharedString::from(&format!(
+                            "Reason provided: {}",
+                            &error_reason
+                        )));
+                        gui.set_page(Page::Error);
+                    }
                 }
             }
-        }
-    });
+        },
+    );
 
     gui.on_power_off({
         let gui_weak = gui_weak.clone();

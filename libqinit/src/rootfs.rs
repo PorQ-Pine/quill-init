@@ -20,11 +20,13 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         &crate::ROOTFS_FILE
     );
     if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
-        fs::create_dir_all(&crate::OVERLAY_WORKDIR).with_context(|| "Failed to create overlay's work directory")?;
+        fs::create_dir_all(&crate::OVERLAY_WORKDIR)
+            .with_context(|| "Failed to create overlay's work directory")?;
         // Necessary to make disk space checks work in chroot (e.g. for package managers)
         Mount::builder()
             .fstype("tmpfs")
-            .mount("tmpfs", &crate::OVERLAY_WORKDIR).with_context(|| "Failed to mount tmpfs at overlay work directory")?;
+            .mount("tmpfs", &crate::OVERLAY_WORKDIR)
+            .with_context(|| "Failed to mount tmpfs at overlay work directory")?;
 
         let ro_mountpoint = format!("{}/{}", &crate::OVERLAY_WORKDIR, "read");
         let rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
@@ -32,11 +34,13 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         fs::create_dir_all(&ro_mountpoint)?;
         fs::create_dir_all(&rw_writedir)?;
         fs::create_dir_all(&rw_workdir)?;
-        fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT).with_context(|| "Failed to create overlay mountpoint's directory")?;
+        fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)
+            .with_context(|| "Failed to create overlay mountpoint's directory")?;
 
         Mount::builder()
             .fstype("squashfs")
-            .mount(&rootfs_file_path, &ro_mountpoint).with_context(|| "Failed to mount root filesystem SquashFS archive")?;
+            .mount(&rootfs_file_path, &ro_mountpoint)
+            .with_context(|| "Failed to mount root filesystem SquashFS archive")?;
 
         let unrestricted_rootfs_file_path = format!("{}/.unrestricted", &ro_mountpoint);
         cfg_if::cfg_if! {
@@ -62,7 +66,8 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
                 ),
                 &crate::OVERLAY_MOUNTPOINT,
             ],
-        ).with_context(|| "Failed to mount fuse-overlayfs filesystem at overlay's mountpoint")?;
+        )
+        .with_context(|| "Failed to mount fuse-overlayfs filesystem at overlay's mountpoint")?;
         setup_mounts()?;
         setup_misc(boot_config)?;
     } else {
@@ -79,19 +84,24 @@ pub fn setup_mounts() -> Result<()> {
 
     Mount::builder()
         .fstype("proc")
-        .mount("proc", &format!("{}/proc", &crate::OVERLAY_MOUNTPOINT)).with_context(|| "Failed to mount proc filesystem at overlay's mountpoint")?;
+        .mount("proc", &format!("{}/proc", &crate::OVERLAY_MOUNTPOINT))
+        .with_context(|| "Failed to mount proc filesystem at overlay's mountpoint")?;
     Mount::builder()
         .fstype("sysfs")
-        .mount("sysfs", &format!("{}/sys", &crate::OVERLAY_MOUNTPOINT)).with_context(|| "Failed to mount sysfs at overlay's mountpoint")?;
+        .mount("sysfs", &format!("{}/sys", &crate::OVERLAY_MOUNTPOINT))
+        .with_context(|| "Failed to mount sysfs at overlay's mountpoint")?;
     Mount::builder()
         .fstype("tmpfs")
-        .mount("tmpfs", &format!("{}/tmp", &crate::OVERLAY_MOUNTPOINT)).with_context(|| "Failed to mount tmpfs at overlay's mountpoint ('/tmp')")?;
+        .mount("tmpfs", &format!("{}/tmp", &crate::OVERLAY_MOUNTPOINT))
+        .with_context(|| "Failed to mount tmpfs at overlay's mountpoint ('/tmp')")?;
     Mount::builder()
         .fstype("tmpfs")
-        .mount("tmpfs", &format!("{}/run", &crate::OVERLAY_MOUNTPOINT)).with_context(|| "Failed to mount tmpfs at overlay's mountpoint ('/run')")?;
+        .mount("tmpfs", &format!("{}/run", &crate::OVERLAY_MOUNTPOINT))
+        .with_context(|| "Failed to mount tmpfs at overlay's mountpoint ('/run')")?;
     Mount::builder()
         .fstype("devtmpfs")
-        .mount("devtmpfs", &format!("{}/dev", &crate::OVERLAY_MOUNTPOINT)).with_context(|| "Failed to mount devtmpfs at overlay's mountpoint")?;
+        .mount("devtmpfs", &format!("{}/dev", &crate::OVERLAY_MOUNTPOINT))
+        .with_context(|| "Failed to mount devtmpfs at overlay's mountpoint")?;
     bind_mount(
         &format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR),
         &format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::BOOT_DIR),
