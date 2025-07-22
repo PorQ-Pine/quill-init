@@ -38,8 +38,6 @@ cfg_if::cfg_if! {
                 use crossterm::event::{self, Event};
                 #[cfg(feature = "debug")]
                 mod debug;
-
-                const QINIT_SOCKET_PATH: &str = "/qinit.sock";
             }
         }
         mod gui;
@@ -65,6 +63,7 @@ use std::fs;
 use std::sync::mpsc::{Receiver, Sender, channel};
 pub const QINIT_LOG_DIR: &str = "/var/log";
 pub const QINIT_LOG_FILE: &str = "qinit.log";
+const QINIT_SOCKET_PATH: &str = "/qinit.sock";
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
