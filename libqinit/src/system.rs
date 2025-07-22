@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
+use base64::prelude::*;
 use log::{info, warn};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use regex::Regex;
+use rmesg;
 use sha256;
 use std::env;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
-use rmesg;
-use base64::prelude::*;
 
 use crate::signing::check_signature;
 
@@ -233,7 +233,10 @@ pub fn generate_version_string(kernel_commit: &str) -> String {
 }
 
 pub fn generate_short_version_string(kernel_commit: &str, kernel_version: &str) -> String {
-    format!("Quill OS, kernel commit {}\n{}", &kernel_commit, &kernel_version)
+    format!(
+        "Quill OS, kernel commit {}\n{}",
+        &kernel_commit, &kernel_version
+    )
 }
 
 pub fn bind_mount(source: &str, mountpoint: &str) -> Result<()> {
@@ -284,7 +287,8 @@ pub fn sha256_match(path: &str, write_new_checksum: bool) -> Result<bool> {
 pub fn read_kernel_buffer_singleshot() -> Result<String> {
     info!("Reading kernel buffer");
     let mut kernel_buffer = String::new();
-    let entries = rmesg::log_entries(rmesg::Backend::Default, false).with_context(|| "Failed to read kernel buffer")?;
+    let entries = rmesg::log_entries(rmesg::Backend::Default, false)
+        .with_context(|| "Failed to read kernel buffer")?;
     for entry in entries {
         kernel_buffer.push_str(&entry.to_string());
         kernel_buffer.push_str("\n");
@@ -308,7 +312,13 @@ pub fn keep_last_lines(string: &str, lines_to_keep: usize) -> String {
 pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
     info!("Compressing string to xz");
     let base64_string = BASE64_STANDARD.encode(string);
-    let data = Command::new("/bin/sh").args(&["-c", &format!("printf '{}' | base64 -d | xz", &base64_string)]).output()?.stdout;
+    let data = Command::new("/bin/sh")
+        .args(&[
+            "-c",
+            &format!("printf '{}' | base64 -d | xz", &base64_string),
+        ])
+        .output()?
+        .stdout;
     info!("Compressed string size: {} bytes", data.iter().count());
 
     Ok(data)

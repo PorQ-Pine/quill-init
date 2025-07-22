@@ -1,10 +1,13 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 use anyhow::Result;
-use libqinit::system::{compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off, reboot, read_kernel_buffer_singleshot};
+use libqinit::system::{
+    compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
+    read_kernel_buffer_singleshot, reboot,
+};
 use log::{error, info};
-use slint::{Image, SharedString, Timer, TimerMode};
 use qrcode_generator::QrCodeEcc;
+use slint::{Image, SharedString, Timer, TimerMode};
 use std::fs;
 slint::include_modules!();
 
@@ -114,7 +117,8 @@ pub fn setup_gui(
                             &crate::QINIT_LOG_DIR,
                             &crate::QINIT_LOG_FILE
                         )) {
-                            let stripped_program_output = keep_last_lines(&program_output, lines_to_keep);
+                            let stripped_program_output =
+                                keep_last_lines(&program_output, lines_to_keep);
                             gui.set_program_output(SharedString::from(&stripped_program_output));
                             qr_code_string.push_str(&stripped_program_output);
                             qr_code_string.push_str("\n\n");
@@ -123,21 +127,31 @@ pub fn setup_gui(
                         }
 
                         if let Ok(kernel_buffer) = read_kernel_buffer_singleshot() {
-                            let stripped_kernel_buffer = keep_last_lines(&kernel_buffer, lines_to_keep);
+                            let stripped_kernel_buffer =
+                                keep_last_lines(&kernel_buffer, lines_to_keep);
                             gui.set_kernel_buffer(SharedString::from(&stripped_kernel_buffer));
                             qr_code_string.push_str(&stripped_kernel_buffer);
                         } else {
                             gui.set_kernel_buffer(SharedString::from(NOT_AVAILABLE));
                         }
 
-                        if let Ok(qr_code_svg) = qrcode_generator::to_svg_to_string(&HELP_URI, QrCodeEcc::Low, 1024, None::<&str>) {
-                            if let Ok(help_uri_qr_code) = Image::load_from_svg_data(&qr_code_svg.as_bytes()) {
+                        if let Ok(qr_code_svg) = qrcode_generator::to_svg_to_string(
+                            &HELP_URI,
+                            QrCodeEcc::Low,
+                            1024,
+                            None::<&str>,
+                        ) {
+                            if let Ok(help_uri_qr_code) =
+                                Image::load_from_svg_data(&qr_code_svg.as_bytes())
+                            {
                                 gui.set_help_uri_qr_code(help_uri_qr_code);
                             }
                         }
 
                         if let Ok(qr_code_svg) = generate_error_splash_qr_code(&qr_code_string) {
-                            if let Ok(debug_qr_code) = Image::load_from_svg_data(&qr_code_svg.as_bytes()) {
+                            if let Ok(debug_qr_code) =
+                                Image::load_from_svg_data(&qr_code_svg.as_bytes())
+                            {
                                 gui.set_debug_qr_code(debug_qr_code);
                             }
                         }
@@ -215,5 +229,10 @@ pub fn setup_gui(
 
 fn generate_error_splash_qr_code(string: &str) -> Result<String> {
     let compressed_string = compress_string_to_xz(&string)?;
-    Ok(qrcode_generator::to_svg_to_string(&compressed_string, QrCodeEcc::Low, 1024, None::<&str>)?)
+    Ok(qrcode_generator::to_svg_to_string(
+        &compressed_string,
+        QrCodeEcc::Low,
+        1024,
+        None::<&str>,
+    )?)
 }
