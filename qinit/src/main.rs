@@ -187,7 +187,7 @@ fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
             boot_receiver.recv()?;
 
             // Function that will always fail: can be used for debugging error splash GUI
-            fs::read("/aaa/bbb").with_context(|| "Dummy error")?;
+            // fs::read("/aaa/bbb").with_context(|| "Dummy error")?;
 
             #[cfg(not(feature = "gui_only"))]
             {

@@ -6,6 +6,7 @@ import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery, Error }
+export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum Dialog { None, Toast, ConfirmationDialog }
 
@@ -26,6 +27,7 @@ export component AppWindow inherits Window {
     in-out property<string> short_version_string;
     in-out property<float> boot_progress;
     in-out property<Page> page;
+    in-out property<QrCodePage> qr_code_page;
     in-out property<ProgressWidget> progress_widget;
     in-out property<Dialog> dialog;
     in-out property<string> dialog_message;
@@ -37,6 +39,7 @@ export component AppWindow inherits Window {
     in-out property<string> kernel_buffer;
     in-out property<image> debug_qr_code;
     in-out property<image> help_uri_qr_code;
+    in-out property<int> debug_tab_index: 0;
     // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
     property<float> hmultiplier: 0.05;
@@ -282,7 +285,7 @@ export component AppWindow inherits Window {
         }
         Rectangle { vertical-stretch: 0.1; }
         TabWidget {
-            current-index: 0;
+            current-index: debug_tab_index;
             Tab {
                 title: "Debug QR code";
                 Rectangle {
@@ -290,9 +293,14 @@ export component AppWindow inherits Window {
                     border-color: tab_rectangle_border_color;
                     VerticalLayout {
                         alignment: center;
-                        Image {
+                        if (qr_code_page == QrCodePage.QrCode): Image {
                             source: debug_qr_code;
                             height: 99%;
+                        }
+                        if (qr_code_page == QrCodePage.NotAvailable): Text {
+                            text: "(Not available)";
+                            font-family: regular_font_family;
+                            horizontal-alignment: center;
                         }
                     }
                 }

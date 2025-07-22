@@ -14,6 +14,8 @@ slint::include_modules!();
 const TOAST_DURATION_MILLIS: i32 = 5000;
 const NOT_AVAILABLE: &str = "Not currently available";
 const HELP_URI: &str = "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/boot-errors.md";
+const QR_CODE_TAB_INDEX: i32 = 0;
+const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
 
 pub fn setup_gui(
     progress_receiver: Receiver<f32>,
@@ -152,7 +154,12 @@ pub fn setup_gui(
                             if let Ok(debug_qr_code) =
                                 Image::load_from_svg_data(&qr_code_svg.as_bytes())
                             {
+                                gui.set_debug_tab_index(QR_CODE_TAB_INDEX);
+                                gui.set_qr_code_page(QrCodePage::QrCode);
                                 gui.set_debug_qr_code(debug_qr_code);
+                            } else {
+                                gui.set_debug_tab_index(QR_CODE_NOT_AVAILABLE_TAB_INDEX);
+                                gui.set_qr_code_page(QrCodePage::NotAvailable);
                             }
                         }
 
