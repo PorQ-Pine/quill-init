@@ -24,22 +24,29 @@ cfg_if::cfg_if! {
         use core::ops::Deref;
         use std::os::unix;
 
-        const QINIT_PATH: &str = "/etc/init.d/qinit";
+        pub const QINIT_PATH: &str = "/etc/init.d/qinit";
     } else {
-        mod eink;
-        mod gui;
-        #[cfg(feature = "debug")]
-        mod debug;
+        cfg_if::cfg_if! {
+            if #[cfg(not(feature = "gui_only"))] {
+                mod eink;
+                use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command};
+                use libqinit::rootfs;
+                use libqinit::systemd;
+                use nix::unistd::sethostname;
+                use postcard::{to_allocvec};
+                use std::time::Duration;
+                use crossterm::event::{self, Event};
+                #[cfg(feature = "debug")]
+                mod debug;
 
-        use crossterm::event::{self, Event};
-        use std::time::Duration;
-        use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, generate_version_string, run_command};
-        use libqinit::rootfs;
+                const QINIT_SOCKET_PATH: &str = "/qinit.sock";
+            }
+        }
+        mod gui;
+
         use libqinit::signing::{read_public_key};
+        use libqinit::system::{generate_version_string, generate_short_version_string};
         use libqinit::boot_config::BootConfig;
-        use libqinit::systemd;
-        use nix::unistd::sethostname;
-        use postcard::{to_allocvec};
         use std::thread;
 
         const SYSTEMD_NO_TARGETS: i32 = -1;
@@ -47,12 +54,17 @@ cfg_if::cfg_if! {
 }
 
 use anyhow::{Context, Result};
-use libqinit::socket;
-use log::{info, error};
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "gui_only"))] {
+        use libqinit::socket;
+    }
+}
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::sync::mpsc::{channel, Sender, Receiver};
-const QINIT_SOCKET_PATH: &str = "/qinit.sock";
+use std::sync::mpsc::{Receiver, Sender, channel};
+pub const QINIT_LOG_DIR: &str = "/var/log";
+pub const QINIT_LOG_FILE: &str = "qinit.log";
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
@@ -63,9 +75,17 @@ fn main() {
     env_logger::init();
     let (interrupt_sender, interrupt_receiver): (Sender<String>, Receiver<String>) = channel();
     if let Err(e) = init(interrupt_receiver) {
-        error!("Function returned early with the following error: {e}");
+        let mut error_string = format!("Reason: {}\nCaused by: ", &e);
+        let error_string_initial_length = error_string.len();
+        e.chain()
+            .skip(1)
+            .for_each(|cause| error_string.push_str(&cause.to_string()));
+        if error_string_initial_length == error_string.chars().count() {
+            error_string.truncate(error_string_initial_length - 12);
+        }
+        error!("{}", &error_string.replace("\n", " | "));
         // Sending error contents to GUI (if ever it is alive)
-        let _ = interrupt_sender.send(e.to_string());
+        let _ = interrupt_sender.send(error_string);
     }
 
     cfg_if::cfg_if! {
@@ -82,7 +102,8 @@ fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
             let unix_listener = socket::bind(&QINIT_SOCKET_PATH)?;
 
             first_stage_info("Spawning second stage qinit binary");
-            Command::new(&QINIT_PATH).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
+            fs::create_dir_all(&QINIT_LOG_DIR)?;
+            Command::new("/bin/sh").args(&["-c", &format!("{} 2>&1 | tee -a {}", &QINIT_PATH, &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE))]).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
 
             first_stage_info("Waiting for status message from second stage qinit binary");
             let status = from_bytes::<OverlayStatus>(socket::read(unix_listener)?.deref())?;
@@ -109,6 +130,7 @@ fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
             let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
             let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
             let version_string = generate_version_string(&kernel_commit);
+            let short_version_string = generate_short_version_string(&kernel_commit, &kernel_version);
 
             // Decode public key embedded in kernel command line
             let pubkey = read_public_key()?;
@@ -159,10 +181,13 @@ fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
-            thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, &version_string, display_progress_bar));
+            thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, version_string, short_version_string, display_progress_bar));
 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
             boot_receiver.recv()?;
+
+            // Function that will always fail: can be used for debugging error splash GUI
+            fs::read("/aaa/bbb").with_context(|| "Dummy error")?;
 
             #[cfg(not(feature = "gui_only"))]
             {

@@ -2,7 +2,7 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { MinorButton } from "../../ui-common/minorbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
-import { ScrollView } from "std-widgets.slint";
+import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery, Error }
@@ -18,10 +18,12 @@ export component AppWindow inherits Window {
     page: Page.QuillBoot;
     // Callbacks
     callback power_off();
+    callback reboot();
     callback toggle_ui_scale();
     callback boot_default();
     // In-out properties
     in-out property<string> version_string;
+    in-out property<string> short_version_string;
     in-out property<float> boot_progress;
     in-out property<Page> page;
     in-out property<ProgressWidget> progress_widget;
@@ -31,6 +33,10 @@ export component AppWindow inherits Window {
     in-out property<float> button_scaling_multiplier: 1;
     in-out property<bool> startup_finished: false;
     in-out property<string> error_reason;
+    in-out property<string> program_output;
+    in-out property<string> kernel_buffer;
+    in-out property<image> debug_qr_code;
+    in-out property<image> help_uri_qr_code;
     // Generic multipliers for default-sized and smaller-sized buttons
     property<float> wmultiplier: 0.25;
     property<float> hmultiplier: 0.05;
@@ -46,9 +52,15 @@ export component AppWindow inherits Window {
     property<length> radius: 10px;
     property<length> logo_width: 0.45 * root.width;
     property<length> logo_height: logo_width;
+    property<length> medium_logo_width: logo_width * 0.55;
+    property<length> medium_logo_height: medium_logo_width;
     property<string> header_font_family: "Inter";
     property<string> console_font_family: "Roboto Mono";
+    property<string> regular_font_family: "U001";
     property<length> console_header_font_size: 0.8 * self.default_font_size;
+    property<length> console_body_font_size: 0.6 * self.default_font_size;
+    property<length> tab_rectangle_border_width: 2px;
+    property<color> tab_rectangle_border_color: darkgrey;
 
     // Main UI
     if (page == Page.QuillBoot) : VerticalLayout {
@@ -127,6 +139,7 @@ export component AppWindow inherits Window {
             Rectangle {}
             Text {
                 vertical-alignment: center;
+                font-family: regular_font_family;
                 text: "Scale GUI";
             }
             Rectangle { horizontal-stretch: 0.05; }
@@ -188,11 +201,12 @@ export component AppWindow inherits Window {
                 Text {
                     text: "Copyright © 2021-2025";
                     horizontal-alignment: center;
-                    font-family: "Inter";
+                    font-family: header_font_family;
                     font-weight: 800;
                 }
                 Text {
                     text: "Nicolas Mailloux\n<nicolecrivain@gmail.com>\nSzybet\n<https://github.com/Szybet>";
+                    font-family: regular_font_family;
                     horizontal-alignment: center;
                 }
                 Rectangle { vertical-stretch: 0.25; }
@@ -229,16 +243,24 @@ export component AppWindow inherits Window {
     }
 
     if (page == Page.Error) : VerticalLayout {
-        padding: layout_padding;
-        Rectangle {}
+        padding-left: layout_padding;
+        padding-right: layout_padding;
+        Rectangle { vertical-stretch: 0.1; }
         HorizontalLayout {
             alignment: center;
+            spacing: root.width * 0.04;
             Image {
                 source: @image-url("../../icons/x-alert.svg");
-                width: logo-width;
-                height: logo-height;
+                width: medium_logo_width;
+                height: medium_logo_height;
+            }
+            Image {
+                source: help_uri_qr_code;
+                width: medium_logo_width;
+                height: medium_logo_height;
             }
         }
+        Rectangle { vertical-stretch: 0.1; }
         Text {
             text: "Fatal error";
             horizontal-alignment: center;
@@ -247,14 +269,115 @@ export component AppWindow inherits Window {
             font-weight: 800;
         }
         Rectangle { vertical-stretch: 0.1; }
-        Text {
-            text: error_reason;
-            wrap: word-wrap;
-            font-family: console_font_family;
-            font-size: console_header_font_size;
-            horizontal-alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                text: error_reason;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                font-family: console_font_family;
+                font-size: console_header_font_size;
+                width: root.width * 0.7;
+            }
         }
-        Rectangle {}
+        Rectangle { vertical-stretch: 0.1; }
+        TabWidget {
+            current-index: 0;
+            Tab {
+                title: "Debug QR code";
+                Rectangle {
+                    border-width: tab_rectangle_border_width;
+                    border-color: tab_rectangle_border_color;
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: debug_qr_code;
+                            height: 99%;
+                        }
+                    }
+                }
+            }
+            Tab {
+                title: "Program output";
+                Rectangle {
+                    border-width: tab_rectangle_border_width;
+                    border-color: tab_rectangle_border_color;
+                    VerticalLayout {
+                        ScrollView {
+                            mouse-drag-pan-enabled: true;
+                            // Scroll to bottom
+                            viewport-y: 0px - self.viewport-height + self.visible-height;
+                            VerticalLayout {
+                                Text {
+                                    text: program_output;
+                                    wrap: word-wrap;
+                                    font-size: console_body_font_size;
+                                    font-family: console_font_family;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Tab {
+                title: "Kernel log";
+                Rectangle {
+                    border-width: tab_rectangle_border_width;
+                    border-color: tab_rectangle_border_color;
+                    VerticalLayout {
+                        ScrollView {
+                            mouse-drag-pan-enabled: true;
+                            // Scroll to bottom
+                            viewport-y: 0px - self.viewport-height + self.visible-height;
+                            VerticalLayout {
+                                Text {
+                                    text: kernel_buffer;
+                                    wrap: word-wrap;
+                                    font-size: console_body_font_size;
+                                    font-family: console_font_family;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle { vertical-stretch: 0.1; }
+        HorizontalLayout {
+            alignment: center;
+            spacing: root.width * 0.1;
+            Button {
+                text: "Power off";
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
+                clicked => {
+                    root.power_off();
+                }
+            }
+            Button {
+                text: "Reboot";
+                width: button_width;
+                height: button_height;
+                border-radius: radius;
+                clicked => {
+                    root.reboot();
+                }
+            }
+        }
+        Rectangle { vertical-stretch: 0.1; }
+        HorizontalLayout {
+            alignment: center;
+            Text {
+                text: short_version_string;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+                font-family: console_font_family;
+                font-size: console_body_font_size;
+                width: root.width * 0.85;
+            }
+        }
+        Rectangle { vertical-stretch: 0.1; }
     }
 
     // Toasts/dialogs

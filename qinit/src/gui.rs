@@ -1,18 +1,23 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 use anyhow::Result;
-use libqinit::system::{get_cmdline_bool, power_off};
+use libqinit::system::{compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off, reboot, read_kernel_buffer_singleshot};
 use log::{error, info};
-use slint::{SharedString, Timer, TimerMode};
+use slint::{Image, SharedString, Timer, TimerMode};
+use qrcode_generator::QrCodeEcc;
+use std::fs;
 slint::include_modules!();
 
 const TOAST_DURATION_MILLIS: i32 = 5000;
+const NOT_AVAILABLE: &str = "Not currently available";
+const HELP_URI: &str = "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/boot-errors.md";
 
 pub fn setup_gui(
     progress_receiver: Receiver<f32>,
     boot_sender: Sender<bool>,
     interrupt_receiver: Receiver<String>,
-    version_string: &str,
+    version_string: String,
+    short_version_string: String,
     display_progress_bar: bool,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
@@ -98,10 +103,47 @@ pub fn setup_gui(
             move || {
                 if let Ok(error_reason) = interrupt_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
-                        gui.set_error_reason(SharedString::from(&format!(
-                            "Reason provided: {}",
-                            &error_reason
-                        )));
+                        let mut qr_code_string = String::new();
+                        let lines_to_keep = 95;
+
+                        qr_code_string.push_str(&error_reason);
+                        qr_code_string.push_str("\n\n");
+
+                        if let Ok(program_output) = fs::read_to_string(&format!(
+                            "{}/{}",
+                            &crate::QINIT_LOG_DIR,
+                            &crate::QINIT_LOG_FILE
+                        )) {
+                            let stripped_program_output = keep_last_lines(&program_output, lines_to_keep);
+                            gui.set_program_output(SharedString::from(&stripped_program_output));
+                            qr_code_string.push_str(&stripped_program_output);
+                            qr_code_string.push_str("\n\n");
+                        } else {
+                            gui.set_program_output(SharedString::from(NOT_AVAILABLE));
+                        }
+
+                        if let Ok(kernel_buffer) = read_kernel_buffer_singleshot() {
+                            let stripped_kernel_buffer = keep_last_lines(&kernel_buffer, lines_to_keep);
+                            gui.set_kernel_buffer(SharedString::from(&stripped_kernel_buffer));
+                            qr_code_string.push_str(&stripped_kernel_buffer);
+                        } else {
+                            gui.set_kernel_buffer(SharedString::from(NOT_AVAILABLE));
+                        }
+
+                        if let Ok(qr_code_svg) = qrcode_generator::to_svg_to_string(&HELP_URI, QrCodeEcc::Low, 1024, None::<&str>) {
+                            if let Ok(help_uri_qr_code) = Image::load_from_svg_data(&qr_code_svg.as_bytes()) {
+                                gui.set_help_uri_qr_code(help_uri_qr_code);
+                            }
+                        }
+
+                        if let Ok(qr_code_svg) = generate_error_splash_qr_code(&qr_code_string) {
+                            if let Ok(debug_qr_code) = Image::load_from_svg_data(&qr_code_svg.as_bytes()) {
+                                gui.set_debug_qr_code(debug_qr_code);
+                            }
+                        }
+
+                        gui.set_short_version_string(SharedString::from(&short_version_string));
+                        gui.set_error_reason(SharedString::from(&format!("{}", &error_reason)));
                         gui.set_page(Page::Error);
                     }
                 }
@@ -115,6 +157,20 @@ pub fn setup_gui(
             if let Err(e) = power_off() {
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to power off";
+                    gui.set_dialog_message(SharedString::from(err_msg));
+                    gui.set_dialog(Dialog::Toast);
+                    error!("{}: {}", &err_msg, e);
+                }
+            }
+        }
+    });
+
+    gui.on_reboot({
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Err(e) = reboot() {
+                if let Some(gui) = gui_weak.upgrade() {
+                    let err_msg = "Failed to reboot";
                     gui.set_dialog_message(SharedString::from(err_msg));
                     gui.set_dialog(Dialog::Toast);
                     error!("{}: {}", &err_msg, e);
@@ -155,4 +211,9 @@ pub fn setup_gui(
     gui.run()?;
 
     Ok(())
+}
+
+fn generate_error_splash_qr_code(string: &str) -> Result<String> {
+    let compressed_string = compress_string_to_xz(&string)?;
+    Ok(qrcode_generator::to_svg_to_string(&compressed_string, QrCodeEcc::Low, 1024, None::<&str>)?)
 }
