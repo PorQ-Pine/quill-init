@@ -13,7 +13,7 @@ slint::include_modules!();
 
 const TOAST_DURATION_MILLIS: i32 = 5000;
 const NOT_AVAILABLE: &str = "(Not currently available)";
-const HELP_URI: &str = "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/boot-errors.md";
+const HELP_URI: &str = "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/fatal-errors.md";
 const QR_CODE_TAB_INDEX: i32 = 0;
 const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
 
