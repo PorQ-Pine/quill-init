@@ -1,10 +1,20 @@
 use anyhow::{Context, Result};
 use log::info;
+use std::fs;
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct ErrorDetails {
+    pub error_reason: String,
+}
 
 pub fn bind(path: &str) -> Result<UnixListener> {
     info!("Binding or creating UNIX socket at path '{}'", &path);
+    if fs::exists(&path)? {
+        fs::remove_file(&path).with_context(|| format!("Failed to remove existing socket at path '{}'", &path))?;
+    }
     let unix_listener = UnixListener::bind(&path)
         .with_context(|| format!("Could not bind to UNIX socket at path '{}'", &path))?;
 

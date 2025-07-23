@@ -315,11 +315,23 @@ pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
     let data = Command::new("/bin/sh")
         .args(&[
             "-c",
-            &format!("printf '{}' | base64 -d | xz", &base64_string),
+            &format!("printf '{}' | base64 -d | xz -9 -e", &base64_string),
         ])
         .output()?
         .stdout;
     info!("Compressed string size: {} bytes", data.iter().count());
 
     Ok(data)
+}
+
+pub fn enforce_fb() -> Result<()> {
+    // Prevent Slint from defaulting to DRM backend
+    let empty_directory_path = "/.empty";
+    let dri_directory_path = "/dev/dri/";
+    fs::create_dir_all(&empty_directory_path)?;
+    if fs::exists(&format!("{}/card0", &dri_directory_path))? {
+        bind_mount(&empty_directory_path, &dri_directory_path)?;
+    }
+
+    Ok(())
 }

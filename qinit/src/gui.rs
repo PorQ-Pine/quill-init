@@ -3,7 +3,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use anyhow::Result;
 use libqinit::system::{
     compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
-    read_kernel_buffer_singleshot, reboot,
+    read_kernel_buffer_singleshot, reboot
 };
 use log::{error, info};
 use qrcode_generator::QrCodeEcc;
@@ -56,10 +56,10 @@ pub fn setup_gui(
                 if let Ok(progress) = progress_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
                         if display_progress_bar {
-                            info!(
+                            /* info!(
                                 "Setting boot progress bar's value to {} %",
                                 (progress * 100.0) as i32
-                            );
+                            );*/
                             gui.set_boot_progress(progress);
                         }
                         if progress == libqinit::READY_PROGRESS_VALUE {
@@ -109,7 +109,7 @@ pub fn setup_gui(
                 if let Ok(error_reason) = interrupt_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
                         let mut qr_code_string = String::new();
-                        let lines_to_keep = 95;
+                        let lines_to_keep = 50;
 
                         qr_code_string.push_str(&error_reason);
                         qr_code_string.push_str("\n\n");
@@ -157,10 +157,10 @@ pub fn setup_gui(
                                 gui.set_debug_tab_index(QR_CODE_TAB_INDEX);
                                 gui.set_qr_code_page(QrCodePage::QrCode);
                                 gui.set_debug_qr_code(debug_qr_code);
-                            } else {
-                                gui.set_debug_tab_index(QR_CODE_NOT_AVAILABLE_TAB_INDEX);
-                                gui.set_qr_code_page(QrCodePage::NotAvailable);
                             }
+                        } else {
+                            gui.set_debug_tab_index(QR_CODE_NOT_AVAILABLE_TAB_INDEX);
+                            gui.set_qr_code_page(QrCodePage::NotAvailable);
                         }
 
                         gui.set_short_version_string(SharedString::from(&short_version_string));

@@ -20,7 +20,6 @@ cfg_if::cfg_if! {
         use libqinit::OVERLAY_MOUNTPOINT;
         use exec;
         use std::process::Command;
-        use postcard::{from_bytes};
         use core::ops::Deref;
         use std::os::unix;
 
@@ -33,7 +32,6 @@ cfg_if::cfg_if! {
                 use libqinit::rootfs;
                 use libqinit::systemd;
                 use nix::unistd::sethostname;
-                use postcard::{to_allocvec};
                 use std::time::Duration;
                 use crossterm::event::{self, Event};
                 #[cfg(feature = "debug")]
@@ -43,7 +41,7 @@ cfg_if::cfg_if! {
         mod gui;
 
         use libqinit::signing::{read_public_key};
-        use libqinit::system::{generate_version_string, generate_short_version_string};
+        use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb};
         use libqinit::boot_config::BootConfig;
         use std::thread;
 
@@ -52,18 +50,16 @@ cfg_if::cfg_if! {
 }
 
 use anyhow::{Context, Result};
-cfg_if::cfg_if! {
-    if #[cfg(not(feature = "gui_only"))] {
-        use libqinit::socket;
-    }
-}
+use libqinit::socket;
+use postcard::{to_allocvec, from_bytes};
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::mpsc::{Receiver, Sender, channel};
 pub const QINIT_LOG_DIR: &str = "/var/log";
 pub const QINIT_LOG_FILE: &str = "qinit.log";
-const QINIT_SOCKET_PATH: &str = "/qinit.sock";
+const BOOT_SOCKET_PATH: &str = "/qinit.sock";
+const QINIT_SOCKET: &str = "qinit.sock";
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
@@ -73,7 +69,8 @@ struct OverlayStatus {
 fn main() {
     env_logger::init();
     let (interrupt_sender, interrupt_receiver): (Sender<String>, Receiver<String>) = channel();
-    if let Err(e) = init(interrupt_receiver) {
+    let interrupt_sender_clone = interrupt_sender.clone();
+    if let Err(e) = init(interrupt_sender_clone, interrupt_receiver) {
         let mut error_string = format!("Reason: {}\nCaused by: ", &e);
         let error_string_initial_length = error_string.len();
         e.chain()
@@ -94,21 +91,21 @@ fn main() {
     }
 }
 
-fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
+fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) -> Result<()> {
     cfg_if::cfg_if! {
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
-            let unix_listener = socket::bind(&QINIT_SOCKET_PATH)?;
+            let boot_unix_listener = socket::bind(&BOOT_SOCKET_PATH)?;
 
             first_stage_info("Spawning second stage qinit binary");
             fs::create_dir_all(&QINIT_LOG_DIR)?;
             Command::new("/bin/sh").args(&["-c", &format!("{} 2>&1 | tee -a {}", &QINIT_PATH, &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE))]).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
 
             first_stage_info("Waiting for status message from second stage qinit binary");
-            let status = from_bytes::<OverlayStatus>(socket::read(unix_listener)?.deref())?;
+            let status = from_bytes::<OverlayStatus>(socket::read(boot_unix_listener)?.deref())?;
             if status.ready {
                 first_stage_info("Ready for systemd initialization");
-                fs::remove_file(&QINIT_SOCKET_PATH).with_context(|| "Failed to remove qinit UNIX socket file")?;
+                fs::remove_file(&BOOT_SOCKET_PATH).with_context(|| "Failed to remove qinit UNIX socket file")?;
 
                 first_stage_info("Entering rootfs chroot, goodbye");
                 unix::fs::chroot(&OVERLAY_MOUNTPOINT).with_context(|| "Failed to chroot to overlay filesytem's mountpoint")?;
@@ -180,6 +177,7 @@ fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
+            enforce_fb()?;
             thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, version_string, short_version_string, display_progress_bar));
 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
@@ -192,8 +190,27 @@ fn init(interrupt_receiver: Receiver<String>) -> Result<()> {
             {
                 // Resume boot
                 rootfs::setup(&pubkey, &mut boot_config)?;
+            }
+
+            // Socket used for binaries inside the chroot wishing to invoke a 'Fatal error' splash
+            let qinit_socket_path = format!("{}/run/{}", &libqinit::OVERLAY_MOUNTPOINT, &QINIT_SOCKET);
+            std::thread::spawn(move || {
+                if let Ok(qinit_unix_listener) = socket::bind(&qinit_socket_path) {
+                    // This is a one-time call: any more fatal errors are useless since we already block the UI until the next boot
+                    if let Ok(qinit_unix_listener_socket) = socket::read(qinit_unix_listener) {
+                        info!("Received request to show fatal error splash: proceeding");
+                        if let Ok(error_details) = from_bytes::<socket::ErrorDetails>(&qinit_unix_listener_socket) {
+                            let _ = interrupt_sender.send(error_details.error_reason);
+                            let _ = fs::remove_file(&qinit_socket_path);
+                        }
+                    }
+                }
+            });
+
+            #[cfg(not(feature = "gui_only"))] {
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
-                socket::write(&QINIT_SOCKET_PATH, &overlay_status)?;
+                socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
+
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
                     systemd::wait_for_targets(systemd_targets_total, progress_sender)?;
