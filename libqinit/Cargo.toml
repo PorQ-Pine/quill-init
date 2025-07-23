@@ -22,3 +22,5 @@ sys-mount = "3.0.1"
 [features]
 debug = []
 free_roam = []
+gui_only = []
+init_wrapper = []

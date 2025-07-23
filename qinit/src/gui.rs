@@ -3,7 +3,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use anyhow::Result;
 use libqinit::system::{
     compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
-    read_kernel_buffer_singleshot, reboot
+    read_kernel_buffer_singleshot, reboot,
 };
 use log::{error, info};
 use qrcode_generator::QrCodeEcc;
@@ -12,7 +12,7 @@ use std::fs;
 slint::include_modules!();
 
 const TOAST_DURATION_MILLIS: i32 = 5000;
-const NOT_AVAILABLE: &str = "Not currently available";
+const NOT_AVAILABLE: &str = "(Not currently available)";
 const HELP_URI: &str = "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/boot-errors.md";
 const QR_CODE_TAB_INDEX: i32 = 0;
 const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
@@ -108,31 +108,26 @@ pub fn setup_gui(
             move || {
                 if let Ok(error_reason) = interrupt_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
-                        let mut qr_code_string = String::new();
-                        let lines_to_keep = 50;
+                        let mut program_output = String::new();
+                        let mut kernel_buffer = String::new();
+                        let qinit_log_file_path =
+                            format!("{}/{}", &crate::QINIT_LOG_DIR, &crate::QINIT_LOG_FILE);
+                        let lines_to_keep_ui = 150;
 
-                        qr_code_string.push_str(&error_reason);
-                        qr_code_string.push_str("\n\n");
-
-                        if let Ok(program_output) = fs::read_to_string(&format!(
-                            "{}/{}",
-                            &crate::QINIT_LOG_DIR,
-                            &crate::QINIT_LOG_FILE
-                        )) {
+                        if let Ok(contents) = fs::read_to_string(&qinit_log_file_path) {
+                            program_output = contents.clone();
                             let stripped_program_output =
-                                keep_last_lines(&program_output, lines_to_keep);
+                                keep_last_lines(&contents, lines_to_keep_ui);
                             gui.set_program_output(SharedString::from(&stripped_program_output));
-                            qr_code_string.push_str(&stripped_program_output);
-                            qr_code_string.push_str("\n\n");
                         } else {
                             gui.set_program_output(SharedString::from(NOT_AVAILABLE));
                         }
 
-                        if let Ok(kernel_buffer) = read_kernel_buffer_singleshot() {
+                        if let Ok(contents) = read_kernel_buffer_singleshot() {
+                            kernel_buffer = contents.clone();
                             let stripped_kernel_buffer =
-                                keep_last_lines(&kernel_buffer, lines_to_keep);
+                                keep_last_lines(&contents, lines_to_keep_ui);
                             gui.set_kernel_buffer(SharedString::from(&stripped_kernel_buffer));
-                            qr_code_string.push_str(&stripped_kernel_buffer);
                         } else {
                             gui.set_kernel_buffer(SharedString::from(NOT_AVAILABLE));
                         }
@@ -150,15 +145,61 @@ pub fn setup_gui(
                             }
                         }
 
-                        if let Ok(qr_code_svg) = generate_error_splash_qr_code(&qr_code_string) {
-                            if let Ok(debug_qr_code) =
-                                Image::load_from_svg_data(&qr_code_svg.as_bytes())
-                            {
-                                gui.set_debug_tab_index(QR_CODE_TAB_INDEX);
-                                gui.set_qr_code_page(QrCodePage::QrCode);
-                                gui.set_debug_qr_code(debug_qr_code);
+                        // Algorithm to find what number of lines to keep to fit the QR code
+                        let mut lines_to_keep_qr = 100;
+                        let mut compressed_size = 0;
+                        let mut compressed_data = vec![];
+                        // Yes, it is very specific: one byte more, and the QR code seems to shrink
+                        let ideal_size = 2563;
+                        info!("Attempting to optimize QR code data");
+                        loop {
+                            if compressed_size == 0 || compressed_size >= ideal_size {
+                                let mut qr_code_string = String::new();
+                                qr_code_string.push_str(&error_reason);
+                                qr_code_string.push_str("\n\n");
+                                qr_code_string
+                                    .push_str(&keep_last_lines(&program_output, lines_to_keep_qr));
+                                qr_code_string.push_str("\n\n");
+                                qr_code_string
+                                    .push_str(&keep_last_lines(&kernel_buffer, lines_to_keep_qr));
+                                if let Ok(data) = compress_string_to_xz(&qr_code_string) {
+                                    compressed_size = data.len();
+                                    if compressed_size <= ideal_size {
+                                        info!("Keeping {} lines from each logging source for a total of {} compressed bytes", &lines_to_keep_qr, &compressed_size);
+                                        compressed_data = data;
+                                        break;
+                                    } else {
+                                        lines_to_keep_qr -= 1;
+                                    }
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        let mut set_not_available = false;
+                        if !compressed_data.is_empty() {
+                            if let Ok(qr_code_svg) = qrcode_generator::to_svg_to_string(
+                                &compressed_data,
+                                QrCodeEcc::Low,
+                                1024,
+                                None::<&str>,
+                            ) {
+                                if let Ok(debug_qr_code) =
+                                    Image::load_from_svg_data(&qr_code_svg.as_bytes())
+                                {
+                                    gui.set_debug_tab_index(QR_CODE_TAB_INDEX);
+                                    gui.set_qr_code_page(QrCodePage::QrCode);
+                                    gui.set_debug_qr_code(debug_qr_code);
+                                }
+                            } else {
+                                set_not_available = true;
                             }
                         } else {
+                            set_not_available = true;
+                        }
+
+                        if set_not_available {
                             gui.set_debug_tab_index(QR_CODE_NOT_AVAILABLE_TAB_INDEX);
                             gui.set_qr_code_page(QrCodePage::NotAvailable);
                         }
@@ -232,14 +273,4 @@ pub fn setup_gui(
     gui.run()?;
 
     Ok(())
-}
-
-fn generate_error_splash_qr_code(string: &str) -> Result<String> {
-    let compressed_string = compress_string_to_xz(&string)?;
-    Ok(qrcode_generator::to_svg_to_string(
-        &compressed_string,
-        QrCodeEcc::Low,
-        1024,
-        None::<&str>,
-    )?)
 }

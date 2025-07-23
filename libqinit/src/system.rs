@@ -310,7 +310,7 @@ pub fn keep_last_lines(string: &str, lines_to_keep: usize) -> String {
 }
 
 pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
-    info!("Compressing string to xz");
+    // info!("Compressing string to xz");
     let base64_string = BASE64_STANDARD.encode(string);
     let data = Command::new("/bin/sh")
         .args(&[
@@ -319,7 +319,7 @@ pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
         ])
         .output()?
         .stdout;
-    info!("Compressed string size: {} bytes", data.iter().count());
+    // info!("Compressed string size: {} bytes", data.iter().count());
 
     Ok(data)
 }

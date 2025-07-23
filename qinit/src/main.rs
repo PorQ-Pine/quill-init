@@ -51,8 +51,8 @@ cfg_if::cfg_if! {
 
 use anyhow::{Context, Result};
 use libqinit::socket;
-use postcard::{to_allocvec, from_bytes};
 use log::{error, info};
+use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::mpsc::{Receiver, Sender, channel};
