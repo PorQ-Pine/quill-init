@@ -1,9 +1,11 @@
 import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
-import { MinorButton } from "../../ui-common/minorbutton.slint";
+import { IconButton } from "../../ui-common/iconbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
 import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
+import { HLine } from "../../ui-common/hline.slint";
+import { VLine } from "../../ui-common/vline.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery, Error }
 export enum QrCodePage { QrCode, NotAvailable }
@@ -12,7 +14,7 @@ export enum Dialog { None, Toast, ConfirmationDialog }
 
 export component AppWindow inherits Window {
     // Scaling
-    in-out property<int> scaling_factor: 1;
+    in-out property <int> scaling_factor: 1;
     // Root properties
     default-font-family: "U001";
     default-font-size: 40px * scaling_factor;
@@ -23,376 +25,512 @@ export component AppWindow inherits Window {
     callback toggle_ui_scale();
     callback boot_default();
     // In-out properties
-    in-out property<string> version_string;
-    in-out property<string> short_version_string;
-    in-out property<float> boot_progress;
-    in-out property<Page> page;
-    in-out property<QrCodePage> qr_code_page;
-    in-out property<ProgressWidget> progress_widget;
-    in-out property<Dialog> dialog;
-    in-out property<string> dialog_message;
-    in-out property<int> dialog_millis_count;
-    in-out property<float> button_scaling_multiplier: 1;
-    in-out property<bool> startup_finished: false;
-    in-out property<string> error_reason;
-    in-out property<string> program_output;
-    in-out property<string> kernel_buffer;
-    in-out property<image> debug_qr_code;
-    in-out property<image> help_uri_qr_code;
-    in-out property<int> debug_tab_index: 0;
+    in-out property <string> version_string;
+    in-out property <string> short_version_string;
+    in-out property <float> boot_progress;
+    in-out property <Page> page;
+    in-out property <QrCodePage> qr_code_page;
+    in-out property <ProgressWidget> progress_widget;
+    in-out property <Dialog> dialog;
+    in-out property <string> dialog_message;
+    in-out property <int> dialog_millis_count;
+    in-out property <float> button_scaling_multiplier: 1;
+    in-out property <bool> startup_finished: false;
+    in-out property <string> error_reason;
+    in-out property <string> program_output;
+    in-out property <string> kernel_buffer;
+    in-out property <image> debug_qr_code;
+    in-out property <image> help_uri_qr_code;
+    in-out property <int> debug_tab_index: 0;
+    in-out property <string> section_header_title;
     // Generic multipliers for default-sized and smaller-sized buttons
-    property<float> wmultiplier: 0.25;
-    property<float> hmultiplier: 0.05;
-    property<float> swmultiplier: 0.25;
-    property<float> shmultiplier: 0.03;
+    property <float> wmultiplier: 0.25;
+    property <float> hmultiplier: 0.05;
+    property <float> swmultiplier: 0.25;
+    property <float> shmultiplier: 0.03;
     // Default sizes/radii/properties; there may be elements that don't enforce them for various reasons
-    property<relative-font-size> header_font_size: 2rem;
-    property<length> layout_padding: 60px;
-    property<length> button_width: root.width * wmultiplier * scaling_factor * button_scaling_multiplier;
-    property<length> button_height: root.height * hmultiplier * scaling_factor * button_scaling_multiplier;
-    property<length> switch_width: button_width * 0.45;
-    property<length> switch_height: button_height * 0.7;
-    property<length> radius: 10px;
-    property<length> logo_width: 0.45 * root.width;
-    property<length> logo_height: logo_width;
-    property<length> medium_logo_width: logo_width * 0.55;
-    property<length> medium_logo_height: medium_logo_width;
-    property<string> header_font_family: "Inter";
-    property<string> console_font_family: "Roboto Mono";
-    property<string> regular_font_family: "U001";
-    property<length> console_header_font_size: 0.8 * self.default_font_size;
-    property<length> console_body_font_size: 0.6 * self.default_font_size;
-    property<length> tab_rectangle_border_width: 2px;
-    property<color> tab_rectangle_border_color: darkgrey;
+    property <relative-font-size> header_font_size: 2rem;
+    property <length> layout_padding: 30px;
+    property <length> layout_spacing: 10px;
+    property <length> button_width: root.width * wmultiplier * scaling_factor * button_scaling_multiplier;
+    property <length> button_height: root.height * hmultiplier * scaling_factor * button_scaling_multiplier;
+    property <length> icon_button_height: button_height * 0.5;
+    property <length> switch_width: button_width * 0.45;
+    property <length> switch_height: button_height * 0.7;
+    property <length> radius: 10px;
+    property <length> logo_width: 0.45 * root.width;
+    property <length> logo_height: logo_width;
+    property <length> medium_logo_width: logo_width * 0.55;
+    property <length> medium_logo_height: medium_logo_width;
+    property <string> header_font_family: "Inter";
+    property <string> console_font_family: "Roboto Mono";
+    property <string> regular_font_family: "U001";
+    property <length> console_header_font_size: 0.8 * self.default_font_size;
+    property <length> console_body_font_size: 0.6 * self.default_font_size;
+    property <length> tab_rectangle_border_width: 2px;
+    property <color> tab_rectangle_border_color: darkgrey;
 
     // Main UI
-    if (page == Page.QuillBoot) : VerticalLayout {
-        padding: layout_padding;
-        Rectangle {}
-        HorizontalLayout {
-            alignment: center;
-            Image {
+    // Don't ask me why a ScrollView is needed here to prevent binding loops...
+    ScrollView {
+        VerticalLayout {
+            padding: layout_padding;
+            spacing: layout_spacing;
+            if (page != Page.QuillBoot) && (page != Page.BootSplash): HorizontalLayout {
+                IconButton {
+                    icon_path: @image-url("../../icons/arrow-back.svg");
+                    border-radius: radius;
+                    height: icon_button_height;
+                    width: self.height;
+                    /* This is needed to center this item vertically on the horizontal layout.
+                        It would be great if Slint provided an option to do it automatically instead... */
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        root.page = Page.QuillBoot;
+                    }
+                }
+
+                Rectangle { }
+
+                Text {
+                    text: section_header_title;
+                    horizontal-alignment: center;
+                    font-family: header_font_family;
+                    font-weight: 800;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Rectangle { }
+
+                Rectangle {
+                    height: icon_button_height;
+                    width: self.height;
+                }
+            }
+            if (page != Page.QuillBoot) && (page != Page.BootSplash): HLine { }
+
+            if (page == Page.QuillBoot): VerticalLayout {
+                padding: layout_padding;
+                Rectangle { }
+
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
                 // Displaying the same image but with the SVG file gave terrible results, for some reason
                 source: @image-url("../../branding/quill-banner.png");
-                width: 768px;
-                height: 330.5625px;
-            }
-        }
-        Rectangle {}
-        HorizontalLayout {
-            Text {
-                text: "QuillBoot";
-                horizontal-alignment: center;
-                font-family: header_font_family;
-                font-size: header_font_size;
-                font-weight: 800;
-            }
-        }
-        HorizontalLayout {
-            alignment: center;
-            Text {
-                text: "Diagnostics & Recovery";
-                font-size: 1rem;
-            }
-        }
-        Rectangle {}
-        HorizontalLayout {
-            Button {
-                text: "Recovery";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.page = Page.Recovery;
+                        width: 768px;
+                        height: 330.5625px;
+                    }
                 }
-            }
-            Rectangle {}
-            Button {
-                text: "Quill OS";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.page = Page.BootSplash;
-                    root.boot_default();
-                }
-            }
-            Rectangle {}
-            Button {
-                text: "Power off";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.power_off();
-                }
-            }
-        }
-        Rectangle {}
-        HorizontalLayout {
-            Button {
-                text: "About";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.page = Page.VersionInfo;
-                }
-            }
-            Rectangle {}
-            Text {
-                vertical-alignment: center;
-                font-family: regular_font_family;
-                text: "Scale GUI";
-            }
-            Rectangle { horizontal-stretch: 0.05; }
-            Switch {
-                y: (parent.height - self.height) / 2;
-                width: switch_width;
-                height: switch_height;
-                border-radius: radius;
-                activated: scaling_factor > 1 ? true : false;
-                toggled => {
-                    root.toggle_ui_scale();
-                }
-            }
-        }
-    }
 
-    if (page == Page.BootSplash) : VerticalLayout {
-        padding-top: 550px;
-        padding-bottom: self.padding-top;
-        HorizontalLayout {
-            alignment: center;
-            Image {
-                width: logo_width;
-                height: logo_height;
-                source: @image-url("../../branding/quillos.svg");
-            }
-        }
-        Rectangle {}
-        HorizontalLayout {
-            alignment: center;
-            if (progress_widget == ProgressWidget.ProgressBar) : ProgressBar {
-                progress: root.boot_progress;
-                width: 37.5%;
-                height: 2%;
-            }
-            if (progress_widget == ProgressWidget.MovingDots) : Rectangle {
-                width: 14%;
-                MovingDots { ready: startup_finished; }
-            }
-        }
-    }
+                Rectangle { }
 
-    if (page == Page.VersionInfo) : VerticalLayout {
-        padding: layout_padding;
-        Rectangle {}
-        HorizontalLayout {
-            alignment: center;
-            Image {
-                source: @image-url("../../branding/quillos.svg");
-                width: 25%;
-                height: 25%;
-            }
-        }
-        Rectangle { vertical-stretch: 0.25; }
-        ScrollView {
-            height: 50%;
-            mouse-drag-pan-enabled: true;
-            VerticalLayout {
-                Text {
-                    text: "Copyright © 2021-2025";
-                    horizontal-alignment: center;
-                    font-family: header_font_family;
-                    font-weight: 800;
+                HorizontalLayout {
+                    Text {
+                        text: "QuillBoot";
+                        horizontal-alignment: center;
+                        font-family: header_font_family;
+                        font-size: header_font_size;
+                        font-weight: 800;
+                    }
                 }
-                Text {
-                    text: "Nicolas Mailloux\n<nicolecrivain@gmail.com>\nSzybet\n<https://github.com/Szybet>";
-                    font-family: regular_font_family;
-                    horizontal-alignment: center;
-                }
-                Rectangle { vertical-stretch: 0.25; }
-                Text {
-                    text: "Software information";
-                    horizontal-alignment: center;
-                    font-family: header_font_family;
-                    font-weight: 800;
-                }
-                Text {
-                    text: root.version_string;
-                    horizontal-alignment: center;
-                    wrap: word-wrap;
-                }
-            }
-        }
-        Rectangle {}
-        HorizontalLayout{
-            alignment: center;
-            Button {
-                text: "Back";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.page = Page.QuillBoot;
-                }
-            }
-        }
-    }
 
-    if (page == Page.Recovery) : VerticalLayout {
+                HorizontalLayout {
+                    alignment: center;
+                    Text {
+                        text: "Diagnostics & Recovery";
+                        font-size: 1rem;
+                    }
+                }
 
-    }
+                Rectangle { }
 
-    if (page == Page.Error) : VerticalLayout {
-        padding-left: layout_padding;
-        padding-right: layout_padding;
-        Rectangle { vertical-stretch: 0.1; }
-        HorizontalLayout {
-            alignment: center;
-            spacing: root.width * 0.04;
-            Image {
-                source: @image-url("../../icons/x-alert.svg");
-                width: medium_logo_width;
-                height: medium_logo_height;
-            }
-            Image {
-                source: help_uri_qr_code;
-                width: medium_logo_width;
-                height: medium_logo_height;
-            }
-        }
-        Rectangle { vertical-stretch: 0.1; }
-        Text {
-            text: "Fatal error";
-            horizontal-alignment: center;
-            font-family: header_font_family;
-            font-size: header_font_size;
-            font-weight: 800;
-        }
-        Rectangle { vertical-stretch: 0.1; }
-        HorizontalLayout {
-            alignment: center;
-            Text {
-                text: error_reason;
-                horizontal-alignment: center;
-                wrap: word-wrap;
-                font-family: console_font_family;
-                font-size: console_header_font_size;
-                width: root.width * 0.7;
-            }
-        }
-        Rectangle { vertical-stretch: 0.1; }
-        TabWidget {
-            current-index: debug_tab_index;
-            Tab {
-                title: "Debug QR code";
-                Rectangle {
-                    border-width: tab_rectangle_border_width;
-                    border-color: tab_rectangle_border_color;
-                    VerticalLayout {
-                        alignment: center;
-                        if (qr_code_page == QrCodePage.QrCode): Image {
-                            source: debug_qr_code;
-                            height: 99%;
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: layout_spacing * 4;
+                    Button {
+                        text: "Recovery";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        clicked => {
+                            section_header_title = "Recovery options";
+                            root.page = Page.Recovery;
                         }
-                        if (qr_code_page == QrCodePage.NotAvailable): Text {
-                            text: "(Not currently available)";
+                    }
+
+                    Button {
+                        text: "Quill OS";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        clicked => {
+                            root.page = Page.BootSplash;
+                            root.boot_default();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 0.17;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    Button {
+                        text: "Power off";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        clicked => {
+                            root.power_off();
+                        }
+                    }
+                }
+
+                Rectangle { }
+
+                HorizontalLayout {
+                    Button {
+                        text: "About";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        clicked => {
+                            section_header_title = "About";
+                            root.page = Page.VersionInfo;
+                        }
+                    }
+
+                    Rectangle { }
+
+                    Text {
+                        vertical-alignment: center;
+                        font-family: regular_font_family;
+                        text: "Scale GUI";
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 0.05;
+                    }
+
+                    Switch {
+                        y: (parent.height - self.height) / 2;
+                        width: switch_width;
+                        height: switch_height;
+                        border-radius: radius;
+                        activated: scaling_factor > 1 ? true : false;
+                        toggled => {
+                            root.toggle_ui_scale();
+                        }
+                    }
+                }
+            }
+
+            if (page == Page.BootSplash): VerticalLayout {
+                padding-top: 550px;
+                padding-bottom: self.padding-top;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        width: logo_width;
+                        height: logo_height;
+                        source: @image-url("../../branding/quillos.svg");
+                    }
+                }
+
+                Rectangle { }
+
+                HorizontalLayout {
+                    alignment: center;
+                    if (progress_widget == ProgressWidget.ProgressBar): ProgressBar {
+                        progress: root.boot_progress;
+                        width: 37.5%;
+                        height: 2%;
+                    }
+                    if (progress_widget == ProgressWidget.MovingDots): Rectangle {
+                        width: 14%;
+                        MovingDots {
+                            ready: startup_finished;
+                        }
+                    }
+                }
+            }
+
+            if (page == Page.VersionInfo): VerticalLayout {
+                spacing: layout_spacing;
+                Rectangle { }
+
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../branding/quillos.svg");
+                        width: root.width * 0.25;
+                        height: self.width;
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 0.1;
+                }
+
+                ScrollView {
+                    height: 50%;
+                    mouse-drag-pan-enabled: true;
+                    VerticalLayout {
+                        Text {
+                            text: "Quill OS";
+                            horizontal-alignment: center;
+                            font-family: header_font_family;
+                            font-size: header_font_size;
+                            font-weight: 800;
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 0.1;
+                        }
+
+                        Text {
+                            text: "Copyright © 2021-2025";
+                            horizontal-alignment: center;
+                            font-family: header_font_family;
+                            font-weight: 800;
+                        }
+
+                        Text {
+                            text: "Nicolas Mailloux\n<nicolecrivain@gmail.com>\nSzybet\n<https://github.com/Szybet>";
                             font-family: regular_font_family;
                             horizontal-alignment: center;
                         }
+
+                        Rectangle {
+                            vertical-stretch: 0.25;
+                        }
+
+                        Text {
+                            text: "Software information";
+                            horizontal-alignment: center;
+                            font-family: header_font_family;
+                            font-weight: 800;
+                        }
+
+                        Text {
+                            text: root.version_string;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
                     }
                 }
+
+                Rectangle { }
             }
-            Tab {
-                title: "Program output";
+
+            if (page == Page.Recovery): VerticalLayout {
+                spacing: layout_spacing;
+                ScrollView {
+                    mouse-drag-pan-enabled: true;
+                    HorizontalLayout {
+                        Text {
+                            text: "Soft-reset this device";
+                            horizontal-alignment: center;
+                            font-family: regular_font_family;
+                        }
+
+                        Rectangle { }
+
+                        Button {
+                            text: "Soft reset";
+                            width: button_width;
+                            height: button_height;
+                            border-radius: radius;
+                        }
+                    }
+
+                    Rectangle { }
+                }
+            }
+
+            if (page == Page.Error): VerticalLayout {
+                padding-left: layout_padding;
+                padding-right: layout_padding;
                 Rectangle {
-                    border-width: tab_rectangle_border_width;
-                    border-color: tab_rectangle_border_color;
-                    VerticalLayout {
-                        ScrollView {
-                            mouse-drag-pan-enabled: true;
+                    vertical-stretch: 0.1;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: root.width * 0.04;
+                    Image {
+                        source: @image-url("../../icons/x-alert.svg");
+                        width: medium_logo_width;
+                        height: medium_logo_height;
+                    }
+
+                    Image {
+                        source: help_uri_qr_code;
+                        width: medium_logo_width;
+                        height: medium_logo_height;
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 0.1;
+                }
+
+                Text {
+                    text: "Fatal error";
+                    horizontal-alignment: center;
+                    font-family: header_font_family;
+                    font-size: header_font_size;
+                    font-weight: 800;
+                }
+
+                Rectangle {
+                    vertical-stretch: 0.1;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    Text {
+                        text: error_reason;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                        font-family: console_font_family;
+                        font-size: console_header_font_size;
+                        width: root.width * 0.7;
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 0.1;
+                }
+
+                TabWidget {
+                    current-index: debug_tab_index;
+                    Tab {
+                        title: "Debug QR code";
+                        Rectangle {
+                            border-width: tab_rectangle_border_width;
+                            border-color: tab_rectangle_border_color;
+                            VerticalLayout {
+                                alignment: center;
+                                if (qr_code_page == QrCodePage.QrCode): Image {
+                                    source: debug_qr_code;
+                                    height: 99%;
+                                }
+                                if (qr_code_page == QrCodePage.NotAvailable): Text {
+                                    text: "(Not currently available)";
+                                    font-family: regular_font_family;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    Tab {
+                        title: "Program output";
+                        Rectangle {
+                            border-width: tab_rectangle_border_width;
+                            border-color: tab_rectangle_border_color;
+                            VerticalLayout {
+                                ScrollView {
+                                    mouse-drag-pan-enabled: true;
                             // Scroll to bottom
                             viewport-y: 0px - self.viewport-height + self.visible-height;
+                                    VerticalLayout {
+                                        Text {
+                                            text: program_output;
+                                            wrap: word-wrap;
+                                            font-size: console_body_font_size;
+                                            font-family: console_font_family;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Tab {
+                        title: "Kernel log";
+                        Rectangle {
+                            border-width: tab_rectangle_border_width;
+                            border-color: tab_rectangle_border_color;
                             VerticalLayout {
-                                Text {
-                                    text: program_output;
-                                    wrap: word-wrap;
-                                    font-size: console_body_font_size;
-                                    font-family: console_font_family;
+                                ScrollView {
+                                    mouse-drag-pan-enabled: true;
+                            // Scroll to bottom
+                            viewport-y: 0px - self.viewport-height + self.visible-height;
+                                    VerticalLayout {
+                                        Text {
+                                            text: kernel_buffer;
+                                            wrap: word-wrap;
+                                            font-size: console_body_font_size;
+                                            font-family: console_font_family;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            Tab {
-                title: "Kernel log";
+
                 Rectangle {
-                    border-width: tab_rectangle_border_width;
-                    border-color: tab_rectangle_border_color;
-                    VerticalLayout {
-                        ScrollView {
-                            mouse-drag-pan-enabled: true;
-                            // Scroll to bottom
-                            viewport-y: 0px - self.viewport-height + self.visible-height;
-                            VerticalLayout {
-                                Text {
-                                    text: kernel_buffer;
-                                    wrap: word-wrap;
-                                    font-size: console_body_font_size;
-                                    font-family: console_font_family;
-                                }
-                            }
+                    vertical-stretch: 0.1;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: root.width * 0.1;
+                    Button {
+                        text: "Power off";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        clicked => {
+                            root.power_off();
+                        }
+                    }
+
+                    Button {
+                        text: "Reboot";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        clicked => {
+                            root.reboot();
                         }
                     }
                 }
-            }
-        }
-        Rectangle { vertical-stretch: 0.1; }
-        HorizontalLayout {
-            alignment: center;
-            spacing: root.width * 0.1;
-            Button {
-                text: "Power off";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.power_off();
+
+                Rectangle {
+                    vertical-stretch: 0.1;
                 }
-            }
-            Button {
-                text: "Reboot";
-                width: button_width;
-                height: button_height;
-                border-radius: radius;
-                clicked => {
-                    root.reboot();
+
+                HorizontalLayout {
+                    alignment: center;
+                    Text {
+                        text: short_version_string;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                        font-family: console_font_family;
+                        font-size: console_body_font_size;
+                        width: root.width * 0.85;
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 0.1;
                 }
             }
         }
-        Rectangle { vertical-stretch: 0.1; }
-        HorizontalLayout {
-            alignment: center;
-            Text {
-                text: short_version_string;
-                horizontal-alignment: center;
-                wrap: word-wrap;
-                font-family: console_font_family;
-                font-size: console_body_font_size;
-                width: root.width * 0.85;
-            }
-        }
-        Rectangle { vertical-stretch: 0.1; }
     }
 
     // Toasts/dialogs
-    if (dialog == Dialog.Toast) : Rectangle {
+    if (dialog == Dialog.Toast): Rectangle {
         width: 0.4 * scaling_factor * root.width;
         height: 0.07 * scaling_factor * root.height;
-        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         border-color: black;
         border-width: 6px;
         border-radius: radius;
