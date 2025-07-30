@@ -6,11 +6,12 @@ import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
+import { Dialog } from "../../ui-common/dialog.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum Dialog { None, Toast, ConfirmationDialog }
+export enum DialogType { None, Toast, SoftReset }
 
 export component AppWindow inherits Window {
     // Scaling
@@ -24,6 +25,7 @@ export component AppWindow inherits Window {
     callback reboot();
     callback toggle_ui_scale();
     callback boot_default();
+    callback soft_reset();
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -31,7 +33,7 @@ export component AppWindow inherits Window {
     in-out property <Page> page;
     in-out property <QrCodePage> qr_code_page;
     in-out property <ProgressWidget> progress_widget;
-    in-out property <Dialog> dialog;
+    in-out property <DialogType> dialog;
     in-out property <string> dialog_message;
     in-out property <int> dialog_millis_count;
     in-out property <float> button_scaling_multiplier: 1;
@@ -343,6 +345,10 @@ export component AppWindow inherits Window {
                             width: button_width;
                             height: button_height;
                             border-radius: radius;
+                            clicked => {
+                                dialog_message = "This will erase all of the user data on this device and reset settings to default, without reinstalling the firmware. Are you sure you want to continue?";
+                                dialog = DialogType.SoftReset;
+                            }
                         }
                     }
 
@@ -458,8 +464,8 @@ export component AppWindow inherits Window {
                             VerticalLayout {
                                 ScrollView {
                                     mouse-drag-pan-enabled: true;
-                            // Scroll to bottom
-                            viewport-y: 0px - self.viewport-height + self.visible-height;
+                                    // Scroll to bottom
+                                    viewport-y: 0px - self.viewport-height + self.visible-height;
                                     VerticalLayout {
                                         Text {
                                             text: kernel_buffer;
@@ -526,7 +532,7 @@ export component AppWindow inherits Window {
     }
 
     // Toasts/dialogs
-    if (dialog == Dialog.Toast): Rectangle {
+    if (dialog == DialogType.Toast): Rectangle {
         width: 0.4 * scaling_factor * root.width;
         height: 0.07 * scaling_factor * root.height;
         x: (parent.width - self.width) / 2;
@@ -539,6 +545,23 @@ export component AppWindow inherits Window {
             text: root.dialog_message;
             font-family: "Inter";
             font-weight: 800;
+        }
+    }
+    if (dialog != DialogType.None && dialog != DialogType.Toast): Dialog {
+        border-radius: radius;
+        width: 0.45 * scaling_factor * root.width;
+        height: 0.3 * scaling_factor * root.height;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        text: root.dialog_message;
+        cancel => {
+            dialog = DialogType.None;
+        }
+        confirm => {
+            if dialog == DialogType.SoftReset {
+                soft_reset();
+            }
+            dialog = DialogType.None;
         }
     }
 }

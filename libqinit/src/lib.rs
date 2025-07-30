@@ -1,4 +1,5 @@
 pub mod boot_config;
+pub mod recovery;
 pub mod rootfs;
 pub mod signing;
 pub mod socket;

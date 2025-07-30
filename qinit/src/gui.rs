@@ -1,6 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 
 use anyhow::Result;
+use libqinit::recovery::soft_reset;
 use libqinit::system::{
     compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
     read_kernel_buffer_singleshot, reboot,
@@ -13,7 +14,8 @@ slint::include_modules!();
 
 const TOAST_DURATION_MILLIS: i32 = 5000;
 const NOT_AVAILABLE: &str = "(Not currently available)";
-const HELP_URI: &str = "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/fatal-errors.md";
+const HELP_URI: &str =
+    "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/fatal-errors.md";
 const QR_CODE_TAB_INDEX: i32 = 0;
 const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
 
@@ -83,12 +85,12 @@ pub fn setup_gui(
             let gui_weak = gui_weak.clone();
             move || {
                 if let Some(gui) = gui_weak.upgrade() {
-                    if gui.get_dialog() == Dialog::Toast {
+                    if gui.get_dialog() == DialogType::Toast {
                         let current_count = gui.get_dialog_millis_count();
                         let future_count = current_count + toast_gc_delay;
                         if future_count > TOAST_DURATION_MILLIS {
                             gui.set_dialog_millis_count(0);
-                            gui.set_dialog(Dialog::None);
+                            gui.set_dialog(DialogType::None);
                         } else {
                             gui.set_dialog_millis_count(future_count);
                         }
@@ -220,7 +222,7 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to power off";
                     gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(Dialog::Toast);
+                    gui.set_dialog(DialogType::Toast);
                     error!("{}: {}", &err_msg, e);
                 }
             }
@@ -234,7 +236,7 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to reboot";
                     gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(Dialog::Toast);
+                    gui.set_dialog(DialogType::Toast);
                     error!("{}: {}", &err_msg, e);
                 }
             }
@@ -263,10 +265,16 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to send boot command";
                     gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(Dialog::Toast);
+                    gui.set_dialog(DialogType::Toast);
                     error!("{}: {}", &err_msg, e);
                 }
             }
+        }
+    });
+
+    gui.on_soft_reset({
+        move || {
+            if let Err(e) = soft_reset() {}
         }
     });
 
