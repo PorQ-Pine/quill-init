@@ -34,6 +34,7 @@ cfg_if::cfg_if! {
                 use nix::unistd::sethostname;
                 use std::time::Duration;
                 use crossterm::event::{self, Event};
+
                 #[cfg(feature = "debug")]
                 mod debug;
             }
@@ -138,9 +139,16 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 mount_data_partition()?;
                 mount_firmware(&pubkey)?;
+            }
 
+            // Read boot configuration
+            let original_boot_config = BootConfig::read()?;
+            let mut boot_config = original_boot_config.clone();
+
+            #[cfg(not(feature = "gui_only"))]
+            {
                 #[cfg(feature = "debug")]
-                debug::start_debug_framework(&pubkey).with_context(|| "Failed to start debug framework")?;
+                debug::start_debug_framework(&pubkey, &mut boot_config).with_context(|| "Failed to start debug framework")?;
 
                 eink::load_waveform()?;
                 eink::load_modules()?;
@@ -161,10 +169,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 }
                 println!();
             }
-
-            // Read boot configuration
-            let original_boot_config = BootConfig::read()?;
-            let mut boot_config = original_boot_config.clone();
 
             // Setup GUI
             let mut systemd_targets_total = SYSTEMD_NO_TARGETS;

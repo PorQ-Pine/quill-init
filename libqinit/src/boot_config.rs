@@ -16,10 +16,18 @@ pub struct RootFS {
     pub timestamp: i64,
 }
 
+#[cfg(feature = "debug")]
+#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+pub struct Debug {
+    pub usbnet_mac_address: Option<String>,
+}
+
 #[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BootConfig {
     pub flags: BootFlags,
     pub rootfs: RootFS,
+    #[cfg(feature = "debug")]
+    pub debug: Debug,
 }
 
 impl BootConfig {

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use libqinit::boot_config::BootConfig;
 use libqinit::signing::check_signature;
 use libqinit::system::{modprobe, run_command};
 use log::warn;
@@ -8,6 +9,7 @@ use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use regex::Regex;
 use std::fs;
+use std::process::Command;
 
 const IP_ADDR: &str = "192.168.2.2";
 const IP_POOL_END: &str = "192.168.2.254";
@@ -17,19 +19,32 @@ const DEBUG_SETUP_SCRIPT: &str = "debug-setup.sh";
 const COPIED_DEBUG_SCRIPT: &str = ".profile";
 const USER_UDHCPD_CONF_FILE: &str = "udhcpd.conf";
 
-pub fn start_debug_framework(pubkey: &PKey<Public>) -> Result<()> {
-    start_usbnet(&pubkey)?;
+pub fn start_debug_framework(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> {
+    start_usbnet(&pubkey, boot_config)?;
     start_sshd()?;
     prepare_script_login(&pubkey)?;
 
     Ok(())
 }
 
-pub fn start_usbnet(pubkey: &PKey<Public>) -> Result<()> {
+pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> {
     warn!("Setting up USB networking");
+
+    let usbnet_mac_address;
+    let generated_mac_address;
+    if let Some(config_usbnet_mac_address) = &boot_config.debug.usbnet_mac_address {
+        usbnet_mac_address = config_usbnet_mac_address;
+    } else {
+        warn!("Generating new MAC address");
+        generated_mac_address = String::from_utf8(Command::new("/bin/sh").args(&["-c", "echo -n 02; od -t x1 -An -N 5 /dev/urandom | tr ' ' ':'"]).output()?.stdout)?.trim().to_string();
+        usbnet_mac_address = &generated_mac_address;
+        boot_config.debug.usbnet_mac_address = Some(usbnet_mac_address.to_string());
+    }
+    warn!("Using MAC address {}", &usbnet_mac_address);
+
     // liblmod is not able to load g_ether properly, it seems
     modprobe(&["phy-rockchip-inno-usb2"])?;
-    modprobe(&["g_ether"])?;
+    modprobe(&["g_ether", &format!("host_addr={}", &usbnet_mac_address), &format!("dev_addr={}", &usbnet_mac_address)])?;
 
     let network_interfaces =
         NetworkInterface::show().with_context(|| "Failed to retrieve network interfaces")?;

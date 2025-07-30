@@ -111,7 +111,7 @@ pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
 
 pub fn modprobe(args: &[&str]) -> Result<()> {
     run_command("/sbin/modprobe", &args)
-        .with_context(|| format!("Failed to load module; modprobe arguments: {:?}", &args))?;
+        .with_context(|| format!("Failed to load module; modprobe arguments: {:?}\n", &args))?;
 
     Ok(())
 }

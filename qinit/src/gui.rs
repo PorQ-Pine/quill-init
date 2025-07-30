@@ -260,6 +260,7 @@ pub fn setup_gui(
 
     gui.on_boot_default({
         let boot_sender_clone = boot_sender.clone();
+        let gui_weak = gui_weak.clone();
         move || {
             if let Err(e) = boot_sender_clone.send(true) {
                 if let Some(gui) = gui_weak.upgrade() {
@@ -273,8 +274,16 @@ pub fn setup_gui(
     });
 
     gui.on_soft_reset({
+        let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = soft_reset() {}
+            if let Some(gui) = gui_weak.upgrade() {
+                if let Err(e) = soft_reset() {
+                    let err_msg = "Failed to soft reset";
+                    gui.set_dialog_message(SharedString::from(err_msg));
+                    gui.set_dialog(DialogType::Toast);
+                    error!("{}: {}", &err_msg, e);
+                }
+            }
         }
     });
 
