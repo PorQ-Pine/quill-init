@@ -1,0 +1,36 @@
+export component SectionButton inherits TouchArea {
+    in property<string> text <=> i-text.text;
+    in property<length> border-radius <=> i-container.border-radius;
+
+    i-container := Rectangle {
+        background: #dbdada;
+        //width: 100%;
+
+        HorizontalLayout {  
+            padding-left: 35px;
+
+            i-text := Text {
+                color: #000000;
+                vertical-alignment: center;
+                font-family: "Inter";
+                font-weight: 800;
+            }
+
+            Rectangle { }
+
+            Image {
+                source: @image-url("../icons/chevron-right.svg");
+                height: parent.height * 0.8;
+                width: self.height;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+    }
+
+    states [  
+        pressed when root.pressed: {
+            i-container.background: #000000;
+            i-text.color: #ffffff;
+        }
+    ]
+}

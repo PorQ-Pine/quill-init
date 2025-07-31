@@ -7,8 +7,9 @@ import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
 import { Dialog } from "../../ui-common/dialog.slint";
+import { SectionButton } from "../../ui-common/sectionbutton.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Recovery, Error }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum DialogType { None, Toast, SoftReset }
@@ -24,6 +25,7 @@ export component AppWindow inherits Window {
     callback power_off();
     callback reboot();
     callback toggle_ui_scale();
+    callback toggle_persistent_rootfs();
     callback boot_default();
     callback soft_reset();
     // In-out properties
@@ -45,6 +47,8 @@ export component AppWindow inherits Window {
     in-out property <image> help_uri_qr_code;
     in-out property <int> debug_tab_index: 0;
     in-out property <string> section_header_title;
+    // Configuration properties
+    in-out property <bool> persistent_rootfs;
     // Generic multipliers for default-sized and smaller-sized buttons
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -57,6 +61,7 @@ export component AppWindow inherits Window {
     property <length> button_width: root.width * wmultiplier * scaling_factor * button_scaling_multiplier;
     property <length> button_height: root.height * hmultiplier * scaling_factor * button_scaling_multiplier;
     property <length> icon_button_height: button_height * 0.5;
+    property <length> section_button_height: button_height * 1.25;
     property <length> switch_width: button_width * 0.45;
     property <length> switch_height: button_height * 0.7;
     property <length> radius: 10px;
@@ -88,7 +93,12 @@ export component AppWindow inherits Window {
                         It would be great if Slint provided an option to do it automatically instead... */
                     y: (parent.height - self.height) / 2;
                     clicked => {
-                        root.page = Page.QuillBoot;
+                        if root.page == Page.Options {
+                            root.page = Page.QuillBoot;
+                        } else if root.page == Page.RecoveryOptions || root.page == Page.BootConfiguration {
+                            section_header_title = "Options";
+                            root.page = Page.Options;
+                        }
                     }
                 }
 
@@ -151,13 +161,13 @@ export component AppWindow inherits Window {
                     alignment: center;
                     spacing: layout_spacing * 4;
                     Button {
-                        text: "Recovery";
+                        text: "Options";
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
                         clicked => {
-                            section_header_title = "Recovery options";
-                            root.page = Page.Recovery;
+                            section_header_title = "Options";
+                            root.page = Page.Options;
                         }
                     }
 
@@ -327,14 +337,38 @@ export component AppWindow inherits Window {
                 Rectangle { }
             }
 
-            if (page == Page.Recovery): VerticalLayout {
+            if (page == Page.Options): ScrollView {
+                mouse-drag-pan-enabled: true;
+                VerticalLayout {
+                    spacing: layout_spacing;
+                    SectionButton {
+                        text: "Recovery options";
+                        height: section_button_height;
+                        clicked => {
+                            section_header_title = "Recovery options";
+                            page = Page.RecoveryOptions;
+                        }
+                    }
+                    SectionButton {
+                        text: "Boot configuration";
+                        height: section_button_height;
+                        clicked => {
+                            section_header_title = "Boot configuration";
+                            page = Page.BootConfiguration;
+                        }
+                    }
+                }
+
+                Rectangle { }
+            }
+
+            if (page == Page.RecoveryOptions): VerticalLayout {
                 spacing: layout_spacing;
                 ScrollView {
                     mouse-drag-pan-enabled: true;
                     HorizontalLayout {
                         Text {
                             text: "Soft-reset this device";
-                            horizontal-alignment: center;
                             font-family: regular_font_family;
                         }
 
@@ -353,6 +387,34 @@ export component AppWindow inherits Window {
                     }
 
                     Rectangle { }
+                }
+            }
+
+            if (page == Page.BootConfiguration): VerticalLayout {
+                ScrollView {
+                    mouse-drag-pan-enabled: true;
+                    VerticalLayout {
+                        spacing: layout_spacing;
+                        HorizontalLayout {
+                            Text {
+                                text: "Persistent root filesystem";
+                                font-family: regular_font_family;
+                            }
+
+                            Rectangle { }
+
+                            Switch {
+                                width: switch_width;
+                                height: switch_height;
+                                y: (parent.height - self.height) / 2;
+                                border-radius: radius;
+                                activated: persistent_rootfs;
+                                toggled => {
+                                    toggle_persistent_rootfs();
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

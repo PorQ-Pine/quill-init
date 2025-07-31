@@ -5,24 +5,25 @@ use std::fs;
 
 const BOOT_CONFIG_FILE: &str = "boot_config.ron";
 
-#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BootFlags {
     pub first_boot_done: bool,
 }
 
-#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct RootFS {
     pub systemd_targets_total: Option<i32>,
     pub timestamp: i64,
+    pub persistent_storage: bool,
 }
 
 #[cfg(feature = "debug")]
-#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Debug {
     pub usbnet_mac_address: Option<String>,
 }
 
-#[derive(Default, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct BootConfig {
     pub flags: BootFlags,
     pub rootfs: RootFS,
@@ -33,7 +34,11 @@ pub struct BootConfig {
 impl BootConfig {
     fn default_boot_config() -> BootConfig {
         let mut boot_config = BootConfig::default();
+
+        // Flags
         boot_config.flags.first_boot_done = false;
+        // Root filesystem
+        boot_config.rootfs.persistent_storage = false;
 
         return boot_config;
     }
