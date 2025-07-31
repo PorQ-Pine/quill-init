@@ -18,6 +18,13 @@ pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";
 pub const FIRMWARE_ARCHIVE: &str = "firmware.squashfs";
 pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 
+#[derive(PartialEq)]
+pub enum BootCommand {
+    PowerOff,
+    Reboot,
+    NormalBoot,
+}
+
 pub fn mount_base_filesystems() -> Result<()> {
     Mount::builder()
         .fstype("proc")

@@ -1,10 +1,12 @@
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use libqinit::boot_config::BootConfig;
 use libqinit::recovery::soft_reset;
 use libqinit::system::{
-    compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
-    read_kernel_buffer_singleshot, reboot,
+    BootCommand, compress_string_to_xz, get_cmdline_bool, keep_last_lines,
+    read_kernel_buffer_singleshot,
 };
 use log::{error, info};
 use qrcode_generator::QrCodeEcc;
@@ -21,11 +23,12 @@ const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
 
 pub fn setup_gui(
     progress_receiver: Receiver<f32>,
-    boot_sender: Sender<bool>,
+    boot_sender: Sender<BootCommand>,
     interrupt_receiver: Receiver<String>,
     version_string: String,
     short_version_string: String,
     display_progress_bar: bool,
+    boot_config_mutex: Arc<Mutex<BootConfig>>,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
@@ -43,7 +46,7 @@ pub fn setup_gui(
         }
         gui.set_page(Page::BootSplash);
         // Trigger normal boot automatically
-        boot_sender.send(true)?;
+        boot_sender.send(BootCommand::NormalBoot)?;
     }
 
     // Boot progress bar timer
@@ -53,7 +56,7 @@ pub fn setup_gui(
         std::time::Duration::from_millis(100),
         {
             let gui_weak = gui_weak.clone();
-            let boot_sender_clone = boot_sender.clone();
+            let boot_sender = boot_sender.clone();
             move || {
                 if let Ok(progress) = progress_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
@@ -66,7 +69,7 @@ pub fn setup_gui(
                         }
                         if progress == libqinit::READY_PROGRESS_VALUE {
                             gui.set_startup_finished(true);
-                            let _ = boot_sender_clone.send(true);
+                            let _ = boot_sender.send(BootCommand::NormalBoot);
                         }
                     }
                 }
@@ -216,9 +219,10 @@ pub fn setup_gui(
     );
 
     gui.on_power_off({
+        let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = power_off() {
+            if let Err(e) = boot_sender.send(BootCommand::PowerOff) {
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to power off";
                     gui.set_dialog_message(SharedString::from(err_msg));
@@ -230,9 +234,10 @@ pub fn setup_gui(
     });
 
     gui.on_reboot({
+        let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = reboot() {
+            if let Err(e) = boot_sender.send(BootCommand::Reboot) {
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to reboot";
                     gui.set_dialog_message(SharedString::from(err_msg));
@@ -258,11 +263,19 @@ pub fn setup_gui(
         }
     });
 
+    gui.on_toggle_persistent_rootfs({
+        let boot_config_mutex = boot_config_mutex.clone();
+        move || {
+            let mut locked_boot_config = boot_config_mutex.lock().unwrap();
+            locked_boot_config.rootfs.persistent_storage = true;
+        }
+    });
+
     gui.on_boot_default({
-        let boot_sender_clone = boot_sender.clone();
+        let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = boot_sender_clone.send(true) {
+            if let Err(e) = boot_sender.send(BootCommand::NormalBoot) {
                 if let Some(gui) = gui_weak.upgrade() {
                     let err_msg = "Failed to send boot command";
                     gui.set_dialog_message(SharedString::from(err_msg));

@@ -28,7 +28,7 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
                 mod eink;
-                use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command};
+                use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command, power_off, reboot};
                 use libqinit::rootfs;
                 use libqinit::systemd;
                 use nix::unistd::sethostname;
@@ -42,7 +42,7 @@ cfg_if::cfg_if! {
         mod gui;
 
         use libqinit::signing::{read_public_key};
-        use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb};
+        use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb, BootCommand};
         use libqinit::boot_config::BootConfig;
         use std::thread;
 
@@ -57,6 +57,7 @@ use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Arc, Mutex};
 pub const QINIT_LOG_DIR: &str = "/var/log";
 pub const QINIT_LOG_FILE: &str = "qinit.log";
 const BOOT_SOCKET_PATH: &str = "/qinit.sock";
@@ -180,12 +181,28 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-            let (boot_sender, boot_receiver): (Sender<bool>, Receiver<bool>) = channel();
+            let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
             enforce_fb()?;
-            thread::spawn(move || gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, version_string, short_version_string, display_progress_bar));
+
+            let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
+            thread::spawn({
+                let boot_config_mutex = boot_config_mutex.clone();
+                move || {
+                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex)
+                }
+            });
 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
-            boot_receiver.recv()?;
+            let boot_command = boot_receiver.recv()?;
+            boot_config = boot_config_mutex.lock().unwrap().clone();
+            if boot_command != BootCommand::NormalBoot {
+                BootConfig::write(&mut boot_config)?;
+                if boot_command == BootCommand::PowerOff {
+                    power_off()?;
+                } else if boot_command == BootCommand::Reboot {
+                    reboot()?;
+                }
+            }
 
             // Function that will always fail: can be used for debugging error splash GUI
             // fs::read("/aaa/bbb").with_context(|| "Dummy error")?;
