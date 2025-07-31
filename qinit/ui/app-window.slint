@@ -344,6 +344,7 @@ export component AppWindow inherits Window {
                     SectionButton {
                         text: "Recovery options";
                         height: section_button_height;
+                        border-radius: radius;
                         clicked => {
                             section_header_title = "Recovery options";
                             page = Page.RecoveryOptions;
@@ -352,6 +353,7 @@ export component AppWindow inherits Window {
                     SectionButton {
                         text: "Boot configuration";
                         height: section_button_height;
+                        border-radius: radius;
                         clicked => {
                             section_header_title = "Boot configuration";
                             page = Page.BootConfiguration;
@@ -363,25 +365,30 @@ export component AppWindow inherits Window {
             }
 
             if (page == Page.RecoveryOptions): VerticalLayout {
-                spacing: layout_spacing;
                 ScrollView {
                     mouse-drag-pan-enabled: true;
-                    HorizontalLayout {
-                        Text {
-                            text: "Soft-reset this device";
-                            font-family: regular_font_family;
-                        }
+                    VerticalLayout {
+                        spacing: layout_spacing;
+                        HorizontalLayout {
+                            Rectangle {
+                                Text {
+                                    text: "Soft-reset this device";
+                                    font-family: regular_font_family;
+                                    vertical-alignment: center;
+                                }
+                            }
 
-                        Rectangle { }
+                            Rectangle { }
 
-                        Button {
-                            text: "Soft reset";
-                            width: button_width;
-                            height: button_height;
-                            border-radius: radius;
-                            clicked => {
-                                dialog_message = "This will erase all of the user data on this device and reset settings to default, without reinstalling the firmware. Are you sure you want to continue?";
-                                dialog = DialogType.SoftReset;
+                            Button {
+                                text: "Soft reset";
+                                width: button_width;
+                                height: button_height;
+                                border-radius: radius;
+                                clicked => {
+                                    dialog_message = "This will erase all of the user data on this device and reset settings to default, without reinstalling the firmware. Are you sure you want to continue?";
+                                    dialog = DialogType.SoftReset;
+                                }
                             }
                         }
                     }
@@ -396,9 +403,12 @@ export component AppWindow inherits Window {
                     VerticalLayout {
                         spacing: layout_spacing;
                         HorizontalLayout {
-                            Text {
-                                text: "Persistent root filesystem";
-                                font-family: regular_font_family;
+                            Rectangle {
+                                Text {
+                                    text: "Persistent root filesystem";
+                                    font-family: regular_font_family;
+                                    vertical-alignment: center;
+                                }
                             }
 
                             Rectangle { }

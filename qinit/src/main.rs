@@ -28,7 +28,7 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
                 mod eink;
-                use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command, power_off, reboot};
+                use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command};
                 use libqinit::rootfs;
                 use libqinit::systemd;
                 use nix::unistd::sethostname;
@@ -42,7 +42,7 @@ cfg_if::cfg_if! {
         mod gui;
 
         use libqinit::signing::{read_public_key};
-        use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb, BootCommand};
+        use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb, power_off, reboot, BootCommand};
         use libqinit::boot_config::BootConfig;
         use std::thread;
 
