@@ -144,6 +144,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
             // Read boot configuration
             let original_boot_config = BootConfig::read()?;
+            info!("Original boot configuration: {:?}", &original_boot_config);
             let mut boot_config = original_boot_config.clone();
 
             #[cfg(not(feature = "gui_only"))]
@@ -195,12 +196,21 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
             let boot_command = boot_receiver.recv()?;
             boot_config = boot_config_mutex.lock().unwrap().clone();
+            info!("Boot configuration after possible modifications: {:?}", &boot_config);
             if boot_command != BootCommand::NormalBoot {
-                BootConfig::write(&mut boot_config)?;
-                if boot_command == BootCommand::PowerOff {
-                    power_off()?;
-                } else if boot_command == BootCommand::Reboot {
-                    reboot()?;
+                if boot_config != original_boot_config {
+                    BootConfig::write(&mut boot_config)?;
+                } else {
+                    info!("Boot configuration did not change: not writing it");
+                }
+                cfg_if::cfg_if! {
+                    if #[cfg(not(feature = "gui_only"))] {
+                        if boot_command == BootCommand::PowerOff {
+                            power_off()?;
+                        } else if boot_command == BootCommand::Reboot {
+                            reboot()?;
+                        }
+                    }
                 }
             }
 

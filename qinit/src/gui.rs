@@ -49,6 +49,14 @@ pub fn setup_gui(
         boot_sender.send(BootCommand::NormalBoot)?;
     }
 
+    // Activating switches if needed
+    {
+        let boot_config_mutex = boot_config_mutex.clone();
+        let boot_config_guard = boot_config_mutex.lock().unwrap();
+
+        gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
+    }
+
     // Boot progress bar timer
     let progress_timer = Timer::default();
     progress_timer.start(
@@ -267,7 +275,7 @@ pub fn setup_gui(
         let boot_config_mutex = boot_config_mutex.clone();
         move || {
             let mut locked_boot_config = boot_config_mutex.lock().unwrap();
-            locked_boot_config.rootfs.persistent_storage = true;
+            locked_boot_config.rootfs.persistent_storage = !locked_boot_config.rootfs.persistent_storage;
         }
     });
 

@@ -10,6 +10,7 @@ use std::env;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
+use std::os::unix::fs::symlink;
 
 use crate::signing::check_signature;
 
@@ -133,6 +134,11 @@ pub fn mount_data_partition() -> Result<()> {
         .data("rw")
         .mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)
         .with_context(|| "Failed to mount data partition")?;
+
+    let boot_dir_path = format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
+    fs::create_dir_all(&boot_dir_path)?;
+    // Create convenient symlink
+    symlink(&format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR), &crate::BOOT_DIR_SYMLINK_PATH).with_context(|| "Failed to create boot directory symlink")?;
 
     Ok(())
 }

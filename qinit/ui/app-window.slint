@@ -420,6 +420,7 @@ export component AppWindow inherits Window {
                                 border-radius: radius;
                                 activated: persistent_rootfs;
                                 toggled => {
+                                    persistent_rootfs = !persistent_rootfs;
                                     toggle_persistent_rootfs();
                                 }
                             }

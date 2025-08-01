@@ -29,8 +29,15 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
             .with_context(|| "Failed to mount tmpfs at overlay work directory")?;
 
         let ro_mountpoint = format!("{}/{}", &crate::OVERLAY_WORKDIR, "read");
-        let rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
-        let rw_workdir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");
+        let rw_writedir;
+        let rw_workdir;
+        if boot_config.rootfs.persistent_storage {
+            rw_writedir = format!("{}/{}/rootfs/write", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
+            rw_workdir = format!("{}/{}/rootfs/work", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
+        } else {
+            rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
+            rw_workdir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");
+        }
         fs::create_dir_all(&ro_mountpoint)?;
         fs::create_dir_all(&rw_writedir)?;
         fs::create_dir_all(&rw_workdir)?;
