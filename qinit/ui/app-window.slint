@@ -83,7 +83,7 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: layout_padding;
             spacing: layout_spacing;
-            if (page != Page.QuillBoot) && (page != Page.BootSplash): HorizontalLayout {
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None): HorizontalLayout {
                 IconButton {
                     icon_path: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -119,7 +119,7 @@ export component AppWindow inherits Window {
                     width: self.height;
                 }
             }
-            if (page != Page.QuillBoot) && (page != Page.BootSplash): HLine { }
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None): HLine { }
 
             if (page == Page.QuillBoot): VerticalLayout {
                 padding: layout_padding;
@@ -177,7 +177,7 @@ export component AppWindow inherits Window {
                         height: button_height;
                         border-radius: radius;
                         clicked => {
-                            root.page = Page.BootSplash;
+                            root.page = Page.None;
                             root.boot_default();
                         }
                     }
@@ -620,6 +620,7 @@ export component AppWindow inherits Window {
             font-weight: 800;
         }
     }
+    // Generic Confirm/Cancel dialog
     if (dialog != DialogType.None && dialog != DialogType.Toast): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;

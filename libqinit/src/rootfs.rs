@@ -32,8 +32,16 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         let rw_writedir;
         let rw_workdir;
         if boot_config.rootfs.persistent_storage {
-            rw_writedir = format!("{}/{}/rootfs/write", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
-            rw_workdir = format!("{}/{}/rootfs/work", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
+            rw_writedir = format!(
+                "{}/{}/rootfs/write",
+                &crate::DATA_PART_MOUNTPOINT,
+                &crate::BOOT_DIR
+            );
+            rw_workdir = format!(
+                "{}/{}/rootfs/work",
+                &crate::DATA_PART_MOUNTPOINT,
+                &crate::BOOT_DIR
+            );
         } else {
             rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
             rw_workdir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");

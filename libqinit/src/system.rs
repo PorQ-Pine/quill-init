@@ -7,10 +7,10 @@ use regex::Regex;
 use rmesg;
 use sha256;
 use std::env;
+use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
-use std::os::unix::fs::symlink;
 
 use crate::signing::check_signature;
 
@@ -24,6 +24,7 @@ pub enum BootCommand {
     PowerOff,
     Reboot,
     NormalBoot,
+    BootFinished,
 }
 
 pub fn mount_base_filesystems() -> Result<()> {
@@ -138,7 +139,11 @@ pub fn mount_data_partition() -> Result<()> {
     let boot_dir_path = format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
     fs::create_dir_all(&boot_dir_path)?;
     // Create convenient symlink
-    symlink(&format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR), &crate::BOOT_DIR_SYMLINK_PATH).with_context(|| "Failed to create boot directory symlink")?;
+    symlink(
+        &format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR),
+        &crate::BOOT_DIR_SYMLINK_PATH,
+    )
+    .with_context(|| "Failed to create boot directory symlink")?;
 
     Ok(())
 }

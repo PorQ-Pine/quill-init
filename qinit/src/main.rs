@@ -183,25 +183,49 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
+            let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
             enforce_fb()?;
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
                 let boot_config_mutex = boot_config_mutex.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex)
+                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex)
                 }
             });
 
             // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
-            let boot_command = boot_receiver.recv()?;
+            let mut boot_command = boot_receiver.recv()?;
             boot_config = boot_config_mutex.lock().unwrap().clone();
             info!("Boot configuration after possible modifications: {:?}", &boot_config);
+
+            // Check if we need to force a reboot here to apply configuration changes
+            let mut config_force_reboot = true;
+            if boot_config.rootfs.persistent_storage != original_boot_config.rootfs.persistent_storage {
+                // It might be useful to recount the number of systemd targets
+                boot_config.rootfs.systemd_targets_total = None;
+            } else {
+                config_force_reboot = false;
+            }
+
+            if config_force_reboot {
+                if boot_command == BootCommand::NormalBoot {
+                    boot_command = BootCommand::Reboot;
+                    toast_sender.send("Applying changes".to_string())?;
+                    BootConfig::write(&mut boot_config)?;
+                    std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
+                    reboot()?;
+                }
+            } else {
+                // Trigger switch to boot splash page
+                progress_sender.send(0.0)?;
+            }
+
             if boot_command != BootCommand::NormalBoot {
                 if boot_config != original_boot_config {
                     BootConfig::write(&mut boot_config)?;
                 } else {
-                    info!("Boot configuration did not change: not writing it");
+                    info!("Boot configuration did not change: not writing it back");
                 }
                 cfg_if::cfg_if! {
                     if #[cfg(not(feature = "gui_only"))] {

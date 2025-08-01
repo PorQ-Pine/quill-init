@@ -14,7 +14,7 @@ use slint::{Image, SharedString, Timer, TimerMode};
 use std::fs;
 slint::include_modules!();
 
-const TOAST_DURATION_MILLIS: i32 = 5000;
+pub const TOAST_DURATION_MILLIS: i32 = 5000;
 const NOT_AVAILABLE: &str = "(Not currently available)";
 const HELP_URI: &str =
     "https://github.com/PorQ-Pine/docs/blob/main/troubleshooting/fatal-errors.md";
@@ -25,6 +25,7 @@ pub fn setup_gui(
     progress_receiver: Receiver<f32>,
     boot_sender: Sender<BootCommand>,
     interrupt_receiver: Receiver<String>,
+    toast_receiver: Receiver<String>,
     version_string: String,
     short_version_string: String,
     display_progress_bar: bool,
@@ -33,17 +34,17 @@ pub fn setup_gui(
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
 
+    if display_progress_bar {
+        gui.set_progress_widget(ProgressWidget::ProgressBar);
+    } else {
+        gui.set_progress_widget(ProgressWidget::MovingDots);
+    }
+
     if get_cmdline_bool("quill_recovery")? {
         info!("Showing QuillBoot menu");
         gui.set_page(Page::QuillBoot);
         gui.set_version_string(SharedString::from(version_string));
     } else {
-        if display_progress_bar {
-            gui.set_progress_widget(ProgressWidget::ProgressBar);
-        } else {
-            info!("Showing moving dots animation");
-            gui.set_progress_widget(ProgressWidget::MovingDots);
-        }
         gui.set_page(Page::BootSplash);
         // Trigger normal boot automatically
         boot_sender.send(BootCommand::NormalBoot)?;
@@ -68,6 +69,9 @@ pub fn setup_gui(
             move || {
                 if let Ok(progress) = progress_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
+                        if progress == 0.0 {
+                            gui.set_page(Page::BootSplash);
+                        }
                         if display_progress_bar {
                             /* info!(
                                 "Setting boot progress bar's value to {} %",
@@ -77,8 +81,26 @@ pub fn setup_gui(
                         }
                         if progress == libqinit::READY_PROGRESS_VALUE {
                             gui.set_startup_finished(true);
-                            let _ = boot_sender.send(BootCommand::NormalBoot);
+                            let _ = boot_sender.send(BootCommand::BootFinished);
                         }
+                    }
+                }
+            }
+        },
+    );
+
+    // Timer to show toasts from external threads/classes
+    let toast_timer = Timer::default();
+    toast_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(100),
+        {
+            let gui_weak = gui_weak.clone();
+            move || {
+                if let Ok(toast_message) = toast_receiver.try_recv() {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        gui.set_dialog_message(SharedString::from(toast_message));
+                        gui.set_dialog(DialogType::Toast);
                     }
                 }
             }
@@ -87,9 +109,9 @@ pub fn setup_gui(
 
     // Toasts garbage collector
     // It's not perfect - even though it's probably not noticeable, it doesn't precisely enforce TOAST_DURATION_MILLIS - but considering the small scale of this UI, I think it's more than enough
-    let toast_timer = Timer::default();
+    let toast_gc_timer = Timer::default();
     let toast_gc_delay = 100;
-    toast_timer.start(
+    toast_gc_timer.start(
         TimerMode::Repeated,
         std::time::Duration::from_millis(toast_gc_delay as u64),
         {
@@ -275,7 +297,8 @@ pub fn setup_gui(
         let boot_config_mutex = boot_config_mutex.clone();
         move || {
             let mut locked_boot_config = boot_config_mutex.lock().unwrap();
-            locked_boot_config.rootfs.persistent_storage = !locked_boot_config.rootfs.persistent_storage;
+            locked_boot_config.rootfs.persistent_storage =
+                !locked_boot_config.rootfs.persistent_storage;
         }
     });
 
