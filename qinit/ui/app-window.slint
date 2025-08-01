@@ -83,7 +83,7 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: layout_padding;
             spacing: layout_spacing;
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None): HorizontalLayout {
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HorizontalLayout {
                 IconButton {
                     icon_path: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -119,7 +119,7 @@ export component AppWindow inherits Window {
                     width: self.height;
                 }
             }
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None): HLine { }
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HLine { }
 
             if (page == Page.QuillBoot): VerticalLayout {
                 padding: layout_padding;

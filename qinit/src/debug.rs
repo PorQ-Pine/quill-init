@@ -30,21 +30,28 @@ pub fn start_debug_framework(pubkey: &PKey<Public>, boot_config: &mut BootConfig
 pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> {
     warn!("Setting up USB networking");
 
-    let usbnet_mac_address;
-    let generated_mac_address;
-    if let Some(config_usbnet_mac_address) = &boot_config.debug.usbnet_mac_address {
-        usbnet_mac_address = config_usbnet_mac_address;
-    } else {
-        warn!("Generating new MAC address");
-        generated_mac_address = String::from_utf8(Command::new("/bin/sh").args(&["-c", "echo -n 02; od -t x1 -An -N 5 /dev/urandom | tr ' ' ':'"]).output()?.stdout)?.trim().to_string();
-        usbnet_mac_address = &generated_mac_address;
-        boot_config.debug.usbnet_mac_address = Some(usbnet_mac_address.to_string());
+    let mut usbnet_host_mac_address = String::new();
+    let mut usbnet_dev_mac_address = String::new();
+    if let Some(config_usbnet_host_mac_address) = &boot_config.debug.usbnet_host_mac_address {
+        usbnet_host_mac_address = config_usbnet_host_mac_address.to_string();
     }
-    warn!("Using MAC address {}", &usbnet_mac_address);
+    if let Some(config_usbnet_dev_mac_address) = &boot_config.debug.usbnet_dev_mac_address {
+        usbnet_dev_mac_address = config_usbnet_dev_mac_address.to_string();
+    }
+
+    if usbnet_host_mac_address.is_empty() || usbnet_dev_mac_address.is_empty() {
+        warn!("Generating new MAC addresses");
+        let generate_command = "printf '%02x' $((0x$(od /dev/urandom -N1 -t x1 -An | tr -d ' ') & 0xFE | 0x02)); od /dev/urandom -N5 -t x1 -An | tr ' '  ':'";
+        usbnet_host_mac_address = String::from_utf8(Command::new("/bin/sh").args(&["-c", &generate_command]).output()?.stdout)?.trim().to_string();
+        usbnet_dev_mac_address = String::from_utf8(Command::new("/bin/sh").args(&["-c", &generate_command]).output()?.stdout)?.trim().to_string();
+        boot_config.debug.usbnet_host_mac_address = Some(usbnet_host_mac_address.to_string());
+        boot_config.debug.usbnet_dev_mac_address = Some(usbnet_dev_mac_address.to_string());
+    }
+    warn!("Using host MAC address {} and device MAC address {}", &usbnet_host_mac_address, &usbnet_dev_mac_address);
 
     // liblmod is not able to load g_ether properly, it seems
     modprobe(&["phy-rockchip-inno-usb2"])?;
-    modprobe(&["g_ether", &format!("host_addr={}", &usbnet_mac_address), &format!("dev_addr={}", &usbnet_mac_address)])?;
+    modprobe(&["g_ether", &format!("host_addr={}", &usbnet_host_mac_address), &format!("dev_addr={}", &usbnet_dev_mac_address)])?;
 
     let network_interfaces =
         NetworkInterface::show().with_context(|| "Failed to retrieve network interfaces")?;

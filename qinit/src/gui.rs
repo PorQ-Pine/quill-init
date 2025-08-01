@@ -1,12 +1,12 @@
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use libqinit::boot_config::BootConfig;
 use libqinit::recovery::soft_reset;
 use libqinit::system::{
-    BootCommand, compress_string_to_xz, get_cmdline_bool, keep_last_lines,
-    read_kernel_buffer_singleshot,
+    BootCommand, compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
+    read_kernel_buffer_singleshot, reboot,
 };
 use log::{error, info};
 use qrcode_generator::QrCodeEcc;
@@ -34,6 +34,30 @@ pub fn setup_gui(
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
 
+    // Channels
+    let (set_page_sender, set_page_receiver): (Sender<Page>, Receiver<Page>) = channel();
+
+    // Guard that ensures that no one can set a page if the current one is Page::Error
+    let page_timer = Timer::default();
+    page_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(20), {
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                if let Ok(page) = set_page_receiver.try_recv() {
+                    info!(
+                        "Received request to change current GUI page to '{:?}'",
+                        &page
+                    );
+                    if gui.get_page() == Page::Error {
+                        error!("Denying request: current page is '{:?}'", Page::Error);
+                    } else {
+                        gui.set_page(page);
+                    }
+                }
+            }
+        }
+    });
+
     if display_progress_bar {
         gui.set_progress_widget(ProgressWidget::ProgressBar);
     } else {
@@ -42,10 +66,10 @@ pub fn setup_gui(
 
     if get_cmdline_bool("quill_recovery")? {
         info!("Showing QuillBoot menu");
-        gui.set_page(Page::QuillBoot);
+        set_page_sender.send(Page::QuillBoot)?;
         gui.set_version_string(SharedString::from(version_string));
     } else {
-        gui.set_page(Page::BootSplash);
+        set_page_sender.send(Page::BootSplash)?;
         // Trigger normal boot automatically
         boot_sender.send(BootCommand::NormalBoot)?;
     }
@@ -66,11 +90,12 @@ pub fn setup_gui(
         {
             let gui_weak = gui_weak.clone();
             let boot_sender = boot_sender.clone();
+            let set_page_sender = set_page_sender.clone();
             move || {
                 if let Ok(progress) = progress_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
                         if progress == 0.0 {
-                            gui.set_page(Page::BootSplash);
+                            let _ = set_page_sender.send(Page::BootSplash);
                         }
                         if display_progress_bar {
                             /* info!(
@@ -140,6 +165,7 @@ pub fn setup_gui(
         std::time::Duration::from_millis(interrupt_timer_delay),
         {
             let gui_weak = gui_weak.clone();
+            let set_page_sender = set_page_sender.clone();
             move || {
                 if let Ok(error_reason) = interrupt_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
@@ -241,7 +267,7 @@ pub fn setup_gui(
 
                         gui.set_short_version_string(SharedString::from(&short_version_string));
                         gui.set_error_reason(SharedString::from(&format!("{}", &error_reason)));
-                        gui.set_page(Page::Error);
+                        let _ = set_page_sender.send(Page::Error);
                     }
                 }
             }
@@ -254,10 +280,21 @@ pub fn setup_gui(
         move || {
             if let Err(e) = boot_sender.send(BootCommand::PowerOff) {
                 if let Some(gui) = gui_weak.upgrade() {
-                    let err_msg = "Failed to power off";
-                    gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(DialogType::Toast);
-                    error!("{}: {}", &err_msg, e);
+                    let mut display_error = true;
+                    if gui.get_page() == Page::Error {
+                        if let Err(_e) = power_off() {
+                            display_error = true;
+                        } else {
+                            display_error = false;
+                        }
+                    }
+
+                    if display_error {
+                        let err_msg = "Failed to power off";
+                        gui.set_dialog_message(SharedString::from(err_msg));
+                        gui.set_dialog(DialogType::Toast);
+                        error!("{}: {}", &err_msg, e);
+                    }
                 }
             }
         }
@@ -269,10 +306,21 @@ pub fn setup_gui(
         move || {
             if let Err(e) = boot_sender.send(BootCommand::Reboot) {
                 if let Some(gui) = gui_weak.upgrade() {
-                    let err_msg = "Failed to reboot";
-                    gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(DialogType::Toast);
-                    error!("{}: {}", &err_msg, e);
+                    let mut display_error = true;
+                    if gui.get_page() == Page::Error {
+                        if let Err(_e) = reboot() {
+                            display_error = true;
+                        } else {
+                            display_error = false;
+                        }
+                    }
+
+                    if display_error {
+                        let err_msg = "Failed to reboot";
+                        gui.set_dialog_message(SharedString::from(err_msg));
+                        gui.set_dialog(DialogType::Toast);
+                        error!("{}: {}", &err_msg, e);
+                    }
                 }
             }
         }

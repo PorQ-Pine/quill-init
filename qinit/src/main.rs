@@ -31,8 +31,8 @@ cfg_if::cfg_if! {
                 use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command};
                 use libqinit::rootfs;
                 use libqinit::systemd;
+
                 use nix::unistd::sethostname;
-                use std::time::Duration;
                 use crossterm::event::{self, Event};
 
                 #[cfg(feature = "debug")]
@@ -44,9 +44,12 @@ cfg_if::cfg_if! {
         use libqinit::signing::{read_public_key};
         use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb, power_off, reboot, BootCommand};
         use libqinit::boot_config::BootConfig;
+        use std::time::Duration;
         use std::thread;
+        use std::sync::{Arc, Mutex};
 
         const SYSTEMD_NO_TARGETS: i32 = -1;
+        const QINIT_SOCKET: &str = "qinit.sock";
     }
 }
 
@@ -57,11 +60,9 @@ use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
 pub const QINIT_LOG_DIR: &str = "/var/log";
 pub const QINIT_LOG_FILE: &str = "qinit.log";
 const BOOT_SOCKET_PATH: &str = "/qinit.sock";
-const QINIT_SOCKET: &str = "qinit.sock";
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
@@ -218,7 +219,9 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 }
             } else {
                 // Trigger switch to boot splash page
-                progress_sender.send(0.0)?;
+                if boot_command == BootCommand::NormalBoot {
+                    progress_sender.send(0.0)?;
+                }
             }
 
             if boot_command != BootCommand::NormalBoot {
@@ -227,14 +230,13 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 } else {
                     info!("Boot configuration did not change: not writing it back");
                 }
-                cfg_if::cfg_if! {
-                    if #[cfg(not(feature = "gui_only"))] {
-                        if boot_command == BootCommand::PowerOff {
-                            power_off()?;
-                        } else if boot_command == BootCommand::Reboot {
-                            reboot()?;
-                        }
-                    }
+
+                if boot_command == BootCommand::PowerOff {
+                    power_off()?;
+                    return Ok(());
+                } else if boot_command == BootCommand::Reboot {
+                    reboot()?;
+                    return Ok(());
                 }
             }
 

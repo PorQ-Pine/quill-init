@@ -213,16 +213,24 @@ pub fn restart_service(service: &str) -> Result<()> {
 
 pub fn power_off() -> Result<()> {
     warn!("Powering off");
-    unmount_data_partition()?;
-    run_command("/sbin/poweroff", &["-f"])?;
+    cfg_if::cfg_if! {
+        if #[cfg(not(feature = "gui_only"))] {
+            unmount_data_partition()?;
+            run_command("/sbin/poweroff", &["-f"])?;
+        }
+    }
 
     Ok(())
 }
 
 pub fn reboot() -> Result<()> {
     warn!("Rebooting");
-    unmount_data_partition()?;
-    run_command("/sbin/reboot", &["-f"])?;
+    cfg_if::cfg_if! {
+        if #[cfg(not(feature = "gui_only"))] {
+            unmount_data_partition()?;
+            run_command("/sbin/reboot", &["-f"])?;
+        }
+    }
 
     Ok(())
 }

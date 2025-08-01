@@ -1,10 +1,16 @@
-pub mod boot_config;
-pub mod recovery;
-pub mod rootfs;
-pub mod signing;
+use cfg_if;
+
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "init_wrapper"))] {
+        pub mod boot_config;
+        pub mod recovery;
+        pub mod rootfs;
+        pub mod signing;
+        pub mod system;
+        pub mod systemd;
+    }
+}
 pub mod socket;
-pub mod system;
-pub mod systemd;
 
 pub const DATA_PART: &str = "/dev/mmcblk0p6";
 pub const DATA_PART_MOUNTPOINT: &str = "/data/";

@@ -20,7 +20,8 @@ pub struct RootFS {
 #[cfg(feature = "debug")]
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Debug {
-    pub usbnet_mac_address: Option<String>,
+    pub usbnet_host_mac_address: Option<String>,
+    pub usbnet_dev_mac_address: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
