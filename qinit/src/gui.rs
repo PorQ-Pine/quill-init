@@ -69,7 +69,6 @@ pub fn setup_gui(
         set_page_sender.send(Page::QuillBoot)?;
         gui.set_version_string(SharedString::from(version_string));
     } else {
-        set_page_sender.send(Page::BootSplash)?;
         // Trigger normal boot automatically
         boot_sender.send(BootCommand::NormalBoot)?;
     }
