@@ -22,6 +22,10 @@ cfg_if::cfg_if! {
         use std::process::Command;
         use core::ops::Deref;
         use std::os::unix;
+        use std::thread;
+        use signal_hook::{iterator::Signals, consts::signal::*};
+        use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+        use nix::unistd::Pid;
 
         pub const QINIT_PATH: &str = "/etc/init.d/qinit";
     } else {
@@ -98,6 +102,15 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
     cfg_if::cfg_if! {
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
+
+            // Install signal handler for SIGCHLD (i.e. allow us to stop iwd after having started it)
+            let mut signals = Signals::new(&[SIGCHLD])?;
+            thread::spawn(move || {
+                for _sig in signals.forever() {
+                    reap_zombies();
+                }
+            });
+
             let boot_unix_listener = socket::bind(&BOOT_SOCKET_PATH)?;
 
             first_stage_info("Spawning second stage qinit binary");
@@ -288,7 +301,38 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
     Ok(())
 }
 
-#[cfg(feature = "init_wrapper")]
-fn first_stage_info(message: &str) {
-    info!("(First stage) {}", &message);
+cfg_if::cfg_if! {
+    if #[cfg(feature = "init_wrapper")] {
+        fn first_stage_info(message: &str) {
+            info!("(First stage) {}", &message);
+        }
+        fn first_stage_error(message: &str) {
+            error!("(First stage) {}", &message);
+        }
+
+        // Thanks, ChatGPT
+        fn reap_zombies() {
+            loop {
+                match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
+                    Ok(WaitStatus::Exited(pid, status)) => {
+                        first_stage_info(&format!("Child {} exited with status {}", pid, status));
+                    }
+                    Ok(WaitStatus::Signaled(pid, sig, _)) => {
+                        first_stage_info(&format!("Child {} killed by signal {:?}", pid, sig));
+                    }
+                    Ok(WaitStatus::StillAlive) => {
+                        break;
+                    }
+                    Ok(_) => {} // Other wait statuses
+                    Err(nix::Error::ECHILD) => {
+                        break; // No more children
+                    }
+                    Err(e) => {
+                        first_stage_error(&format!("waitpid error: {:?}", e));
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }

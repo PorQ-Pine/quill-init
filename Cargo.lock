@@ -3554,6 +3554,7 @@ dependencies = [
  "qrcode-generator",
  "regex",
  "serde",
+ "signal-hook",
  "slint",
  "slint-build",
  "sys-mount",
