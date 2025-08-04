@@ -10,6 +10,7 @@ cfg-if = "1.0.1"
 env_logger = "0.11.8"
 log = "0.4.27"
 openssl = "0.10.73"
+ping-rs = "0.1.2"
 regex = "1.11.1"
 rmesg = { version = "1.0.23", features = ["sync"] }
 ron = "0.10.1"

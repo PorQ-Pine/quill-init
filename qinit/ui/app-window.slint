@@ -47,6 +47,7 @@ export component AppWindow inherits Window {
     in-out property <image> help_uri_qr_code;
     in-out property <int> debug_tab_index: 0;
     in-out property <string> section_header_title;
+    in-out property <image> wifi_icon;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
     // Generic multipliers for default-sized and smaller-sized buttons
@@ -85,7 +86,7 @@ export component AppWindow inherits Window {
             spacing: layout_spacing;
             if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HorizontalLayout {
                 IconButton {
-                    icon_path: @image-url("../../icons/arrow-back.svg");
+                    icon: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
                     height: icon_button_height;
                     width: self.height;
@@ -212,6 +213,16 @@ export component AppWindow inherits Window {
                             section_header_title = "About";
                             root.page = Page.VersionInfo;
                         }
+                    }
+
+                    Rectangle { }
+
+                    IconButton {
+                        icon: wifi_icon;
+                        border-radius: radius;
+                        height: button_height;
+                        width: self.height;
+                        y: (parent.height - self.height) / 2;
                     }
 
                     Rectangle { }
