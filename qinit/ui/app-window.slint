@@ -631,6 +631,16 @@ export component AppWindow inherits Window {
         }
     }
 
+    // Make dialogs modal and make them disappear whenever the user clicks outside of them
+    TouchArea {
+        width: root.width;
+        height: root.height;
+        enabled: dialog == DialogType.None ? false : true;
+        clicked => {
+            dialog = DialogType.None;
+        }
+    }
+
     // Toasts/dialogs
     if (dialog == DialogType.Toast): Rectangle {
         width: 0.4 * scaling_factor * root.width;
@@ -641,6 +651,11 @@ export component AppWindow inherits Window {
         border-width: dialog_rectangle_thickness;
         border-radius: radius;
         background: white;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: true;
+        }
         Text {
             text: root.dialog_message;
             font-family: "Inter";
@@ -666,7 +681,7 @@ export component AppWindow inherits Window {
         }
     }
     // Wi-Fi UI dialog
-    if (dialog == DialogType.WifiUI) && (page == Page.QuillBoot): Rectangle {
+    if (dialog == DialogType.WifiUI): Rectangle {
         border-width: dialog_rectangle_thickness;
         border-color: black;
         border-radius: radius;
@@ -675,6 +690,11 @@ export component AppWindow inherits Window {
         height: scaling_factor > 1 ? 0.4 * scaling_factor * root.height : 0.45 * root.height;
         x: scaling_factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - 60px;
         y: scaling_factor > 1 ? (root.height - self.height) / 2 : root.height - self.height - 165px;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: true;
+        }
         VerticalLayout {
             padding: layout_padding;
             HorizontalLayout {

@@ -10,6 +10,11 @@ export component Dialog inherits Rectangle {
     border-width: 6px;
     background: white;
 
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        enabled: true;
+    }
     VerticalLayout {
         padding: 40px;
         Rectangle {}
