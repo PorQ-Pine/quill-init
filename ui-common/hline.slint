@@ -1,6 +1,8 @@
 export component HLine inherits VerticalLayout {
-    padding-top: 5px;
-    padding-bottom: 5px;
+    in property <float> top-padding-multiplier: 1;
+    in property <float> bottom-padding-multiplier: 1;
+    padding-top: 5px * top-padding-multiplier;
+    padding-bottom: 5px * bottom-padding-multiplier;
     Rectangle {
         background: black;
         height: 3px;

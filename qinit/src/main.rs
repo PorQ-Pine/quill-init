@@ -67,7 +67,6 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 pub const QINIT_LOG_DIR: &str = "/var/log";
 pub const QINIT_LOG_FILE: &str = "qinit.log";
 const BOOT_SOCKET_PATH: &str = "/qinit.sock";
-use libqinit::wifi;
 
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {

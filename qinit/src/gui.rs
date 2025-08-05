@@ -37,8 +37,12 @@ pub fn setup_gui(
 
     // Channels
     let (set_page_sender, set_page_receiver): (Sender<Page>, Receiver<Page>) = channel();
-    let (wifi_status_sender, wifi_status_receiver): (Sender<wifi::Status>, Receiver<wifi::Status>) = channel();
-    let (wifi_command_sender, wifi_command_receiver): (Sender<wifi::CommandForm>, Receiver<wifi::CommandForm>) = channel();
+    let (wifi_status_sender, wifi_status_receiver): (Sender<wifi::Status>, Receiver<wifi::Status>) =
+        channel();
+    let (wifi_command_sender, wifi_command_receiver): (
+        Sender<wifi::CommandForm>,
+        Receiver<wifi::CommandForm>,
+    ) = channel();
 
     // Guard that ensures that no one can set a page if the current one is Page::Error
     let page_timer = Timer::default();
@@ -278,30 +282,54 @@ pub fn setup_gui(
 
     // Wi-Fi
     let wifi_status_timer = Timer::default();
-    wifi_status_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(100), {
-        let gui_weak = gui_weak.clone();
-        let wifi_disabled_icon = Image::load_from_svg_data(include_bytes!("../../icons/wifi-disabled.svg"))?;
-        let wifi_not_connected_icon = Image::load_from_svg_data(include_bytes!("../../icons/wifi-notconnected.svg"))?;
-        let wifi_connected_icon = Image::load_from_svg_data(include_bytes!("../../icons/wifi-connected.svg"))?;
-        let wifi_error_icon = Image::load_from_svg_data(include_bytes!("../../icons/wifi-error.svg"))?;
-        move || {
-            if let Ok(wifi_status) = wifi_status_receiver.try_recv() {
-                info!("Received new Wi-Fi status: {:?}", &wifi_status);
-                if let Some(gui) = gui_weak.upgrade() {
-                    match wifi_status.status_type {
-                        wifi::StatusType::Disabled => gui.set_wifi_icon(wifi_disabled_icon.to_owned()),
-                        wifi::StatusType::NotConnected => gui.set_wifi_icon(wifi_not_connected_icon.to_owned()),
-                        wifi::StatusType::Connected => gui.set_wifi_icon(wifi_connected_icon.to_owned()),
-                        wifi::StatusType::Error => gui.set_wifi_icon(wifi_error_icon.to_owned()),
+    wifi_status_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(100),
+        {
+            let gui_weak = gui_weak.clone();
+            let wifi_disabled_icon =
+                Image::load_from_svg_data(include_bytes!("../../icons/wifi-disabled.svg"))?;
+            let wifi_not_connected_icon =
+                Image::load_from_svg_data(include_bytes!("../../icons/wifi-notconnected.svg"))?;
+            let wifi_connected_icon =
+                Image::load_from_svg_data(include_bytes!("../../icons/wifi-connected.svg"))?;
+            let wifi_error_icon =
+                Image::load_from_svg_data(include_bytes!("../../icons/wifi-error.svg"))?;
+            move || {
+                if let Ok(wifi_status) = wifi_status_receiver.try_recv() {
+                    info!("Received new Wi-Fi status: {:?}", &wifi_status);
+                    if let Some(gui) = gui_weak.upgrade() {
+                        match wifi_status.status_type {
+                            wifi::StatusType::Disabled => {
+                                gui.set_wifi_enabled(false);
+                                gui.set_wifi_icon(wifi_disabled_icon.to_owned());
+                            }
+                            wifi::StatusType::NotConnected => {
+                                gui.set_wifi_enabled(true);
+                                gui.set_wifi_icon(wifi_not_connected_icon.to_owned());
+                            }
+                            wifi::StatusType::Connected => {
+                                gui.set_wifi_enabled(true);
+                                gui.set_wifi_icon(wifi_connected_icon.to_owned());
+                            }
+                            wifi::StatusType::Error => {
+                                gui.set_wifi_enabled(true);
+                                gui.set_wifi_icon(wifi_error_icon.to_owned());
+                            }
+                        }
+                        gui.set_wifi_lock(false);
                     }
                 }
             }
-        }
-    });
+        },
+    );
 
     thread::spawn(|| wifi::daemon(wifi_status_sender, wifi_command_receiver));
-
-    wifi_command_sender.send(wifi::CommandForm { command_type: wifi::CommandType::GetStatus, string_arguments: None })?;
+    // Set initial Wi-Fi icon
+    wifi_command_sender.send(wifi::CommandForm {
+        command_type: wifi::CommandType::GetStatus,
+        string_arguments: None,
+    })?;
 
     gui.on_power_off({
         let boot_sender = boot_sender.clone();
@@ -403,6 +431,37 @@ pub fn setup_gui(
                     gui.set_dialog_message(SharedString::from(err_msg));
                     gui.set_dialog(DialogType::Toast);
                     error!("{}: {}", &err_msg, e);
+                }
+            }
+        }
+    });
+
+    gui.on_toggle_wifi({
+        let wifi_command_sender = wifi_command_sender.clone();
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                gui.set_wifi_lock(true);
+                if gui.get_wifi_enabled() {
+                    if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                        command_type: wifi::CommandType::Disable,
+                        string_arguments: None,
+                    }) {
+                        let err_msg = "Failed to enable Wi-Fi";
+                        gui.set_dialog_message(SharedString::from(err_msg));
+                        gui.set_dialog(DialogType::Toast);
+                        error!("{}: {}", &err_msg, e)
+                    }
+                } else {
+                    if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                        command_type: wifi::CommandType::Enable,
+                        string_arguments: None,
+                    }) {
+                        let err_msg = "Failed to disable Wi-Fi";
+                        gui.set_dialog_message(SharedString::from(err_msg));
+                        gui.set_dialog(DialogType::Toast);
+                        error!("{}: {}", &err_msg, e)
+                    }
                 }
             }
         }

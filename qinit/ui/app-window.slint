@@ -12,7 +12,7 @@ import { SectionButton } from "../../ui-common/sectionbutton.slint";
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset }
+export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs }
 
 export component AppWindow inherits Window {
     // Scaling
@@ -26,6 +26,7 @@ export component AppWindow inherits Window {
     callback reboot();
     callback toggle_ui_scale();
     callback toggle_persistent_rootfs();
+    callback toggle_wifi();
     callback boot_default();
     callback soft_reset();
     // In-out properties
@@ -50,6 +51,9 @@ export component AppWindow inherits Window {
     in-out property <image> wifi_icon;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
+    // Run-time properties
+    in-out property <bool> wifi_enabled;
+    in-out property <bool> wifi_lock;
     // Generic multipliers for default-sized and smaller-sized buttons
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -77,6 +81,7 @@ export component AppWindow inherits Window {
     property <length> console_body_font_size: 0.6 * self.default_font_size;
     property <length> tab_rectangle_border_width: 2px;
     property <color> tab_rectangle_border_color: darkgrey;
+    property <length> dialog_rectangle_thickness: 6px;
 
     // Main UI
     // Don't ask me why a ScrollView is needed here to prevent binding loops...
@@ -94,7 +99,7 @@ export component AppWindow inherits Window {
                         It would be great if Slint provided an option to do it automatically instead... */
                     y: (parent.height - self.height) / 2;
                     clicked => {
-                        if root.page == Page.Options {
+                        if root.page == Page.Options || root.page == Page.VersionInfo {
                             root.page = Page.QuillBoot;
                         } else if root.page == Page.RecoveryOptions || root.page == Page.BootConfiguration {
                             section_header_title = "Options";
@@ -217,16 +222,6 @@ export component AppWindow inherits Window {
 
                     Rectangle { }
 
-                    IconButton {
-                        icon: wifi_icon;
-                        border-radius: radius;
-                        height: button_height;
-                        width: self.height;
-                        y: (parent.height - self.height) / 2;
-                    }
-
-                    Rectangle { }
-
                     Text {
                         vertical-alignment: center;
                         font-family: regular_font_family;
@@ -245,6 +240,27 @@ export component AppWindow inherits Window {
                         activated: scaling_factor > 1 ? true : false;
                         toggled => {
                             root.toggle_ui_scale();
+                        }
+                    }
+
+                    VLine {
+                        left-padding-multiplier: 5.0;
+                        right-padding-multiplier: self.left-padding-multiplier * 1/2;
+                    }
+
+                    IconButton {
+                        icon: wifi_icon;
+                        border-radius: radius;
+                        height: button_height;
+                        width: self.height;
+                        padding-value: 15px;
+                        y: (parent.height - self.height) / 2;
+                        clicked => {
+                            if dialog == DialogType.WifiUI {
+                                dialog = DialogType.None;
+                            } else {
+                                dialog = DialogType.WifiUI;
+                            }
                         }
                     }
                 }
@@ -525,8 +541,8 @@ export component AppWindow inherits Window {
                             VerticalLayout {
                                 ScrollView {
                                     mouse-drag-pan-enabled: true;
-                            // Scroll to bottom
-                            viewport-y: 0px - self.viewport-height + self.visible-height;
+                                    // Scroll to bottom
+                                    viewport-y: 0px - self.viewport-height + self.visible-height;
                                     VerticalLayout {
                                         Text {
                                             text: program_output;
@@ -622,7 +638,7 @@ export component AppWindow inherits Window {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         border-color: black;
-        border-width: 6px;
+        border-width: dialog_rectangle_thickness;
         border-radius: radius;
         background: white;
         Text {
@@ -632,7 +648,7 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiLogs): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;
         height: 0.3 * scaling_factor * root.height;
@@ -647,6 +663,44 @@ export component AppWindow inherits Window {
                 soft_reset();
             }
             dialog = DialogType.None;
+        }
+    }
+    // Wi-Fi UI dialog
+    if (dialog == DialogType.WifiUI) && (page == Page.QuillBoot): Rectangle {
+        border-width: dialog_rectangle_thickness;
+        border-color: black;
+        border-radius: radius;
+        background: white;
+        width: 0.45 * scaling_factor * root.width;
+        height: scaling_factor > 1 ? 0.4 * scaling_factor * root.height : 0.45 * root.height;
+        x: scaling_factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - 60px;
+        y: scaling_factor > 1 ? (root.height - self.height) / 2 : root.height - self.height - 165px;
+        VerticalLayout {
+            padding: layout_padding;
+            HorizontalLayout {
+                Text {
+                    text: "Enable Wi-Fi";
+                    font-family: regular_font_family;
+                    vertical-alignment: center;
+                }
+                Rectangle { }
+                Switch {
+                    y: (parent.height - self.height) / 2;
+                    width: switch_width;
+                    height: switch_height;
+                    border-radius: radius;
+                    activated: wifi_enabled;
+                    enabled: !wifi_lock;
+                    toggled => {
+                        toggle_wifi();
+                    }
+                }
+            }
+            HLine {
+                top-padding-multiplier: 4.0;
+                bottom-padding-multiplier: self.top-padding-multiplier;
+            }
+            Rectangle { }
         }
     }
 }

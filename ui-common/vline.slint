@@ -1,6 +1,8 @@
 export component VLine inherits HorizontalLayout {
-    padding-left: 5px;
-    padding-right: 5px;
+    in property <float> left-padding-multiplier: 1;
+    in property <float> right-padding-multiplier: 1;
+    padding-left: 5px * left-padding-multiplier;
+    padding-right: 5px * right-padding-multiplier;
     Rectangle {
         background: black;
         width: 3px;

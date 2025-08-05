@@ -1,11 +1,10 @@
-use crate::system::{start_service, restart_service, run_command, modprobe};
+use crate::system::{modprobe, restart_service, run_command, start_service};
 use anyhow::{Context, Result};
-use std::process::Command;
-use std::fs;
-use regex::Regex;
 use log::info;
+use regex::Regex;
+use std::fs;
+use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use ping_rs;
 
 const WIFI_MODULE: &str = "brcmfmac_wcc";
 const WIFI_IF: &str = "wlan0";
@@ -49,12 +48,18 @@ pub struct CommandForm {
     pub string_arguments: Option<String>,
 }
 
-pub fn daemon(wifi_status_sender: Sender<Status>, wifi_command_receiver: Receiver<CommandForm>) -> Result<()> {
+pub fn daemon(
+    wifi_status_sender: Sender<Status>,
+    wifi_command_receiver: Receiver<CommandForm>,
+) -> Result<()> {
     loop {
         if let Ok(command_form) = wifi_command_receiver.recv() {
-            if command_form.command_type == CommandType::GetStatus {
-                wifi_status_sender.send(get_status()?)?;
+            if command_form.command_type == CommandType::Enable {
+                enable()?;
+            } else if command_form.command_type == CommandType::Disable {
+                disable()?;
             }
+            wifi_status_sender.send(get_status()?)?;
         }
     }
 }
@@ -73,7 +78,9 @@ fn get_networks() -> Result<Vec<Network>> {
     let mut networks_list = Vec::new();
 
     run_command(&IWCTL_PATH, &["station", &WIFI_IF, "scan"])?;
-    let raw_iwd_output = Command::new(&IWCTL_PATH).args(&["station", &WIFI_IF, "get-networks"]).output()?;
+    let raw_iwd_output = Command::new(&IWCTL_PATH)
+        .args(&["station", &WIFI_IF, "get-networks"])
+        .output()?;
     let raw_networks_list = String::from_utf8_lossy(&raw_iwd_output.stdout);
 
     let ansi_escape = Regex::new(r"\x1b\[[0-9;]*m")?;
@@ -81,9 +88,8 @@ fn get_networks() -> Result<Vec<Network>> {
     let mut lines: Vec<_> = raw_networks_list.lines().map(str::to_string).collect();
     lines = lines[4..lines.len() - 1].to_vec();
 
-    for (i, line) in lines.iter().enumerate() {
-        let mut clean_line = line.to_string();
-        clean_line = ansi_escape.replace_all(line, "").trim_start().to_string();
+    for (_i, line) in lines.iter().enumerate() {
+        let clean_line = ansi_escape.replace_all(line, "").trim_start().to_string();
 
         // Maximum SSID length for a Wi-Fi network is 32 characters, so we should be safe here
         let network_name_str = &clean_line[..32].trim();
@@ -96,7 +102,10 @@ fn get_networks() -> Result<Vec<Network>> {
             open = true;
         }
 
-        let network = Network { name: network_name_str.to_string(), open: open };
+        let network = Network {
+            name: network_name_str.to_string(),
+            open: open,
+        };
         networks_list.push(network);
     }
 
@@ -104,14 +113,24 @@ fn get_networks() -> Result<Vec<Network>> {
 }
 
 fn disable() -> Result<()> {
+    info!("Disabling Wi-Fi");
     modprobe(&["-r", &WIFI_MODULE])?;
 
     Ok(())
 }
 
 fn enable() -> Result<()> {
+    info!("Enabling Wi-Fi");
     modprobe(&[&WIFI_MODULE])?;
-    run_command("/sbin/ifconfig", &[WIFI_IF, "up"])?;
+    // Wait for Wi-Fi interface to appear before trying to enable it
+    loop {
+        if fs::exists(&format!("/sys/class/net/{}", &WIFI_IF))? {
+            run_command("/sbin/ifconfig", &[WIFI_IF, "up"])?;
+            break;
+        } else {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
     restart_service(&IWD_SERVICE)?;
 
     Ok(())
@@ -120,10 +139,31 @@ fn enable() -> Result<()> {
 fn get_status() -> Result<Status> {
     let status;
     if fs::exists("/sys/module/brcmfmac_wcc")? {
-        status = Status { status_type: StatusType::NotConnected, error: None };
+        if is_connected_to_internet()? {
+            status = Status {
+                status_type: StatusType::Connected,
+                error: None,
+            };
+        } else {
+            status = Status {
+                status_type: StatusType::NotConnected,
+                error: None,
+            };
+        }
     } else {
-        status = Status { status_type: StatusType::Error, error: Some("Unknown".to_string()) };
+        status = Status {
+            status_type: StatusType::Disabled,
+            error: None,
+        };
     }
 
     Ok(status)
+}
+
+fn is_connected_to_internet() -> Result<bool> {
+    if let Err(_e) = run_command("/bin/ping", &["-c", "1", "1.1.1.1"]) {
+        return Ok(false);
+    } else {
+        return Ok(true);
+    }
 }
