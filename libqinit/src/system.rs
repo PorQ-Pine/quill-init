@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use base64::prelude::*;
-use log::{info, warn};
+use log::{debug, info, warn};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use regex::Regex;
@@ -101,7 +101,11 @@ pub fn wait_for_path(path: &str) -> Result<()> {
 }
 
 pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
-    // info!("Running command '{}' with arguments '{}'", &command, &args.join(" "));
+    debug!(
+        "Running command '{}' with arguments '{}'",
+        &command,
+        &args.join(" ")
+    );
     let status = Command::new(&command)
         .args(args)
         .status()

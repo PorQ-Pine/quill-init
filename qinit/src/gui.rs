@@ -130,8 +130,7 @@ pub fn setup_gui(
             move || {
                 if let Ok(toast_message) = toast_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
-                        gui.set_dialog_message(SharedString::from(toast_message));
-                        gui.set_dialog(DialogType::Toast);
+                        toast(&gui, &toast_message);
                     }
                 }
             }
@@ -286,6 +285,7 @@ pub fn setup_gui(
         TimerMode::Repeated,
         std::time::Duration::from_millis(100),
         {
+            let wifi_command_sender = wifi_command_sender.clone();
             let gui_weak = gui_weak.clone();
             let wifi_disabled_icon =
                 Image::load_from_svg_data(include_bytes!("../../icons/wifi-disabled.svg"))?;
@@ -295,6 +295,7 @@ pub fn setup_gui(
                 Image::load_from_svg_data(include_bytes!("../../icons/wifi-connected.svg"))?;
             let wifi_error_icon =
                 Image::load_from_svg_data(include_bytes!("../../icons/wifi-error.svg"))?;
+            let mut hold_wifi_locks = false;
             move || {
                 if let Ok(wifi_status) = wifi_status_receiver.try_recv() {
                     info!("Received new Wi-Fi status: {:?}", &wifi_status);
@@ -305,6 +306,28 @@ pub fn setup_gui(
                                 gui.set_wifi_icon(wifi_disabled_icon.to_owned());
                             }
                             wifi::StatusType::NotConnected => {
+                                if wifi_status.list.is_none() {
+                                    // Trigger networks scan
+                                    if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                                        command_type: wifi::CommandType::GetNetworks,
+                                        string_arguments: None,
+                                    }) {
+                                        error_toast(&gui, "Failed to get networks list", e.into());
+                                    }
+                                    gui.set_wifi_scanning_lock(true);
+                                    hold_wifi_locks = true;
+                                } else {
+                                    if let Some(networks_list) = wifi_status.list {
+                                        let mut network_names: Vec<SharedString> = vec![];
+                                        let mut network_open_vec: Vec<bool> = vec![];
+                                        for network in networks_list {
+                                            network_names.push(SharedString::from(network.name));
+                                            network_open_vec.push(network.open);
+                                        }
+                                        gui.set_wifi_network_names(slint::ModelRc::new(slint::VecModel::from(network_names)));
+                                        gui.set_wifi_network_open_vec(slint::ModelRc::new(slint::VecModel::from(network_open_vec)));
+                                    }
+                                }
                                 gui.set_wifi_enabled(true);
                                 gui.set_wifi_icon(wifi_not_connected_icon.to_owned());
                             }
@@ -317,7 +340,13 @@ pub fn setup_gui(
                                 gui.set_wifi_icon(wifi_error_icon.to_owned());
                             }
                         }
-                        gui.set_wifi_lock(false);
+
+                        if !hold_wifi_locks {
+                            gui.set_wifi_lock(false);
+                            gui.set_wifi_scanning_lock(false);
+                        } else {
+                            hold_wifi_locks = false;
+                        }
                     }
                 }
             }
@@ -347,10 +376,7 @@ pub fn setup_gui(
                     }
 
                     if display_error {
-                        let err_msg = "Failed to power off";
-                        gui.set_dialog_message(SharedString::from(err_msg));
-                        gui.set_dialog(DialogType::Toast);
-                        error!("{}: {}", &err_msg, e);
+                        error_toast(&gui, "Failed to power off", e.into());
                     }
                 }
             }
@@ -373,10 +399,7 @@ pub fn setup_gui(
                     }
 
                     if display_error {
-                        let err_msg = "Failed to reboot";
-                        gui.set_dialog_message(SharedString::from(err_msg));
-                        gui.set_dialog(DialogType::Toast);
-                        error!("{}: {}", &err_msg, e);
+                        error_toast(&gui, "Failed to reboot", e.into());
                     }
                 }
             }
@@ -413,10 +436,7 @@ pub fn setup_gui(
         move || {
             if let Err(e) = boot_sender.send(BootCommand::NormalBoot) {
                 if let Some(gui) = gui_weak.upgrade() {
-                    let err_msg = "Failed to send boot command";
-                    gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(DialogType::Toast);
-                    error!("{}: {}", &err_msg, e);
+                    error_toast(&gui, "Failed to send boot command", e.into());
                 }
             }
         }
@@ -427,10 +447,7 @@ pub fn setup_gui(
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 if let Err(e) = soft_reset() {
-                    let err_msg = "Failed to soft reset";
-                    gui.set_dialog_message(SharedString::from(err_msg));
-                    gui.set_dialog(DialogType::Toast);
-                    error!("{}: {}", &err_msg, e);
+                    error_toast(&gui, "Failed to soft-reset", e.into());
                 }
             }
         }
@@ -447,20 +464,14 @@ pub fn setup_gui(
                         command_type: wifi::CommandType::Disable,
                         string_arguments: None,
                     }) {
-                        let err_msg = "Failed to enable Wi-Fi";
-                        gui.set_dialog_message(SharedString::from(err_msg));
-                        gui.set_dialog(DialogType::Toast);
-                        error!("{}: {}", &err_msg, e)
+                        error_toast(&gui, "Failed to enable Wi-Fi", e.into());
                     }
                 } else {
                     if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
                         command_type: wifi::CommandType::Enable,
                         string_arguments: None,
                     }) {
-                        let err_msg = "Failed to disable Wi-Fi";
-                        gui.set_dialog_message(SharedString::from(err_msg));
-                        gui.set_dialog(DialogType::Toast);
-                        error!("{}: {}", &err_msg, e)
+                        error_toast(&gui, "Failed to disable Wi-Fi", e.into());
                     }
                 }
             }
@@ -470,4 +481,16 @@ pub fn setup_gui(
     gui.run()?;
 
     Ok(())
+}
+
+fn toast(gui: &AppWindow, message: &str) {
+    gui.set_dialog_message(SharedString::from(message));
+    gui.set_dialog(DialogType::Toast);
+    info!("{}", &message);
+}
+
+fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
+    gui.set_dialog_message(SharedString::from(message));
+    gui.set_dialog(DialogType::Toast);
+    error!("{}: {}", &message, e);
 }

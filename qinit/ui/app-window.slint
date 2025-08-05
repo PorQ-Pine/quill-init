@@ -52,8 +52,11 @@ export component AppWindow inherits Window {
     // Configuration properties
     in-out property <bool> persistent_rootfs;
     // Run-time properties
-    in-out property <bool> wifi_enabled;
-    in-out property <bool> wifi_lock;
+    in property <bool> wifi_enabled;
+    in property <bool> wifi_lock;
+    in property <bool> wifi_scanning_lock;
+    in property <[string]> wifi_network_names;
+    in property <[bool]> wifi_network_open_vec;
     // Generic multipliers for default-sized and smaller-sized buttons
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -699,8 +702,9 @@ export component AppWindow inherits Window {
             padding: layout_padding;
             HorizontalLayout {
                 Text {
-                    text: "Enable Wi-Fi";
-                    font-family: regular_font_family;
+                    text: "Wi-Fi";
+                    font-family: header_font_family;
+                    font-weight: 800;
                     vertical-alignment: center;
                 }
                 Rectangle { }
@@ -720,7 +724,79 @@ export component AppWindow inherits Window {
                 top-padding-multiplier: 4.0;
                 bottom-padding-multiplier: self.top-padding-multiplier;
             }
-            Rectangle { }
+            if (wifi_enabled && !wifi_scanning_lock): ScrollView {
+                mouse-drag-pan-enabled: true;
+                VerticalLayout {
+                    spacing: layout_spacing;
+                    // Wi-Fi button(s)
+                    for name[index] in wifi_network_names: TouchArea {
+                        i-container := Rectangle {
+                            border-radius: radius;
+                            border-width: 3px;
+                            border-color: #a5a5a5;
+                            background: #ffffff;
+
+                            HorizontalLayout {  
+                                padding: 20px;
+                                spacing: layout_spacing;
+
+                                i-text := Text {
+                                    color: #000000;
+                                    horizontal-alignment: left;
+                                    vertical-alignment: center;
+                                    font-family: regular_font_family;
+                                    font-size: root.default-font-size * 0.8;
+                                    text: name;
+                                    wrap: word-wrap;
+                                }
+                                Rectangle { }
+                                VerticalLayout {
+                                    alignment: center;
+                                    if (wifi_network_open_vec[index] == true): Image {
+                                        source: @image-url("../../icons/wifi-network-open.svg");
+                                        height: icon_button_height;
+                                        width: self.height;
+                                    }
+                                    if (wifi_network_open_vec[index] == false): Image {
+                                        source: @image-url("../../icons/wifi-network-locked.svg");
+                                        height: icon_button_height;
+                                        width: self.height;
+                                    }
+                                }
+                            }
+                        }
+
+                        states [  
+                            pressed when self.pressed: {
+                                i-container.background: #000000;
+                                i-text.color: #ffffff;
+                            }
+                        ]
+                    }
+                }
+            }
+            if (!wifi_enabled): HorizontalLayout {
+                alignment: center;
+                Text {
+                    text: "Enable Wi-Fi in order to connect to a network";
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    font-size: root.default-font-size * 0.9;
+                    wrap: word-wrap;
+                    width: parent.width * 0.75;
+                }
+            }
+            if (wifi_scanning_lock): HorizontalLayout {
+                alignment: center;
+                Text {
+                    text: "Scanning for networks";
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    font-size: root.default-font-size * 0.9;
+                    wrap: word-wrap;
+                    width: parent.width * 0.75;
+                }
+            }
         }
     }
 }

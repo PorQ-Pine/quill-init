@@ -10,6 +10,7 @@ const WIFI_MODULE: &str = "brcmfmac_wcc";
 const WIFI_IF: &str = "wlan0";
 const IWCTL_PATH: &str = "/usr/bin/iwctl";
 const IWD_SERVICE: &str = "iwd";
+const MAX_SCAN_RETRIES: i32 = 5;
 
 #[derive(Debug, PartialEq)]
 pub struct Network {
@@ -30,6 +31,7 @@ pub enum StatusType {
 #[derive(Debug, PartialEq)]
 pub struct Status {
     pub status_type: StatusType,
+    pub list: Option<Vec<Network>>,
     pub error: Option<String>,
 }
 
@@ -40,6 +42,7 @@ pub enum CommandType {
     Connect,
     Disconnect,
     GetStatus,
+    GetNetworks,
 }
 
 #[derive(Debug, PartialEq)]
@@ -59,7 +62,14 @@ pub fn daemon(
             } else if command_form.command_type == CommandType::Disable {
                 disable()?;
             }
-            wifi_status_sender.send(get_status()?)?;
+
+            let mut wifi_status = get_status()?;
+
+            if command_form.command_type == CommandType::GetNetworks {
+                wifi_status.list = Some(get_networks()?);
+            }
+
+            wifi_status_sender.send(wifi_status)?;
         }
     }
 }
@@ -77,7 +87,18 @@ fn get_networks() -> Result<Vec<Network>> {
 
     let mut networks_list = Vec::new();
 
-    run_command(&IWCTL_PATH, &["station", &WIFI_IF, "scan"])?;
+    let mut scan_retries = 0;
+    loop {
+        if scan_retries < MAX_SCAN_RETRIES {
+            if let Ok(()) = run_command(&IWCTL_PATH, &["station", &WIFI_IF, "scan"]) {
+                break;
+            }
+        } else {
+            return Err(anyhow::anyhow!("Failed to scan for networks"));
+        }
+        scan_retries += 1;
+    }
+
     let raw_iwd_output = Command::new(&IWCTL_PATH)
         .args(&["station", &WIFI_IF, "get-networks"])
         .output()?;
@@ -94,8 +115,6 @@ fn get_networks() -> Result<Vec<Network>> {
         // Maximum SSID length for a Wi-Fi network is 32 characters, so we should be safe here
         let network_name_str = &clean_line[..32].trim();
         let security_str = &clean_line[34..54].trim();
-
-        info!("{},{}", &network_name_str, &security_str);
 
         let mut open = false;
         if security_str.contains("open") {
@@ -138,21 +157,24 @@ fn enable() -> Result<()> {
 
 fn get_status() -> Result<Status> {
     let status;
-    if fs::exists("/sys/module/brcmfmac_wcc")? {
+    if fs::exists(&format!("/sys/module/{}", &WIFI_MODULE))? {
         if is_connected_to_internet()? {
             status = Status {
                 status_type: StatusType::Connected,
+                list: None,
                 error: None,
             };
         } else {
             status = Status {
                 status_type: StatusType::NotConnected,
+                list: None,
                 error: None,
             };
         }
     } else {
         status = Status {
             status_type: StatusType::Disabled,
+            list: None,
             error: None,
         };
     }

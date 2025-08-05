@@ -87,7 +87,7 @@ fn main() {
             error_string.truncate(error_string_initial_length - 12);
         }
         error!("{}", &error_string.replace("\n", " | "));
-        // Sending error contents to GUI (if ever it is alive)
+        // Send error reason to GUI (if ever it is alive)
         let _ = interrupt_sender.send(error_string);
     }
 
@@ -103,7 +103,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
 
-            // Install signal handler for SIGCHLD (i.e. allow us to stop iwd after having started it)
+            // Install signal handler for SIGCHLD (i.e. allow us to stop iwd after having started it, for example)
             let mut signals = Signals::new(&[SIGCHLD])?;
             thread::spawn(move || {
                 for _sig in signals.forever() {
