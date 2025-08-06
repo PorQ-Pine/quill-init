@@ -8,6 +8,7 @@ import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
 import { Dialog } from "../../ui-common/dialog.slint";
 import { SectionButton } from "../../ui-common/sectionbutton.slint";
+import { VirtualKeyboard } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
@@ -29,6 +30,8 @@ export component AppWindow inherits Window {
     callback toggle_wifi();
     callback boot_default();
     callback soft_reset();
+    callback get_networks();
+    callback connect_to_wifi_network(string, string);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -53,8 +56,11 @@ export component AppWindow inherits Window {
     in-out property <bool> persistent_rootfs;
     // Run-time properties
     in property <bool> wifi_enabled;
+    in property <bool> wifi_connected;
     in property <bool> wifi_lock;
     in property <bool> wifi_scanning_lock;
+    in property <bool> wifi_connecting_lock;
+    in property <string> wifi_connected_name;
     in property <[string]> wifi_network_names;
     in property <[bool]> wifi_network_open_vec;
     // Generic multipliers for default-sized and smaller-sized buttons
@@ -646,7 +652,7 @@ export component AppWindow inherits Window {
 
     // Toasts/dialogs
     if (dialog == DialogType.Toast): Rectangle {
-        width: 0.4 * scaling_factor * root.width;
+        width: 0.5 * scaling_factor * root.width;
         height: 0.07 * scaling_factor * root.height;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
@@ -708,6 +714,22 @@ export component AppWindow inherits Window {
                     vertical-alignment: center;
                 }
                 Rectangle { }
+                IconButton {
+                    icon: @image-url("../../icons/refresh.svg");
+                    border-radius: radius;
+                    height: button_height * 0.7;
+                    width: self.height;
+                    y: (parent.height - self.height) / 2;
+                    visible: wifi_enabled;
+                    clicked => {
+                        get_networks();
+                    }
+                }
+                VLine {
+                    left-padding-multiplier: 2.5;
+                    right-padding-multiplier: 5.0;
+                    visible: wifi_enabled;
+                }
                 Switch {
                     y: (parent.height - self.height) / 2;
                     width: switch_width;
@@ -724,7 +746,7 @@ export component AppWindow inherits Window {
                 top-padding-multiplier: 4.0;
                 bottom-padding-multiplier: self.top-padding-multiplier;
             }
-            if (wifi_enabled && !wifi_scanning_lock): ScrollView {
+            if (wifi_enabled && !wifi_scanning_lock && !wifi_connecting_lock): ScrollView {
                 mouse-drag-pan-enabled: true;
                 VerticalLayout {
                     spacing: layout_spacing;
@@ -734,7 +756,7 @@ export component AppWindow inherits Window {
                             border-radius: radius;
                             border-width: 3px;
                             border-color: #a5a5a5;
-                            background: #ffffff;
+                            background: name == wifi_connected_name ? #dbdada : #ffffff;
 
                             HorizontalLayout {  
                                 padding: 20px;
@@ -752,15 +774,23 @@ export component AppWindow inherits Window {
                                 Rectangle { }
                                 VerticalLayout {
                                     alignment: center;
-                                    if (wifi_network_open_vec[index] == true): Image {
-                                        source: @image-url("../../icons/wifi-network-open.svg");
-                                        height: icon_button_height;
-                                        width: self.height;
-                                    }
-                                    if (wifi_network_open_vec[index] == false): Image {
-                                        source: @image-url("../../icons/wifi-network-locked.svg");
-                                        height: icon_button_height;
-                                        width: self.height;
+                                    HorizontalLayout {
+                                        spacing: layout_spacing;
+                                        if (name == wifi_connected_name): Image {
+                                            source: @image-url("../../icons/wifi-connected-alt.svg");
+                                            height: icon_button_height;
+                                            width: self.height;
+                                        }
+                                        if (wifi_network_open_vec[index]): Image {
+                                            source: @image-url("../../icons/wifi-network-open.svg");
+                                            height: icon_button_height;
+                                            width: self.height;
+                                        }
+                                        if (!wifi_network_open_vec[index]): Image {
+                                            source: @image-url("../../icons/wifi-network-locked.svg");
+                                            height: icon_button_height;
+                                            width: self.height;
+                                        }
                                     }
                                 }
                             }
@@ -772,7 +802,14 @@ export component AppWindow inherits Window {
                                 i-text.color: #ffffff;
                             }
                         ]
+
+                        clicked => {
+                            if wifi_network_open_vec[index] {
+                                connect_to_wifi_network(name, "");
+                            }
+                        }
                     }
+                    Rectangle { }
                 }
             }
             if (!wifi_enabled): HorizontalLayout {
@@ -790,6 +827,17 @@ export component AppWindow inherits Window {
                 alignment: center;
                 Text {
                     text: "Scanning for networks";
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    font-size: root.default-font-size * 0.9;
+                    wrap: word-wrap;
+                    width: parent.width * 0.75;
+                }
+            }
+            if (wifi_connecting_lock): HorizontalLayout {
+                alignment: center;
+                Text {
+                    text: "Connecting to network";
                     horizontal-alignment: center;
                     vertical-alignment: center;
                     font-size: root.default-font-size * 0.9;

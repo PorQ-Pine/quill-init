@@ -1,21 +1,25 @@
-use crate::system::{modprobe, restart_service, run_command, start_service};
+use crate::system::{modprobe, restart_service, run_command, start_service, stop_service};
 use anyhow::{Context, Result};
-use log::info;
+use log::{error, info};
 use regex::Regex;
 use std::fs;
 use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender, channel};
+use std::thread::current;
 
 const WIFI_MODULE: &str = "brcmfmac_wcc";
 const WIFI_IF: &str = "wlan0";
 const IWCTL_PATH: &str = "/usr/bin/iwctl";
 const IWD_SERVICE: &str = "iwd";
-const MAX_SCAN_RETRIES: i32 = 5;
+const MAX_SCAN_RETRIES: i32 = 30;
+const MAX_PING_RETRIES: i32 = 10;
+const PING_TIMEOUT_SECS: i32 = 5;
 
 #[derive(Debug, PartialEq)]
 pub struct Network {
     pub name: String,
     pub open: bool,
+    pub currently_connected: bool,
     // Maybe something to implement in the future?
     // strength: i32,
 }
@@ -46,9 +50,15 @@ pub enum CommandType {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct NetworkForm {
+    pub name: String,
+    pub passphrase: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct CommandForm {
     pub command_type: CommandType,
-    pub string_arguments: Option<String>,
+    pub arguments: Option<NetworkForm>,
 }
 
 pub fn daemon(
@@ -57,16 +67,65 @@ pub fn daemon(
 ) -> Result<()> {
     loop {
         if let Ok(command_form) = wifi_command_receiver.recv() {
+            info!("Wi-Fi daemon: received new command: {:?}", &command_form.command_type);
+
+            let mut wifi_status: Status;
+
             if command_form.command_type == CommandType::Enable {
-                enable()?;
+                if let Err(e) = enable() {
+                    error!("Failed to enable Wi-Fi: {}", &e);
+                }
             } else if command_form.command_type == CommandType::Disable {
-                disable()?;
+                if let Err(e) = disable() {
+                    error!("Failed to disable Wi-Fi: {}", &e);
+                }
             }
 
-            let mut wifi_status = get_status()?;
+            if let Ok(wifi_status_) = get_status(false) {
+                wifi_status = wifi_status_;
+            } else {
+                wifi_status = Status {
+                    status_type: StatusType::Error,
+                    list: None,
+                    error: Some("Failed to get Wi-Fi status".to_string()),
+                }
+            }
 
-            if command_form.command_type == CommandType::GetNetworks {
-                wifi_status.list = Some(get_networks()?);
+            if command_form.command_type == CommandType::Connect {
+                if let Some(network) = command_form.arguments {
+                    if let Err(e) = connect(&network) {
+                        wifi_status.status_type = StatusType::Error;
+                        wifi_status.error = Some("Failed to connect to network".to_string());
+                        error!("Failed to connect to network: {}", &e);
+                    }
+                } else {
+                    wifi_status.status_type = StatusType::Error;
+                    wifi_status.error = Some("Failed to get network details".to_string());
+                }
+            }
+            if wifi_status.status_type != StatusType::Disabled
+                && (command_form.command_type == CommandType::GetNetworks
+                    || command_form.command_type == CommandType::GetStatus
+                    || command_form.command_type == CommandType::Connect)
+            {
+                if let Ok(networks_list) = get_networks() {
+                    if wifi_status.error.is_none() {
+                        // Get Wi-Fi status again if no errors were reported to check if we are connected to the Internet
+                        if let Ok(wifi_status_) = get_status(true) {
+                            wifi_status = wifi_status_;
+                        } else {
+                            wifi_status = Status {
+                                status_type: StatusType::Error,
+                                list: None,
+                                error: Some("Failed to get Wi-Fi status".to_string()),
+                            }
+                        }
+                    }
+                    wifi_status.list = Some(networks_list);
+                } else {
+                    wifi_status.status_type = StatusType::Error;
+                    wifi_status.error = Some("Failed to get networks list".to_string());
+                }
             }
 
             wifi_status_sender.send(wifi_status)?;
@@ -74,16 +133,8 @@ pub fn daemon(
     }
 }
 
-fn start_iwd() -> Result<()> {
-    if !fs::exists(&format!("{}/started/iwd", &crate::OPENRC_WORKDIR))? {
-        start_service("iwd")?;
-    }
-
-    Ok(())
-}
-
 fn get_networks() -> Result<Vec<Network>> {
-    start_iwd()?;
+    restart_service(&IWD_SERVICE)?;
 
     let mut networks_list = Vec::new();
 
@@ -121,9 +172,17 @@ fn get_networks() -> Result<Vec<Network>> {
             open = true;
         }
 
+        let mut final_network_name = network_name_str.to_string();
+        let mut currently_connected = false;
+        if final_network_name.starts_with(">   ") {
+            currently_connected = true;
+            final_network_name = final_network_name[4..].to_string();
+        }
+
         let network = Network {
-            name: network_name_str.to_string(),
+            name: final_network_name,
             open: open,
+            currently_connected: currently_connected,
         };
         networks_list.push(network);
     }
@@ -133,6 +192,7 @@ fn get_networks() -> Result<Vec<Network>> {
 
 fn disable() -> Result<()> {
     info!("Disabling Wi-Fi");
+    stop_service(&IWD_SERVICE)?;
     modprobe(&["-r", &WIFI_MODULE])?;
 
     Ok(())
@@ -150,15 +210,44 @@ fn enable() -> Result<()> {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
-    restart_service(&IWD_SERVICE)?;
 
     Ok(())
 }
 
-fn get_status() -> Result<Status> {
+fn connect(network: &NetworkForm) -> Result<()> {
+    info!(
+        "Attempting to connect to network with the following credentials: {:?}",
+        &network
+    );
+    if network.passphrase.is_none() {
+        run_command(
+            &IWCTL_PATH,
+            &["station", &WIFI_IF, "connect", &network.name],
+        )?;
+    } else {
+        if let Some(passphrase) = &network.passphrase {
+            run_command(
+                &IWCTL_PATH,
+                &[
+                    "--passphrase",
+                    &passphrase,
+                    "station",
+                    &WIFI_IF,
+                    "connect",
+                    &network.name,
+                ],
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn get_status(do_ping: bool) -> Result<Status> {
+    info!("Determining Wi-Fi status");
     let status;
     if fs::exists(&format!("/sys/module/{}", &WIFI_MODULE))? {
-        if is_connected_to_internet()? {
+        if do_ping && is_connected_to_internet()? {
             status = Status {
                 status_type: StatusType::Connected,
                 list: None,
@@ -183,9 +272,16 @@ fn get_status() -> Result<Status> {
 }
 
 fn is_connected_to_internet() -> Result<bool> {
-    if let Err(_e) = run_command("/bin/ping", &["-c", "1", "1.1.1.1"]) {
-        return Ok(false);
-    } else {
-        return Ok(true);
+    let mut retries = 0;
+    loop {
+        if retries < MAX_PING_RETRIES {
+            if let Ok(()) = run_command("/bin/ping", &["-w", &format!("{}", &PING_TIMEOUT_SECS), "-c", "1", "1.1.1.1"]) {
+                return Ok(true);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            retries += 1;
+        } else {
+            return Ok(false);
+        }
     }
 }

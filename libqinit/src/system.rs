@@ -111,6 +111,7 @@ pub fn run_command(command: &str, args: &[&str]) -> Result<()> {
         .status()
         .with_context(|| format!("Failed to execute command: {}", &command))?;
 
+    debug!("Exit status is {}", &status);
     if status.success() {
         Ok(())
     } else {

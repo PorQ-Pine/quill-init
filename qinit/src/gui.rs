@@ -302,48 +302,74 @@ pub fn setup_gui(
                     if let Some(gui) = gui_weak.upgrade() {
                         match wifi_status.status_type {
                             wifi::StatusType::Disabled => {
+                                gui.set_wifi_connected(false);
                                 gui.set_wifi_enabled(false);
                                 gui.set_wifi_icon(wifi_disabled_icon.to_owned());
                             }
                             wifi::StatusType::NotConnected => {
-                                if wifi_status.list.is_none() {
-                                    // Trigger networks scan
-                                    if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
-                                        command_type: wifi::CommandType::GetNetworks,
-                                        string_arguments: None,
-                                    }) {
-                                        error_toast(&gui, "Failed to get networks list", e.into());
-                                    }
-                                    gui.set_wifi_scanning_lock(true);
-                                    hold_wifi_locks = true;
-                                } else {
-                                    if let Some(networks_list) = wifi_status.list {
-                                        let mut network_names: Vec<SharedString> = vec![];
-                                        let mut network_open_vec: Vec<bool> = vec![];
-                                        for network in networks_list {
-                                            network_names.push(SharedString::from(network.name));
-                                            network_open_vec.push(network.open);
-                                        }
-                                        gui.set_wifi_network_names(slint::ModelRc::new(slint::VecModel::from(network_names)));
-                                        gui.set_wifi_network_open_vec(slint::ModelRc::new(slint::VecModel::from(network_open_vec)));
-                                    }
-                                }
+                                gui.set_wifi_connected(false);
                                 gui.set_wifi_enabled(true);
                                 gui.set_wifi_icon(wifi_not_connected_icon.to_owned());
                             }
                             wifi::StatusType::Connected => {
                                 gui.set_wifi_enabled(true);
+                                gui.set_wifi_connected(true);
                                 gui.set_wifi_icon(wifi_connected_icon.to_owned());
                             }
                             wifi::StatusType::Error => {
+                                gui.set_wifi_connected(false);
                                 gui.set_wifi_enabled(true);
                                 gui.set_wifi_icon(wifi_error_icon.to_owned());
+                                if let Some(error) = wifi_status.error {
+                                    toast(&gui, &error);
+                                }
+                            }
+                        }
+
+                        if wifi_status.list.is_none()
+                            && wifi_status.status_type != wifi::StatusType::Disabled
+                        {
+                            // Trigger networks scan
+                            if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                                command_type: wifi::CommandType::GetNetworks,
+                                arguments: None,
+                            }) {
+                                error_toast(&gui, "Failed to get networks list", e.into());
+                            }
+                            gui.set_wifi_scanning_lock(true);
+                            hold_wifi_locks = true;
+                        } else {
+                            if let Some(networks_list) = wifi_status.list {
+                                let mut network_names: Vec<SharedString> = vec![];
+                                let mut network_open_vec: Vec<bool> = vec![];
+                                for network in networks_list {
+                                    network_names.push(SharedString::from(network.name.to_owned()));
+                                    network_open_vec.push(network.open);
+
+                                    if network.currently_connected {
+                                        info!("Currently connected to network '{}'", &network.name);
+                                        gui.set_wifi_connected_name(SharedString::from(
+                                            network.name,
+                                        ));
+                                    } else {
+                                        if wifi_status.status_type != wifi::StatusType::Connected {
+                                            gui.set_wifi_connected_name(SharedString::new());
+                                        }
+                                    }
+                                }
+                                gui.set_wifi_network_names(slint::ModelRc::new(
+                                    slint::VecModel::from(network_names),
+                                ));
+                                gui.set_wifi_network_open_vec(slint::ModelRc::new(
+                                    slint::VecModel::from(network_open_vec),
+                                ));
                             }
                         }
 
                         if !hold_wifi_locks {
                             gui.set_wifi_lock(false);
                             gui.set_wifi_scanning_lock(false);
+                            gui.set_wifi_connecting_lock(false);
                         } else {
                             hold_wifi_locks = false;
                         }
@@ -357,7 +383,7 @@ pub fn setup_gui(
     // Set initial Wi-Fi icon
     wifi_command_sender.send(wifi::CommandForm {
         command_type: wifi::CommandType::GetStatus,
-        string_arguments: None,
+        arguments: None,
     })?;
 
     gui.on_power_off({
@@ -462,16 +488,37 @@ pub fn setup_gui(
                 if gui.get_wifi_enabled() {
                     if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
                         command_type: wifi::CommandType::Disable,
-                        string_arguments: None,
+                        arguments: None,
                     }) {
                         error_toast(&gui, "Failed to enable Wi-Fi", e.into());
                     }
                 } else {
                     if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
                         command_type: wifi::CommandType::Enable,
-                        string_arguments: None,
+                        arguments: None,
                     }) {
                         error_toast(&gui, "Failed to disable Wi-Fi", e.into());
+                    }
+                }
+            }
+        }
+    });
+
+    gui.on_connect_to_wifi_network({
+        let wifi_command_sender = wifi_command_sender.clone();
+        let gui_weak = gui_weak.clone();
+        move |network_name, passphrase| {
+            if let Some(gui) = gui_weak.upgrade() {
+                gui.set_wifi_connecting_lock(true);
+                if passphrase.is_empty() {
+                    if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                        command_type: wifi::CommandType::Connect,
+                        arguments: Some(wifi::NetworkForm {
+                            name: network_name.to_string(),
+                            passphrase: None,
+                        }),
+                    }) {
+                        error_toast(&gui, "Failed to connect to network", e.into());
                     }
                 }
             }
