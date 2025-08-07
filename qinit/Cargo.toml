@@ -11,7 +11,7 @@ env_logger = "0.11.8"
 log = "0.4.27"
 network-interface = "2.0.1"
 slint = { version = "1.12.1", default-features = false, features = ["compat-1-2", "backend-linuxkms-noseat", "libm", "log", "renderer-software"] }
-sys-mount = "3.0.1"
+sys-mount = { version = "3.0.1", default-features = false }
 libqinit = { path = "../libqinit" }
 openssl = "0.10.73"
 embed-file = "0.2.0"

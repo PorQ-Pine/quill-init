@@ -1,18 +1,17 @@
-use crate::system::{modprobe, restart_service, run_command, start_service, stop_service};
-use anyhow::{Context, Result};
+use crate::system::{modprobe, restart_service, run_command, stop_service};
+use anyhow::Result;
 use log::{error, info};
 use regex::Regex;
 use std::fs;
 use std::process::Command;
-use std::sync::mpsc::{Receiver, Sender, channel};
-use std::thread::current;
+use std::sync::mpsc::{Receiver, Sender};
 
 const WIFI_MODULE: &str = "brcmfmac_wcc";
 const WIFI_IF: &str = "wlan0";
 const IWCTL_PATH: &str = "/usr/bin/iwctl";
 const IWD_SERVICE: &str = "iwd";
 const MAX_SCAN_RETRIES: i32 = 30;
-const MAX_PING_RETRIES: i32 = 10;
+const MAX_PING_RETRIES: i32 = 5;
 const PING_TIMEOUT_SECS: i32 = 5;
 
 #[derive(Debug, PartialEq)]
@@ -67,7 +66,10 @@ pub fn daemon(
 ) -> Result<()> {
     loop {
         if let Ok(command_form) = wifi_command_receiver.recv() {
-            info!("Wi-Fi daemon: received new command: {:?}", &command_form.command_type);
+            info!(
+                "Wi-Fi daemon: received new command: {:?}",
+                &command_form.command_type
+            );
 
             let mut wifi_status: Status;
 
@@ -110,7 +112,7 @@ pub fn daemon(
             {
                 if let Ok(networks_list) = get_networks() {
                     if wifi_status.error.is_none() {
-                        // Get Wi-Fi status again if no errors were reported to check if we are connected to the Internet
+                        // If no errors were reported, get Wi-Fi status again to check whether or not we are connected to the Internet
                         if let Ok(wifi_status_) = get_status(true) {
                             wifi_status = wifi_status_;
                         } else {
@@ -147,6 +149,7 @@ fn get_networks() -> Result<Vec<Network>> {
         } else {
             return Err(anyhow::anyhow!("Failed to scan for networks"));
         }
+        std::thread::sleep(std::time::Duration::from_millis(100));
         scan_retries += 1;
     }
 
@@ -275,10 +278,19 @@ fn is_connected_to_internet() -> Result<bool> {
     let mut retries = 0;
     loop {
         if retries < MAX_PING_RETRIES {
-            if let Ok(()) = run_command("/bin/ping", &["-w", &format!("{}", &PING_TIMEOUT_SECS), "-c", "1", "1.1.1.1"]) {
+            if let Ok(()) = run_command(
+                "/bin/ping",
+                &[
+                    "-w",
+                    &format!("{}", &PING_TIMEOUT_SECS),
+                    "-c",
+                    "1",
+                    "1.1.1.1",
+                ],
+            ) {
                 return Ok(true);
             }
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(100));
             retries += 1;
         } else {
             return Ok(false);

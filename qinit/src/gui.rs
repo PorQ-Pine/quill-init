@@ -366,8 +366,13 @@ pub fn setup_gui(
                             }
                         }
 
+                        if gui.get_wifi_enabling_lock() && (wifi_status.status_type == wifi::StatusType::NotConnected || wifi_status.status_type == wifi::StatusType::Connected) {
+                            gui.set_wifi_enabling_lock(false);
+                        }
+                        if gui.get_wifi_disabling_lock() && wifi_status.status_type == wifi::StatusType::Disabled {
+                            gui.set_wifi_disabling_lock(false);
+                        }
                         if !hold_wifi_locks {
-                            gui.set_wifi_lock(false);
                             gui.set_wifi_scanning_lock(false);
                             gui.set_wifi_connecting_lock(false);
                         } else {
@@ -484,8 +489,8 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
-                gui.set_wifi_lock(true);
                 if gui.get_wifi_enabled() {
+                    gui.set_wifi_disabling_lock(true);
                     if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
                         command_type: wifi::CommandType::Disable,
                         arguments: None,
@@ -493,6 +498,7 @@ pub fn setup_gui(
                         error_toast(&gui, "Failed to enable Wi-Fi", e.into());
                     }
                 } else {
+                    gui.set_wifi_enabling_lock(true);
                     if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
                         command_type: wifi::CommandType::Enable,
                         arguments: None,
@@ -520,6 +526,19 @@ pub fn setup_gui(
                     }) {
                         error_toast(&gui, "Failed to connect to network", e.into());
                     }
+                }
+            }
+        }
+    });
+
+    gui.on_get_networks({
+        let wifi_command_sender = wifi_command_sender.clone();
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                gui.set_wifi_scanning_lock(true);
+                if let Err(e) = wifi_command_sender.send(wifi::CommandForm { command_type: wifi::CommandType::GetNetworks, arguments: None, }) {
+                    error_toast(&gui, "Failed to scan networks", e.into());
                 }
             }
         }
