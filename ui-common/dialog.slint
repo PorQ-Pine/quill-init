@@ -1,6 +1,7 @@
 import { Button } from "button.slint";
 export component Dialog inherits Rectangle {
     in property <string> text <=> i-text.text;
+    in property <string> button_font_family;
     property <length> button_width: root.width * 0.4;
     property <length> button_height: root.height * 0.15;
     callback cancel();
@@ -31,6 +32,7 @@ export component Dialog inherits Rectangle {
                 width: button_width;
                 height: button_height;
                 border-radius: root.border-radius;
+                font-family: button_font_family;
                 clicked => {
                     cancel();
                 }
@@ -40,6 +42,7 @@ export component Dialog inherits Rectangle {
                 width: button_width;
                 height: button_height;
                 border-radius: root.border-radius;
+                font-family: button_font_family;
                 clicked => {
                     confirm();
                 }

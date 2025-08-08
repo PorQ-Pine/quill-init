@@ -163,7 +163,8 @@ pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
     );
     if fs::exists(&firmware_archive_path)? && check_signature(&pubkey, &firmware_archive_path)? {
         // musl introduces compile-time issues with the 'loop' feature of the crate 'sys_mount': I have disabled it. Thus, here we need to use an external binary to mount SquashFS files.
-        run_command("/bin/mount", &[&firmware_archive_path, &FIRMWARE_DIR_PATH]).with_context(|| "Failed to mount device's firmware")?;
+        run_command("/bin/mount", &[&firmware_archive_path, &FIRMWARE_DIR_PATH])
+            .with_context(|| "Failed to mount device's firmware")?;
         Mount::builder()
             .fstype("tmpfs")
             .data("size=32M")

@@ -10,10 +10,12 @@ component VirtualKeyboardButton {
     in property <image> icon;
     in property <length> key-height;
     in property <length> radius;
+    in property <string> font-family;
+    in property <float> scaling-factor;
 
     callback key-pressed(/* key */ string);
 
-    preferred-width: root.key == "" ? key-height * 1.25 : key-height * 0.75;
+    preferred-width: root.key == "" ? key-height * 1.125 : key-height * 0.85;
     min-height: key-height;
     horizontal-stretch: 0;
 
@@ -22,13 +24,13 @@ component VirtualKeyboardButton {
         border-radius: radius;
 
         HorizontalLayout {
-            if (root.key != "") : Text {
+            if (root.key != "") : i-text := Text {
                 text: root.key;
                 color: i-touch-area.pressed ? #ffffff : #000000;
-                font-size: key-height * 0.35;
+                font-size: key-height * 0.35 * scaling-factor;
                 vertical-alignment: center;
                 horizontal-alignment: center;
-                font-family: "Inter";
+                font-family: font-family;
                 font-weight: 600;
             }
 
@@ -36,7 +38,7 @@ component VirtualKeyboardButton {
                 alignment: center;
                 Image {
                     source: root.icon;
-                    height: key-height * 0.5;
+                    height: key-height * 0.5 * scaling-factor;
                     min-width: self.height;
                     colorize: i-touch-area.pressed ? #ffffff : #000000;
                 }
@@ -159,6 +161,8 @@ export component VirtualKeyboard {
     private property <bool> shift;
     in property <length> key-height;
     in property <length> radius;
+    in property <string> font-family;
+    in property <float> scaling-factor;
 
     callback close();
 
@@ -180,12 +184,17 @@ export component VirtualKeyboard {
         for row[index] in VirtualKeyboardHandler.keys : HorizontalLayout {
             spacing: 8px;
             if (index == 0) : VirtualKeyboardButton {
-                key-height: key-height;           
+                key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
+                radius: radius;
                 key: "⎋";
             }
 
             if (index == 1) : VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.tab;
 
@@ -197,6 +206,8 @@ export component VirtualKeyboard {
             // shift
             if (index == 2) : VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.arrow-up;
 
@@ -207,6 +218,8 @@ export component VirtualKeyboard {
 
             for km in row : VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 key: root.shift ? km.shift-key : km.key;
 
@@ -218,6 +231,8 @@ export component VirtualKeyboard {
 
             if (index == 0) : VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.chevron-left;
 
@@ -228,6 +243,8 @@ export component VirtualKeyboard {
 
             if (index == 1) : VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.arrow-circle-o-left;
 
@@ -239,6 +256,8 @@ export component VirtualKeyboard {
             // shift
             if (index == 2) : VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.arrow-up;
 
@@ -253,6 +272,8 @@ export component VirtualKeyboard {
 
              VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.expand-more;
 
@@ -263,6 +284,8 @@ export component VirtualKeyboard {
 
             VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.globe;
 
@@ -272,6 +295,8 @@ export component VirtualKeyboard {
             }
             VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 horizontal-stretch: 10;
                 key: " ";
@@ -283,6 +308,8 @@ export component VirtualKeyboard {
             }
             VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.arrow-left;
 
@@ -292,6 +319,8 @@ export component VirtualKeyboard {
             }
             VirtualKeyboardButton {
                 key-height: key-height;
+                font-family: font-family;
+                scaling-factor: scaling-factor;
                 radius: radius;
                 icon: Icons.arrow-right;
 
@@ -300,7 +329,5 @@ export component VirtualKeyboard {
                 }
             }
         }
-
-
     }
 }

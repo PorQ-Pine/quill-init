@@ -520,6 +520,7 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         move |network_name, passphrase| {
             if let Some(gui) = gui_weak.upgrade() {
+                let err_msg = "Failed to connect to network";
                 gui.set_wifi_connecting_lock(true);
                 if passphrase.is_empty() {
                     if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
@@ -527,6 +528,16 @@ pub fn setup_gui(
                         arguments: Some(wifi::NetworkForm {
                             name: network_name.to_string(),
                             passphrase: None,
+                        }),
+                    }) {
+                        error_toast(&gui, &err_msg, e.into());
+                    }
+                } else {
+                    if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                        command_type: wifi::CommandType::Connect,
+                        arguments: Some(wifi::NetworkForm {
+                            name: network_name.to_string(),
+                            passphrase: Some(passphrase.to_string()),
                         }),
                     }) {
                         error_toast(&gui, "Failed to connect to network", e.into());
@@ -548,6 +559,18 @@ pub fn setup_gui(
                 }) {
                     error_toast(&gui, "Failed to scan networks", e.into());
                 }
+            }
+        }
+    });
+
+    gui.global::<VirtualKeyboardHandler>().on_key_pressed({
+        let gui_weak = gui_weak.clone();
+        move |key| {
+            if let Some(gui) = gui_weak.upgrade() {
+                gui.window()
+                    .dispatch_event(slint::platform::WindowEvent::KeyPressed { text: key.clone() });
+                gui.window()
+                    .dispatch_event(slint::platform::WindowEvent::KeyReleased { text: key });
             }
         }
     });

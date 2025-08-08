@@ -2,18 +2,19 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { IconButton } from "../../ui-common/iconbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
-import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
+import { ScrollView, TabWidget, TextEdit, LineEdit, CheckBox } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
 import { Dialog } from "../../ui-common/dialog.slint";
 import { SectionButton } from "../../ui-common/sectionbutton.slint";
-import { VirtualKeyboard } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
+import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs }
+export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs, WifiPassphrase }
+export { VirtualKeyboardHandler, KeyModel }
 
 export component AppWindow inherits Window {
     // Scaling
@@ -62,13 +63,15 @@ export component AppWindow inherits Window {
     in property <bool> wifi_enabling_lock;
     in property <bool> wifi_disabling_lock;
     in property <string> wifi_connected_name;
+    in-out property <string> potential_wifi_network;
     in property <[string]> wifi_network_names;
     in property <[bool]> wifi_network_open_vec;
-    // Generic multipliers for default-sized and smaller-sized buttons
+    // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
     property <float> swmultiplier: 0.25;
     property <float> shmultiplier: 0.03;
+    property <float> dialog_sizes_multiplier: 0.9;
     // Default sizes/radii/properties; there may be elements that don't enforce them for various reasons
     property <relative-font-size> header_font_size: 2rem;
     property <length> layout_padding: 30px;
@@ -86,12 +89,13 @@ export component AppWindow inherits Window {
     property <length> medium_logo_height: medium_logo_width;
     property <string> header_font_family: "Inter";
     property <string> console_font_family: "Roboto Mono";
-    property <string> regular_font_family: "U001";
+    property <string> regular_font_family: root.default-font-family;
     property <length> console_header_font_size: 0.8 * self.default_font_size;
     property <length> console_body_font_size: 0.6 * self.default_font_size;
     property <length> tab_rectangle_border_width: 2px;
     property <color> tab_rectangle_border_color: darkgrey;
     property <length> dialog_rectangle_thickness: 6px;
+    property <length> keyboard_key_height: 0.055 * root.height;
 
     // Main UI
     // Don't ask me why a ScrollView is needed here to prevent binding loops...
@@ -181,6 +185,7 @@ export component AppWindow inherits Window {
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             section_header_title = "Options";
                             root.page = Page.Options;
@@ -192,6 +197,7 @@ export component AppWindow inherits Window {
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             root.page = Page.None;
                             root.boot_default();
@@ -210,6 +216,7 @@ export component AppWindow inherits Window {
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             root.power_off();
                         }
@@ -224,6 +231,7 @@ export component AppWindow inherits Window {
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             section_header_title = "About";
                             root.page = Page.VersionInfo;
@@ -255,7 +263,7 @@ export component AppWindow inherits Window {
 
                     VLine {
                         left-padding-multiplier: 5.0;
-                        right-padding-multiplier: self.left-padding-multiplier * 1/2;
+                        right-padding-multiplier: self.left-padding-multiplier * 1 / 2;
                     }
 
                     IconButton {
@@ -382,15 +390,18 @@ export component AppWindow inherits Window {
                         text: "Recovery options";
                         height: section_button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             section_header_title = "Recovery options";
                             page = Page.RecoveryOptions;
                         }
                     }
+
                     SectionButton {
                         text: "Boot configuration";
                         height: section_button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             section_header_title = "Boot configuration";
                             page = Page.BootConfiguration;
@@ -422,6 +433,7 @@ export component AppWindow inherits Window {
                                 width: button_width;
                                 height: button_height;
                                 border-radius: radius;
+                                font-family: header_font_family;
                                 clicked => {
                                     dialog_message = "This will erase all of the user data on this device and reset settings to default, without reinstalling the firmware. Are you sure you want to continue?";
                                     dialog = DialogType.SoftReset;
@@ -602,6 +614,7 @@ export component AppWindow inherits Window {
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             root.power_off();
                         }
@@ -612,6 +625,7 @@ export component AppWindow inherits Window {
                         width: button_width;
                         height: button_height;
                         border-radius: radius;
+                        font-family: header_font_family;
                         clicked => {
                             root.reboot();
                         }
@@ -647,6 +661,7 @@ export component AppWindow inherits Window {
         height: root.height;
         enabled: dialog == DialogType.None ? false : true;
         clicked => {
+            TextInputInterface.text-input-focused = false;
             dialog = DialogType.None;
         }
     }
@@ -666,6 +681,7 @@ export component AppWindow inherits Window {
             height: parent.height;
             enabled: true;
         }
+
         Text {
             text: root.dialog_message;
             font-family: "Inter";
@@ -673,13 +689,14 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiLogs): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiLogs && dialog != DialogType.WifiPassphrase): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;
         height: 0.3 * scaling_factor * root.height;
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
         text: root.dialog_message;
+        button_font_family: header_font_family;
         cancel => {
             dialog = DialogType.None;
         }
@@ -690,29 +707,23 @@ export component AppWindow inherits Window {
             dialog = DialogType.None;
         }
     }
-    /*VerticalLayout {
-        alignment: end;
-        VirtualKeyboard {
-            radius: radius;
-            key-height: root.height * 0.06;
-        }
-    }*/
     // Wi-Fi UI dialog
-    if (dialog == DialogType.WifiUI): Rectangle {
+    if (dialog == DialogType.WifiUI || dialog == DialogType.WifiPassphrase): Rectangle {
         border-width: dialog_rectangle_thickness;
         border-color: black;
         border-radius: radius;
         background: white;
-        width: 0.45 * scaling_factor * root.width;
-        height: scaling_factor > 1 ? 0.4 * scaling_factor * root.height : 0.45 * root.height;
-        x: scaling_factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - 60px;
-        y: scaling_factor > 1 ? (root.height - self.height) / 2 : root.height - self.height - 165px;
+        width: (scaling_factor == 1 && TextInputInterface.text-input-focused) ? 0.55 * scaling_factor * root.width : 0.45 * scaling_factor * root.width;
+        height: (scaling_factor > 1 && TextInputInterface.text-input-focused) ? 0.3 * scaling_factor * root.height : scaling_factor > 1 ? 0.4 * scaling_factor * root.height : 0.45 * root.height;
+        x: (scaling_factor > 1 || TextInputInterface.text-input-focused) ? (root.width - self.width) / 2 : root.width - self.width - 60px;
+        y: (scaling_factor > 1 && !TextInputInterface.text-input-focused) ? (root.height - self.height) / 2 : TextInputInterface.text-input-focused ? root.height - self.height - (keyboard_key_height * 4.15) - 100px : root.height - self.height - 165px;
         TouchArea {
             width: parent.width;
             height: parent.height;
             enabled: true;
         }
-        VerticalLayout {
+
+        if (dialog == DialogType.WifiUI): VerticalLayout {
             padding: layout_padding;
             HorizontalLayout {
                 Text {
@@ -721,11 +732,13 @@ export component AppWindow inherits Window {
                     font-weight: 800;
                     vertical-alignment: center;
                 }
+
                 Rectangle { }
+
                 IconButton {
                     icon: @image-url("../../icons/refresh.svg");
                     border-radius: radius;
-                    height: button_height * 0.7;
+                    height: button_height * 0.65;
                     width: self.height;
                     y: (parent.height - self.height) / 2;
                     visible: wifi_enabled && !wifi_disabling_lock;
@@ -734,11 +747,13 @@ export component AppWindow inherits Window {
                         get_networks();
                     }
                 }
+
                 VLine {
                     left-padding-multiplier: 2.5;
                     right-padding-multiplier: 5.0;
                     visible: wifi_enabled && !wifi_disabling_lock;
                 }
+
                 Switch {
                     y: (parent.height - self.height) / 2;
                     width: switch_width;
@@ -751,23 +766,25 @@ export component AppWindow inherits Window {
                     }
                 }
             }
+
             HLine {
                 top-padding-multiplier: 4.0;
                 bottom-padding-multiplier: self.top-padding-multiplier;
             }
+
             if (wifi_enabled && !wifi_scanning_lock && !wifi_connecting_lock && !wifi_enabling_lock && !wifi_disabling_lock): ScrollView {
                 mouse-drag-pan-enabled: true;
                 VerticalLayout {
                     spacing: layout_spacing;
                     // Wi-Fi button(s)
-                    for name[index] in wifi_network_names: TouchArea {
+                    for name[index] in wifi_network_names: i-button := TouchArea {
                         i-container := Rectangle {
                             border-radius: radius;
                             border-width: 3px;
                             border-color: #a5a5a5;
                             background: name == wifi_connected_name ? #dbdada : #ffffff;
 
-                            HorizontalLayout {  
+                            HorizontalLayout {
                                 padding: 20px;
                                 spacing: layout_spacing;
 
@@ -780,7 +797,9 @@ export component AppWindow inherits Window {
                                     text: name;
                                     wrap: word-wrap;
                                 }
+
                                 Rectangle { }
+
                                 VerticalLayout {
                                     alignment: center;
                                     HorizontalLayout {
@@ -789,23 +808,26 @@ export component AppWindow inherits Window {
                                             source: @image-url("../../icons/wifi-connected-alt.svg");
                                             height: icon_button_height;
                                             width: self.height;
+                                            colorize: i-button.pressed ? #ffffff : #000000;
                                         }
                                         if (wifi_network_open_vec[index]): Image {
                                             source: @image-url("../../icons/wifi-network-open.svg");
                                             height: icon_button_height;
                                             width: self.height;
+                                            colorize: i-button.pressed ? #ffffff : #000000;
                                         }
                                         if (!wifi_network_open_vec[index]): Image {
                                             source: @image-url("../../icons/wifi-network-locked.svg");
                                             height: icon_button_height;
                                             width: self.height;
+                                            colorize: i-button.pressed ? #ffffff : #000000;
                                         }
                                     }
                                 }
                             }
                         }
 
-                        states [  
+                        states [
                             pressed when self.pressed: {
                                 i-container.background: #000000;
                                 i-text.color: #ffffff;
@@ -815,6 +837,10 @@ export component AppWindow inherits Window {
                         clicked => {
                             if wifi_network_open_vec[index] {
                                 connect_to_wifi_network(name, "");
+                            } else {
+                                potential_wifi_network = name;
+                                TextInputInterface.text-input-focused = true;
+                                dialog = DialogType.WifiPassphrase;
                             }
                         }
                     }
@@ -874,6 +900,119 @@ export component AppWindow inherits Window {
                     font-size: root.default-font-size * 0.9;
                     wrap: word-wrap;
                     width: parent.width * 0.75;
+                }
+            }
+        }
+        if (dialog == DialogType.WifiPassphrase): VerticalLayout {
+            padding: layout_padding;
+            HorizontalLayout {
+                height: switch_height;
+                IconButton {
+                    icon: @image-url("../../icons/arrow-back.svg");
+                    border-radius: radius;
+                    height: icon_button_height;
+                    width: self.height;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        TextInputInterface.text-input-focused = false;
+                        dialog = DialogType.WifiUI;
+                    }
+                }
+                Text {
+                    text: "Enter passphrase";
+                    font-family: header_font_family;
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    font-weight: 800;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    height: icon_button_height;
+                    width: self.height;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+
+            HLine {
+                top-padding-multiplier: 4.0;
+                bottom-padding-multiplier: self.top-padding-multiplier;
+            }
+
+            Rectangle {
+                height: parent.height * 0.08;
+                border-width: 3px;
+                border-color: black;
+                border-radius: radius;
+                passphrase-edit := LineEdit {
+                    width: parent.width * 0.99;
+                    height: parent.height * 0.925;
+                    placeholder-text: "Passphrase for “\{potential_wifi_network}”";
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    input-type: password;
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 0.05;
+            }
+
+            HorizontalLayout {
+                Text {
+                    font-family: regular_font_family;
+                    text: "Show passphrase";
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    vertical-alignment: center;
+                }
+                Rectangle { }
+                Switch {
+                    y: (parent.height - self.height) / 2;
+                    width: switch_width * dialog_sizes_multiplier;
+                    height: switch_height * dialog_sizes_multiplier;
+                    border-radius: radius;
+                    activated: passphrase-edit.input-type == InputType.text ? true : false;
+                    toggled => {
+                        if (passphrase-edit.input-type == InputType.password) {
+                            passphrase-edit.input-type = InputType.text;
+                        } else {
+                            passphrase-edit.input-type = InputType.password;
+                        }
+                    }
+                }
+            }
+
+            Rectangle { }
+
+            Button {
+                width: 100%;
+                height: button_height * dialog_sizes_multiplier;
+                font-family: header_font_family;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                border-radius: radius;
+                text: "Connect";
+                clicked => {
+                    TextInputInterface.text-input-focused = false;
+                    dialog = DialogType.WifiUI;
+                    connect_to_wifi_network(potential_wifi_network, passphrase-edit.text);
+                }
+            }
+        }
+    }
+
+    // Virtual keyboard
+    if (TextInputInterface.text-input-focused): VerticalLayout {
+        alignment: end;
+        VirtualKeyboard {
+            font-family: header_font_family;
+            radius: radius;
+            key-height: keyboard_key_height;
+            scaling-factor: scaling_factor;
+            close => {
+                TextInputInterface.text-input-focused = false;
+                if (dialog == DialogType.WifiPassphrase) {
+                    dialog = DialogType.WifiUI;
+                } else {
+                    dialog = DialogType.None;
                 }
             }
         }
