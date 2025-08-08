@@ -52,10 +52,7 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)
             .with_context(|| "Failed to create overlay mountpoint's directory")?;
 
-        Mount::builder()
-            .fstype("squashfs")
-            .mount(&rootfs_file_path, &ro_mountpoint)
-            .with_context(|| "Failed to mount root filesystem SquashFS archive")?;
+        run_command("/bin/mount", &[&rootfs_file_path, &ro_mountpoint]).with_context(|| "Failed to mount root filesystem's SquashFS archive")?;
 
         let unrestricted_rootfs_file_path = format!("{}/.unrestricted", &ro_mountpoint);
         cfg_if::cfg_if! {

@@ -690,6 +690,13 @@ export component AppWindow inherits Window {
             dialog = DialogType.None;
         }
     }
+    /*VerticalLayout {
+        alignment: end;
+        VirtualKeyboard {
+            radius: radius;
+            key-height: root.height * 0.06;
+        }
+    }*/
     // Wi-Fi UI dialog
     if (dialog == DialogType.WifiUI): Rectangle {
         border-width: dialog_rectangle_thickness;

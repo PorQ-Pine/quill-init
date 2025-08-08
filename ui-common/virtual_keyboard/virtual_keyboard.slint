@@ -8,39 +8,38 @@ import { Icons } from "icons.slint";
 component VirtualKeyboardButton {
     in property <string> key;
     in property <image> icon;
+    in property <length> key-height;
+    in property <length> radius;
 
     callback key-pressed(/* key */ string);
 
-    min-width: 32px;
-    min-height: 32px;
+    preferred-width: root.key == "" ? key-height * 1.25 : key-height * 0.75;
+    min-height: key-height;
     horizontal-stretch: 0;
 
-    states [
-        pressed when i-touch-area.pressed : {
-            i-state-area.opacity: 0.5;
-        }
-    ]
-
     i-container := Rectangle {
-        border-radius: 4px;
-        background: Palette.color-scheme == ColorScheme.dark ? #373737 : #ffffff;
+        background: i-touch-area.pressed ? #000000 : #ffffff;
+        border-radius: radius;
 
         HorizontalLayout {
-            padding: 8px;
-
             if (root.key != "") : Text {
                 text: root.key;
-                color: Palette.color-scheme == ColorScheme.dark ? #ffffff : #000000;
-                font-size: 12px;
+                color: i-touch-area.pressed ? #ffffff : #000000;
+                font-size: key-height * 0.35;
                 vertical-alignment: center;
                 horizontal-alignment: center;
+                font-family: "Inter";
+                font-weight: 600;
             }
 
-            if (root.key == "") : Image {
-                y: (parent.height - self.height) / 2;
-                source: root.icon;
-                height: 18px;
-                colorize: Palette.color-scheme == ColorScheme.dark ? #ffffff : #000000;
+            if (root.key == "") : VerticalLayout {
+                alignment: center;
+                Image {
+                    source: root.icon;
+                    height: key-height * 0.5;
+                    min-width: self.height;
+                    colorize: i-touch-area.pressed ? #ffffff : #000000;
+                }
             }
         }
     }
@@ -49,8 +48,6 @@ component VirtualKeyboardButton {
         border-radius: i-container.border-radius;
         opacity: 0;
         background: #000000;
-
-        animate opacity { duration: 150ms; }
     }
 
     i-touch-area := TouchArea {
@@ -158,8 +155,10 @@ export global VirtualKeyboardHandler {
     }
 }
 
-export component VirtualKeyboard  {
+export component VirtualKeyboard {
     private property <bool> shift;
+    in property <length> key-height;
+    in property <length> radius;
 
     callback close();
 
@@ -168,27 +167,27 @@ export component VirtualKeyboard  {
     TouchArea {}
 
     Rectangle {
-        background: Palette.color-scheme == ColorScheme.dark ? #1c1c1c : #d4d4d4;
+        border-width: 3px;
+        border-color: black;
+        background: #c1c1c1;
         height: 100%;
     }
 
     i-layout := VerticalLayout {
-        padding: 8px;
-        spacing: 4px;
+        padding: 30px;
+        spacing: 8px;
 
         for row[index] in VirtualKeyboardHandler.keys : HorizontalLayout {
-            spacing: 4px;
-
+            spacing: 8px;
             if (index == 0) : VirtualKeyboardButton {
-                key: "ESC";
-
-                key-pressed => {
-                    VirtualKeyboardHandler.key-pressed(Key.Escape);
-                }
+                key-height: key-height;           
+                key: "⎋";
             }
 
             if (index == 1) : VirtualKeyboardButton {
-                key: "Tab";
+                key-height: key-height;
+                radius: radius;
+                icon: Icons.tab;
 
                 key-pressed => {
                     VirtualKeyboardHandler.key-pressed(Key.Tab);
@@ -197,6 +196,8 @@ export component VirtualKeyboard  {
 
             // shift
             if (index == 2) : VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.arrow-up;
 
                 key-pressed => {
@@ -205,6 +206,8 @@ export component VirtualKeyboard  {
             }
 
             for km in row : VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 key: root.shift ? km.shift-key : km.key;
 
                 key-pressed(key) => {
@@ -214,6 +217,8 @@ export component VirtualKeyboard  {
             }
 
             if (index == 0) : VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.chevron-left;
 
                 key-pressed => {
@@ -222,6 +227,8 @@ export component VirtualKeyboard  {
             }
 
             if (index == 1) : VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.arrow-circle-o-left;
 
                 key-pressed => {
@@ -231,6 +238,8 @@ export component VirtualKeyboard  {
 
             // shift
             if (index == 2) : VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.arrow-up;
 
                 key-pressed => {
@@ -240,9 +249,11 @@ export component VirtualKeyboard  {
         }
 
         HorizontalLayout {
-            spacing: 4px;
+            spacing: 8px;
 
              VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.expand-more;
 
                 key-pressed(key) => {
@@ -251,6 +262,8 @@ export component VirtualKeyboard  {
             }
 
             VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.globe;
 
                 key-pressed(key) => {
@@ -258,7 +271,9 @@ export component VirtualKeyboard  {
                 }
             }
             VirtualKeyboardButton {
-                horizontal-stretch: 1;
+                key-height: key-height;
+                radius: radius;
+                horizontal-stretch: 10;
                 key: " ";
 
                 key-pressed(key) => {
@@ -267,6 +282,8 @@ export component VirtualKeyboard  {
                 }
             }
             VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.arrow-left;
 
                 key-pressed(key) => {
@@ -274,6 +291,8 @@ export component VirtualKeyboard  {
                 }
             }
             VirtualKeyboardButton {
+                key-height: key-height;
+                radius: radius;
                 icon: Icons.arrow-right;
 
                 key-pressed(key) => {
@@ -284,6 +303,4 @@ export component VirtualKeyboard  {
 
 
     }
-
-    animate y { duration: 500ms; easing: cubic-bezier(0.05, 0.7, 0.1, 1.0); }
 }
