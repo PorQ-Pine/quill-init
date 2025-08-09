@@ -140,7 +140,7 @@ export global VirtualKeyboardHandler {
        ]
     ];
 
-    out property <int> current-key-set;
+    in-out property <int> current-key-set;
     out property <[[KeyModel]]> keys: default-key-sets[self.current-key-set];
     in-out property <bool> open;
 
@@ -158,7 +158,7 @@ export global VirtualKeyboardHandler {
 }
 
 export component VirtualKeyboard {
-    private property <bool> shift;
+    in-out property <bool> shift;
     in property <length> key-height;
     in property <length> radius;
     in property <string> font-family;

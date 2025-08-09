@@ -906,7 +906,6 @@ export component AppWindow inherits Window {
         if (dialog == DialogType.WifiPassphrase): VerticalLayout {
             padding: layout_padding;
             HorizontalLayout {
-                height: switch_height;
                 IconButton {
                     icon: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -1000,19 +999,28 @@ export component AppWindow inherits Window {
     }
 
     // Virtual keyboard
-    if (TextInputInterface.text-input-focused): VerticalLayout {
-        alignment: end;
-        VirtualKeyboard {
-            font-family: header_font_family;
-            radius: radius;
-            key-height: keyboard_key_height;
-            scaling-factor: scaling_factor;
-            close => {
-                TextInputInterface.text-input-focused = false;
-                if (dialog == DialogType.WifiPassphrase) {
-                    dialog = DialogType.WifiUI;
-                } else {
-                    dialog = DialogType.None;
+    ScrollView {
+        VerticalLayout {
+            alignment: end;
+            visible: TextInputInterface.text-input-focused;
+            changed visible => {
+                if (self.visible == false) {
+                    VirtualKeyboardHandler.current-key-set = 0;
+                    i-keyboard.shift = false;
+                }
+            }
+            i-keyboard := VirtualKeyboard {
+                font-family: header_font_family;
+                radius: radius;
+                key-height: keyboard_key_height;
+                scaling-factor: scaling_factor;
+                close => {
+                    TextInputInterface.text-input-focused = false;
+                    if (dialog == DialogType.WifiPassphrase) {
+                        dialog = DialogType.WifiUI;
+                    } else {
+                        dialog = DialogType.None;
+                    }
                 }
             }
         }
