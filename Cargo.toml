@@ -1,3 +1,6 @@
 [workspace]
 resolver = "3"
 members = ["qinit", "libqinit", "notify_fatal_error"]
+
+[patch.crates-io]
+slint = { git = "https://github.com/PorQ-Pine/slint-package.git" }

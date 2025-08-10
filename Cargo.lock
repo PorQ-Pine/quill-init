@@ -4142,8 +4142,7 @@ checksum = "04dc19736151f35336d325007ac991178d504a119863a2fcb3758cdb5e52c50d"
 [[package]]
 name = "slint"
 version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c99512aff435eb85fc719bf73aff5c4a13f3d202843c326a2f50eb0377956f8"
+source = "git+https://github.com/PorQ-Pine/slint-package.git#4267086e54226e1babd6e13970860e80e1087cbd"
 dependencies = [
  "const-field-offset",
  "i-slint-backend-selector",
