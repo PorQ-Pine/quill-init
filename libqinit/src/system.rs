@@ -7,7 +7,6 @@ use regex::Regex;
 use rmesg;
 use sha256;
 use std::env;
-use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
@@ -130,39 +129,35 @@ pub fn modprobe(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub fn mount_data_partition() -> Result<()> {
+pub fn mount_base_partitions() -> Result<()> {
     info!("Mounting data partition");
-    fs::create_dir_all(&crate::DATA_PART_MOUNTPOINT)
+    fs::create_dir_all(&crate::BOOT_PART_MOUNTPOINT)
         .with_context(|| "Failed to create data partition mountpoint's directory")?;
-    wait_for_path(&crate::DATA_PART)?;
+    wait_for_path(&crate::BOOT_PART)?;
     Mount::builder()
         .fstype("ext4")
         .data("rw")
-        .mount(&crate::DATA_PART, &crate::DATA_PART_MOUNTPOINT)
+        .mount(&crate::BOOT_PART, &crate::BOOT_PART_MOUNTPOINT)
         .with_context(|| "Failed to mount data partition")?;
 
-    let boot_dir_path = format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR);
-    fs::create_dir_all(&boot_dir_path)?;
-    // Create convenient symlink
-    symlink(
-        &format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR),
-        &crate::BOOT_DIR_SYMLINK_PATH,
-    )
-    .with_context(|| "Failed to create boot directory symlink")?;
+    info!("Mounting main partition");
+    fs::create_dir_all(&crate::MAIN_PART_MOUNTPOINT)
+        .with_context(|| "Failed to create main partition mountpoint's directory")?;
+    wait_for_path(&crate::MAIN_PART)?;
+    Mount::builder()
+        .fstype("ext4")
+        .data("rw")
+        .mount(&crate::MAIN_PART, &crate::MAIN_PART_MOUNTPOINT)
+        .with_context(|| "Failed to mount main partition")?;
 
     Ok(())
 }
 
 pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
     info!("Mounting system firmware SquashFS archive");
-    let firmware_archive_path = format!(
-        "{}/{}/{}",
-        &crate::DATA_PART_MOUNTPOINT,
-        &crate::BOOT_DIR,
-        &FIRMWARE_ARCHIVE
-    );
+    let firmware_archive_path = format!("{}/{}", &crate::BOOT_PART_MOUNTPOINT, &FIRMWARE_ARCHIVE);
     if fs::exists(&firmware_archive_path)? && check_signature(&pubkey, &firmware_archive_path)? {
-        // musl introduces compile-time issues with the 'loop' feature of the crate 'sys_mount': I have disabled it. Thus, here we need to use an external binary to mount SquashFS files.
+        // musl introduces compile-time issues with the 'loop' feature of the 'sys_mount' crate: I have disabled it. Thus, here we need to use an external binary to mount SquashFS files.
         run_command("/bin/mount", &[&firmware_archive_path, &FIRMWARE_DIR_PATH])
             .with_context(|| "Failed to mount device's firmware")?;
         Mount::builder()
@@ -179,10 +174,12 @@ pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
     Ok(())
 }
 
-pub fn unmount_data_partition() -> Result<()> {
-    info!("Unmounting data partition");
+pub fn unmount_base_partitions() -> Result<()> {
     sync_disks()?;
-    unmount(&crate::DATA_PART_MOUNTPOINT, UnmountFlags::DETACH)?;
+    info!("Unmounting main partition");
+    unmount(&crate::MAIN_PART_MOUNTPOINT, UnmountFlags::DETACH)?;
+    info!("Unmounting data partition");
+    unmount(&crate::BOOT_PART_MOUNTPOINT, UnmountFlags::DETACH)?;
 
     Ok(())
 }
@@ -219,7 +216,7 @@ pub fn power_off() -> Result<()> {
     warn!("Powering off");
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "gui_only"))] {
-            unmount_data_partition()?;
+            unmount_base_partitions()?;
             run_command("/sbin/poweroff", &["-f"])?;
         }
     }
@@ -231,7 +228,7 @@ pub fn reboot() -> Result<()> {
     warn!("Rebooting");
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "gui_only"))] {
-            unmount_data_partition()?;
+            unmount_base_partitions()?;
             run_command("/sbin/reboot", &["-f"])?;
         }
     }
@@ -340,7 +337,7 @@ pub fn keep_last_lines(string: &str, lines_to_keep: usize) -> String {
 }
 
 pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
-    // info!("Compressing string to xz");
+    debug!("Compressing string to xz");
     let base64_string = BASE64_STANDARD.encode(string);
     let data = Command::new("/bin/sh")
         .args(&[
@@ -349,13 +346,14 @@ pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
         ])
         .output()?
         .stdout;
-    // info!("Compressed string size: {} bytes", data.iter().count());
+    debug!("Compressed string size: {} bytes", data.iter().count());
 
     Ok(data)
 }
 
 pub fn enforce_fb() -> Result<()> {
     // Prevent Slint from defaulting to DRM backend
+    // Note: this does *not* prevent access to DRM resources from the main root filesystem
     let empty_directory_path = "/.empty";
     let dri_directory_path = "/dev/dri/";
     fs::create_dir_all(&empty_directory_path)?;

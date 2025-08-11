@@ -58,9 +58,8 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
     // To extract base device IP from custom udhcpd configuration (if present)
     let ip_regex = Regex::new(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")?;
     let user_udhcpd_conf_path = format!(
-        "{}/{}/{}",
-        &libqinit::DATA_PART_MOUNTPOINT,
-        &libqinit::BOOT_DIR,
+        "{}/{}",
+        &libqinit::BOOT_PART_MOUNTPOINT,
         &USER_UDHCPD_CONF_FILE
     );
 
@@ -113,9 +112,8 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
 pub fn start_sshd() -> Result<()> {
     warn!("Starting SSH server");
     let dropbear_rsa_key_path = format!(
-        "{}/{}/{}",
-        &libqinit::DATA_PART_MOUNTPOINT,
-        &libqinit::BOOT_DIR,
+        "{}/{}",
+        &libqinit::BOOT_PART_MOUNTPOINT,
         &DROPBEAR_RSA_KEY_FILE
     );
     if !fs::exists(&dropbear_rsa_key_path)? {
@@ -137,9 +135,8 @@ pub fn start_sshd() -> Result<()> {
 pub fn prepare_script_login(pubkey: &PKey<Public>) -> Result<()> {
     warn!("Looking for script to run upon console login");
     let script_path = format!(
-        "{}/{}/{}",
-        &libqinit::DATA_PART_MOUNTPOINT,
-        &libqinit::BOOT_DIR,
+        "{}/{}",
+        &libqinit::BOOT_PART_MOUNTPOINT,
         &DEBUG_SETUP_SCRIPT
     );
     if fs::exists(&script_path)? && check_signature(&pubkey, &script_path)? {

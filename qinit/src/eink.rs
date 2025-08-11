@@ -22,9 +22,8 @@ pub fn load_waveform() -> Result<()> {
         &CUSTOMWF_FILE
     );
     let waveform_backup_dir_path = format!(
-        "{}/{}/{}",
-        &libqinit::DATA_PART_MOUNTPOINT,
-        &libqinit::BOOT_DIR,
+        "{}/{}",
+        &libqinit::BOOT_PART_MOUNTPOINT,
         &FIRMWARE_DIR
     );
     let waveform_backup_ebcwbf_path = format!("{}/{}", &waveform_backup_dir_path, &WAVEFORM_FILE);
