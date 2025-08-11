@@ -53,8 +53,8 @@ pub fn wait_for_targets(targets_total: i32, progress_sender: Sender<f32>) -> Res
 pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
     let rootfs_file_path = format!(
         "{}/{}/{}",
-        &crate::DATA_PART_MOUNTPOINT,
-        &crate::BOOT_DIR,
+        &crate::MAIN_PART_MOUNTPOINT,
+        &crate::ROOTFS_DIR,
         &crate::ROOTFS_FILE
     );
     let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)?.mtime();

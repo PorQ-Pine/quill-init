@@ -32,7 +32,7 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
                 mod eink;
-                use libqinit::system::{mount_base_filesystems, mount_data_partition, mount_firmware, set_workdir, run_command};
+                use libqinit::system::{mount_base_filesystems, mount_base_partitions, mount_firmware, set_workdir, run_command};
                 use libqinit::rootfs;
                 use libqinit::systemd;
 
@@ -152,7 +152,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 set_workdir("/").with_context(|| "Failed to set current directory to / (not in chroot)")?;
                 fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT).with_context(|| "Failed to create default mountpoint's directory")?;
 
-                mount_data_partition()?;
+                mount_base_partitions()?;
                 mount_firmware(&pubkey)?;
             }
 

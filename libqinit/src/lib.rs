@@ -13,10 +13,12 @@ cfg_if::cfg_if! {
 }
 pub mod socket;
 
-pub const DATA_PART: &str = "/dev/mmcblk0p6";
-pub const DATA_PART_MOUNTPOINT: &str = "/data/";
+pub const BOOT_PART: &str = "/dev/mmcblk0p7";
+pub const MAIN_PART: &str = "/dev/mmcblk0p9";
+pub const BOOT_PART_MOUNTPOINT: &str = "/boot/";
+pub const MAIN_PART_MOUNTPOINT: &str = "/main/";
 pub const BOOT_DIR: &str = "boot/";
-pub const BOOT_DIR_SYMLINK_PATH: &str = "/boot";
+pub const ROOTFS_DIR: &str = "rootfs/";
 pub const DEFAULT_MOUNTPOINT: &str = "/mnt/";
 pub const GENERIC_DIGEST_EXT: &str = ".dgst";
 pub const HOME_DIR: &str = "/root/";

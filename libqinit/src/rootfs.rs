@@ -15,8 +15,8 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
     info!("Mounting root filesystem SquashFS archive");
     let rootfs_file_path = format!(
         "{}/{}/{}",
-        &crate::DATA_PART_MOUNTPOINT,
-        &crate::BOOT_DIR,
+        &crate::MAIN_PART_MOUNTPOINT,
+        &crate::ROOTFS_DIR,
         &crate::ROOTFS_FILE
     );
     if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
@@ -33,14 +33,14 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         let rw_workdir;
         if boot_config.rootfs.persistent_storage {
             rw_writedir = format!(
-                "{}/{}/rootfs/write",
-                &crate::DATA_PART_MOUNTPOINT,
-                &crate::BOOT_DIR
+                "{}/{}/write",
+                &crate::MAIN_PART_MOUNTPOINT,
+                &crate::ROOTFS_DIR
             );
             rw_workdir = format!(
-                "{}/{}/rootfs/work",
-                &crate::DATA_PART_MOUNTPOINT,
-                &crate::BOOT_DIR
+                "{}/{}/work",
+                &crate::MAIN_PART_MOUNTPOINT,
+                &crate::ROOTFS_DIR
             );
         } else {
             rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
@@ -116,7 +116,7 @@ pub fn setup_mounts() -> Result<()> {
         .mount("devtmpfs", &format!("{}/dev", &crate::OVERLAY_MOUNTPOINT))
         .with_context(|| "Failed to mount devtmpfs at overlay's mountpoint")?;
     bind_mount(
-        &format!("{}/{}", &crate::DATA_PART_MOUNTPOINT, &crate::BOOT_DIR),
+        &format!("{}", &crate::BOOT_PART_MOUNTPOINT),
         &format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::BOOT_DIR),
     )?;
     bind_mount(

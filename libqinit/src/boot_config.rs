@@ -80,11 +80,6 @@ impl BootConfig {
     }
 
     fn get_boot_config_path() -> String {
-        return format!(
-            "{}/{}/{}",
-            &crate::DATA_PART_MOUNTPOINT,
-            &crate::BOOT_DIR,
-            &BOOT_CONFIG_FILE,
-        );
+        return format!("{}/{}", &crate::BOOT_PART_MOUNTPOINT, &BOOT_CONFIG_FILE);
     }
 }
