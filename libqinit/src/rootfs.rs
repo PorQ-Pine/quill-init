@@ -16,7 +16,7 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
     let rootfs_file_path = format!(
         "{}/{}/{}",
         &crate::MAIN_PART_MOUNTPOINT,
-        &crate::ROOTFS_DIR,
+        &crate::SYSTEM_DIR,
         &crate::ROOTFS_FILE
     );
     if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
@@ -33,13 +33,15 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         let rw_workdir;
         if boot_config.rootfs.persistent_storage {
             rw_writedir = format!(
-                "{}/{}/write",
+                "{}/{}/{}/write",
                 &crate::MAIN_PART_MOUNTPOINT,
+                &crate::SYSTEM_DIR,
                 &crate::ROOTFS_DIR
             );
             rw_workdir = format!(
-                "{}/{}/work",
+                "{}/{}/{}/work",
                 &crate::MAIN_PART_MOUNTPOINT,
+                &crate::SYSTEM_DIR,
                 &crate::ROOTFS_DIR
             );
         } else {

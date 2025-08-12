@@ -18,6 +18,7 @@ pub const MAIN_PART: &str = "/dev/mmcblk0p9";
 pub const BOOT_PART_MOUNTPOINT: &str = "/boot/";
 pub const MAIN_PART_MOUNTPOINT: &str = "/main/";
 pub const BOOT_DIR: &str = "boot/";
+pub const SYSTEM_DIR: &str = "system/";
 pub const ROOTFS_DIR: &str = "rootfs/";
 pub const DEFAULT_MOUNTPOINT: &str = "/mnt/";
 pub const GENERIC_DIGEST_EXT: &str = ".dgst";

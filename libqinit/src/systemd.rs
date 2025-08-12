@@ -1,6 +1,6 @@
 use crate::boot_config::BootConfig;
 use crate::rootfs;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{info, warn};
 use rmesg;
 use std::{fs, os::unix::fs::MetadataExt, sync::mpsc::Sender};
@@ -54,10 +54,12 @@ pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
     let rootfs_file_path = format!(
         "{}/{}/{}",
         &crate::MAIN_PART_MOUNTPOINT,
-        &crate::ROOTFS_DIR,
+        &crate::SYSTEM_DIR,
         &crate::ROOTFS_FILE
     );
-    let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)?.mtime();
+    let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)
+        .with_context(|| "Failed to retrieve root filesystem SquashFS archive's metadata")?
+        .mtime();
     if current_rootfs_timestamp == boot_config.rootfs.timestamp {
         if let Some(systemd_targets_total) = boot_config.rootfs.systemd_targets_total {
             info!("Displaying boot progress bar");

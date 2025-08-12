@@ -21,6 +21,8 @@ component VirtualKeyboardButton {
 
     i-container := Rectangle {
         background: i-touch-area.pressed ? #000000 : #ffffff;
+        border-color: #000000;
+        border-width: 2px;
         border-radius: radius;
 
         HorizontalLayout {
@@ -173,7 +175,7 @@ export component VirtualKeyboard {
     Rectangle {
         border-width: 3px;
         border-color: black;
-        background: #c1c1c1;
+        background: #000000;
         height: 100%;
     }
 
