@@ -2,7 +2,7 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { IconButton } from "../../ui-common/iconbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
-import { ScrollView, TabWidget, TextEdit, LineEdit, CheckBox } from "std-widgets.slint";
+import { ScrollView, TabWidget, TextEdit, LineEdit, CheckBox, VerticalBox } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
@@ -10,11 +10,18 @@ import { Dialog } from "../../ui-common/dialog.slint";
 import { SectionButton } from "../../ui-common/sectionbutton.slint";
 import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, Error }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs, WifiPassphrase }
 export { VirtualKeyboardHandler, KeyModel }
+
+export struct SystemUser {
+    name: string,
+    encryption: bool,
+    encrypted_key: string,
+    salt: string,
+}
 
 export component AppWindow inherits Window {
     // Scaling
@@ -33,6 +40,8 @@ export component AppWindow inherits Window {
     callback soft_reset();
     callback get_networks();
     callback connect_to_wifi_network(string, string);
+    callback get_users_using_storage_encryption();
+    callback get_selected_encryption_user_details(string);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -66,6 +75,8 @@ export component AppWindow inherits Window {
     in-out property <string> potential_wifi_network;
     in property <[string]> wifi_network_names;
     in property <[bool]> wifi_network_open_vec;
+    in property <[string]> users_using_storage_encryption;
+    in-out property <SystemUser> selected_encryption_user;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -96,6 +107,8 @@ export component AppWindow inherits Window {
     property <color> tab_rectangle_border_color: darkgrey;
     property <length> dialog_rectangle_thickness: 6px;
     property <length> keyboard_key_height: 0.055 * root.height;
+    property <color> item_border_color: #a5a5a5;
+    property <color> item_selected_color: #dbdada;
 
     // Main UI
     // Don't ask me why a ScrollView is needed here to prevent binding loops...
@@ -115,7 +128,7 @@ export component AppWindow inherits Window {
                     clicked => {
                         if root.page == Page.Options || root.page == Page.VersionInfo {
                             root.page = Page.QuillBoot;
-                        } else if root.page == Page.RecoveryOptions || root.page == Page.BootConfiguration {
+                        } else if root.page == Page.RecoveryOptions || root.page == Page.BootConfiguration || root.page == Page.StorageEncryptionOptions {
                             section_header_title = "Options";
                             root.page = Page.Options;
                         }
@@ -148,10 +161,9 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     Image {
-                // Displaying the same image but with the SVG file gave terrible results, for some reason
-                source: @image-url("../../../branding/quill-banner.png");
-                        width: 768px;
-                        height: 330.5625px;
+                        source: @image-url("../../../branding/quillos.svg");
+                        width: root.width * 0.35;
+                        height: self.width;
                     }
                 }
 
@@ -392,8 +404,21 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            section_header_title = "Recovery options";
+                            section_header_title = self.text;
                             page = Page.RecoveryOptions;
+                        }
+                    }
+
+                    SectionButton {
+                        text: "Storage encryption";
+                        height: section_button_height;
+                        border-radius: radius;
+                        font-family: header_font_family;
+                        clicked => {
+                            get_users_using_storage_encryption();
+                            section_header_title = self.text;
+                            selected_encryption_user.name = "";
+                            page = Page.StorageEncryptionOptions;
                         }
                     }
 
@@ -403,7 +428,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            section_header_title = "Boot configuration";
+                            section_header_title = self.text;
                             page = Page.BootConfiguration;
                         }
                     }
@@ -471,6 +496,144 @@ export component AppWindow inherits Window {
                                 toggled => {
                                     persistent_rootfs = !persistent_rootfs;
                                     toggle_persistent_rootfs();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (page == Page.StorageEncryptionOptions): VerticalLayout {
+                ScrollView {
+                    mouse-drag-pan-enabled: true;
+                    VerticalLayout {
+                        HorizontalLayout {
+                            spacing: layout_spacing;
+                            ScrollView {
+                                mouse-drag-pan-enabled: true;
+                                width: 40%;
+                                VerticalLayout {
+                                    spacing: layout_spacing;
+                                    for username[index] in users_using_storage_encryption: i-user-using-encryption-button := TouchArea {
+                                        i-user-using-encryption-container := Rectangle {
+                                            border-color: item_border_color;
+                                            border-radius: radius;
+                                            border-width: 3px;
+                                            background: username == selected_encryption_user.name ? item_selected_color : #ffffff;
+                                            HorizontalLayout {
+                                                padding: 20px;
+                                                spacing: layout_spacing * 1.5;
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Image {
+                                                        source: @image-url("../../icons/user.svg");
+                                                        height: icon_button_height * 1.15;
+                                                        width: self.height;
+                                                        colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
+                                                    }
+                                                }
+                                                i-user-using-encryption-text := Text {
+                                                    font-family: regular_font_family;
+                                                    vertical-alignment: center;
+                                                    wrap: word-wrap;
+                                                    text: username;
+                                                }
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Image {
+                                                        source: @image-url("../../icons/key.svg");
+                                                        height: icon_button_height * 1.15;
+                                                        width: self.height;
+                                                        colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        states [
+                                            pressed when self.pressed: {
+                                                i-user-using-encryption-container.background: #000000;
+                                                i-user-using-encryption-text.color: #ffffff;
+                                            }
+                                        ]
+
+                                        clicked => {
+                                            get_selected_encryption_user_details(username);
+                                        }
+                                    }
+                                    Rectangle {}
+                                }
+                            }
+                            VLine {
+                                thickness: 2px;
+                            }
+                            if (selected_encryption_user.name.is-empty): VerticalLayout {
+                                alignment: center;
+                                Text {
+                                    text: "Select a user to manage its settings";
+                                    horizontal-alignment: center;
+                                    font-family: regular_font_family;
+                                    wrap: word-wrap;
+                                }
+                            }
+                            if (!selected_encryption_user.name.is-empty): ScrollView {
+                                mouse-drag-pan-enabled: true;
+                                VerticalLayout {
+                                    spacing: layout_spacing;
+                                    HorizontalLayout {
+                                        Text {
+                                            text: "Enabled";
+                                            vertical-alignment: center;
+                                        }
+                                        Switch {
+                                            y: (parent.height - self.height) / 2;
+                                            width: switch_width * dialog_sizes_multiplier;
+                                            height: switch_height * dialog_sizes_multiplier;
+                                            border-radius: radius;
+                                            activated: selected_encryption_user.encryption;
+                                        }
+                                    }
+                                    HLine {
+                                        thickness: 1px;
+                                    }
+                                    HorizontalLayout {
+                                        Text {
+                                            text: "Salt";
+                                            vertical-alignment: center;
+                                        }
+                                        Rectangle {
+                                            width: 50px;
+                                        }
+                                        Text {
+                                            text: selected_encryption_user.salt;
+                                            font-family: console_font_family;
+                                            font-size: console_body_font_size;
+                                            wrap: char-wrap;
+                                            vertical-alignment: center;
+                                            horizontal-alignment: right;
+                                        }
+                                    }
+                                    HLine {
+                                        thickness: 1px;
+                                    }
+                                    HorizontalLayout {
+                                        Text {
+                                            text: "Key";
+                                            vertical-alignment: center;
+                                        }
+                                        Rectangle {
+                                            width: 50px;
+                                        }
+                                        Text {
+                                            text: selected_encryption_user.encrypted-key;
+                                            font-family: console_font_family;
+                                            font-size: console_body_font_size;
+                                            wrap: char-wrap;
+                                            vertical-alignment: center;
+                                            horizontal-alignment: right;
+                                        }
+                                    }
+                                    Rectangle {}
                                 }
                             }
                         }
@@ -668,7 +831,7 @@ export component AppWindow inherits Window {
 
     // Toasts/dialogs
     if (dialog == DialogType.Toast): Rectangle {
-        width: 0.5 * scaling_factor * root.width;
+        width: scaling_factor > 1 ? 0.45 * scaling_factor * root.width : 0.5 * scaling_factor * root.width;
         height: 0.07 * scaling_factor * root.height;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
@@ -777,18 +940,18 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     spacing: layout_spacing;
                     // Wi-Fi button(s)
-                    for name[index] in wifi_network_names: i-button := TouchArea {
-                        i-container := Rectangle {
+                    for name[index] in wifi_network_names: i-network-button := TouchArea {
+                        i-network-container := Rectangle {
                             border-radius: radius;
                             border-width: 3px;
-                            border-color: #a5a5a5;
-                            background: name == wifi_connected_name ? #dbdada : #ffffff;
+                            border-color: item_border_color;
+                            background: name == wifi_connected_name ? item_selected_color : #ffffff;
 
                             HorizontalLayout {
                                 padding: 20px;
                                 spacing: layout_spacing;
 
-                                i-text := Text {
+                                i-network-text := Text {
                                     color: #000000;
                                     horizontal-alignment: left;
                                     vertical-alignment: center;
@@ -808,19 +971,19 @@ export component AppWindow inherits Window {
                                             source: @image-url("../../icons/wifi-connected-alt.svg");
                                             height: icon_button_height;
                                             width: self.height;
-                                            colorize: i-button.pressed ? #ffffff : #000000;
+                                            colorize: i-network-button.pressed ? #ffffff : #000000;
                                         }
                                         if (wifi_network_open_vec[index]): Image {
                                             source: @image-url("../../icons/wifi-network-open.svg");
                                             height: icon_button_height;
                                             width: self.height;
-                                            colorize: i-button.pressed ? #ffffff : #000000;
+                                            colorize: i-network-button.pressed ? #ffffff : #000000;
                                         }
                                         if (!wifi_network_open_vec[index]): Image {
                                             source: @image-url("../../icons/wifi-network-locked.svg");
                                             height: icon_button_height;
                                             width: self.height;
-                                            colorize: i-button.pressed ? #ffffff : #000000;
+                                            colorize: i-network-button.pressed ? #ffffff : #000000;
                                         }
                                     }
                                 }
@@ -829,8 +992,8 @@ export component AppWindow inherits Window {
 
                         states [
                             pressed when self.pressed: {
-                                i-container.background: #000000;
-                                i-text.color: #ffffff;
+                                i-network-container.background: #000000;
+                                i-network-text.color: #ffffff;
                             }
                         ]
 

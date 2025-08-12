@@ -150,6 +150,17 @@ pub fn mount_base_partitions() -> Result<()> {
         .mount(&crate::MAIN_PART, &crate::MAIN_PART_MOUNTPOINT)
         .with_context(|| "Failed to mount main partition")?;
 
+    fs::create_dir_all(&format!(
+        "{}/{}",
+        &crate::MAIN_PART_MOUNTPOINT,
+        &crate::SYSTEM_DIR
+    ))?;
+    fs::create_dir_all(&format!(
+        "{}/{}",
+        &crate::MAIN_PART_MOUNTPOINT,
+        &crate::SYSTEM_HOME_DIR
+    ))?;
+
     Ok(())
 }
 

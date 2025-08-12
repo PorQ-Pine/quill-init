@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use libqinit::boot_config::BootConfig;
 use libqinit::recovery::soft_reset;
+use libqinit::storage_encryption;
 use libqinit::system::{
     BootCommand, compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
     read_kernel_buffer_singleshot, reboot,
@@ -163,6 +164,7 @@ pub fn setup_gui(
         },
     );
 
+    // Fatal errors
     let interrupt_timer = Timer::default();
     let interrupt_timer_delay = 100;
     interrupt_timer.start(
@@ -396,6 +398,7 @@ pub fn setup_gui(
         arguments: None,
     })?;
 
+    // System
     gui.on_power_off({
         let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -419,6 +422,7 @@ pub fn setup_gui(
         }
     });
 
+    // System
     gui.on_reboot({
         let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -442,6 +446,7 @@ pub fn setup_gui(
         }
     });
 
+    // Scaling
     gui.on_toggle_ui_scale({
         let gui_weak = gui_weak.clone();
         move || {
@@ -457,6 +462,7 @@ pub fn setup_gui(
         }
     });
 
+    // Boot configuration
     gui.on_toggle_persistent_rootfs({
         let boot_config_mutex = boot_config_mutex.clone();
         move || {
@@ -466,6 +472,7 @@ pub fn setup_gui(
         }
     });
 
+    // System command
     gui.on_boot_default({
         let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -478,6 +485,7 @@ pub fn setup_gui(
         }
     });
 
+    // Soft reset
     gui.on_soft_reset({
         let gui_weak = gui_weak.clone();
         move || {
@@ -489,6 +497,7 @@ pub fn setup_gui(
         }
     });
 
+    // Wi-Fi (toggle)
     gui.on_toggle_wifi({
         let wifi_command_sender = wifi_command_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -515,6 +524,7 @@ pub fn setup_gui(
         }
     });
 
+    // Wi-Fi (connect)
     gui.on_connect_to_wifi_network({
         let wifi_command_sender = wifi_command_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -547,6 +557,7 @@ pub fn setup_gui(
         }
     });
 
+    // Wi-Fi (get networks)
     gui.on_get_networks({
         let wifi_command_sender = wifi_command_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -563,6 +574,7 @@ pub fn setup_gui(
         }
     });
 
+    // Virtual keyboard
     gui.global::<VirtualKeyboardHandler>().on_key_pressed({
         let gui_weak = gui_weak.clone();
         move |key| {
@@ -571,6 +583,46 @@ pub fn setup_gui(
                     .dispatch_event(slint::platform::WindowEvent::KeyPressed { text: key.clone() });
                 gui.window()
                     .dispatch_event(slint::platform::WindowEvent::KeyReleased { text: key });
+            }
+        }
+    });
+
+    // Storage encryption
+    gui.on_get_users_using_storage_encryption({
+        let gui_weak = gui_weak.clone();
+        let set_page_sender = set_page_sender.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                match storage_encryption::get_users_using_storage_encryption() {
+                    Ok(users_using_storage_encryption) => {
+                        let users_shared_string_vec: Vec<SharedString> = users_using_storage_encryption
+                            .iter()
+                            .map(|user| SharedString::from(user))
+                            .collect();
+                        gui.set_users_using_storage_encryption(slint::ModelRc::new(
+                            slint::VecModel::from(users_shared_string_vec),
+                        ));
+                    }
+                    Err(e) => {
+                        error_toast(&gui, "Failed to get users list", e.into());
+                        let _ = set_page_sender.send(Page::Options);
+                    }
+                }
+            }
+        }
+    });
+
+    gui.on_get_selected_encryption_user_details({
+        let gui_weak = gui_weak.clone();
+        move |user| {
+            if let Some(gui) = gui_weak.upgrade() {
+                match storage_encryption::get_encryption_user_details(&user) {
+                    Ok(details) => gui.set_selected_encryption_user(SystemUser { encryption: true, name: user, encrypted_key: SharedString::from(&details.encrypted_key), salt: SharedString::from(&details.salt) }),
+                    Err(e) => {
+                        gui.set_selected_encryption_user(SystemUser { encryption: true, name: user, encrypted_key: SharedString::new(), salt: SharedString::new() });
+                        error_toast(&gui, "Failed to get user's details", e.into())
+                    }
+                }
             }
         }
     });

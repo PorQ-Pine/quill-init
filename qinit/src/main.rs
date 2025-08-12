@@ -208,7 +208,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 }
             });
 
-            // Block this function until the main thread receives a signal to continue booting (allowing an user to perform recovery tasks, for example)
+            // Block this function until the main thread receives a signal to continue booting (allowing a user to perform recovery tasks, for example)
             let mut boot_command = boot_receiver.recv()?;
             boot_config = boot_config_mutex.lock().unwrap().clone();
             info!("Boot configuration after possible modifications: {:?}", &boot_config);

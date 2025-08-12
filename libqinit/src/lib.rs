@@ -9,6 +9,7 @@ cfg_if::cfg_if! {
         pub mod system;
         pub mod systemd;
         pub mod wifi;
+        pub mod storage_encryption;
     }
 }
 pub mod socket;
@@ -20,6 +21,7 @@ pub const MAIN_PART_MOUNTPOINT: &str = "/main/";
 pub const BOOT_DIR: &str = "boot/";
 pub const SYSTEM_DIR: &str = "system/";
 pub const ROOTFS_DIR: &str = "rootfs/";
+pub const SYSTEM_HOME_DIR: &str = "home/";
 pub const DEFAULT_MOUNTPOINT: &str = "/mnt/";
 pub const GENERIC_DIGEST_EXT: &str = ".dgst";
 pub const HOME_DIR: &str = "/root/";
