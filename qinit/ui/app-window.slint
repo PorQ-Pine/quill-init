@@ -13,7 +13,7 @@ import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-comm
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs, WifiPassphrase }
+export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword }
 export { VirtualKeyboardHandler, KeyModel }
 
 export struct SystemUser {
@@ -442,7 +442,12 @@ export component AppWindow inherits Window {
                     mouse-drag-pan-enabled: true;
                     VerticalLayout {
                         spacing: layout_spacing;
+                        padding-top: layout_spacing;
+                        padding-bottom: layout_spacing;
                         HorizontalLayout {
+                            spacing: layout_spacing;
+                            padding-left: layout_padding;
+                            padding-right: layout_padding;
                             Rectangle {
                                 Text {
                                     text: "Soft-reset this device";
@@ -476,7 +481,11 @@ export component AppWindow inherits Window {
                     mouse-drag-pan-enabled: true;
                     VerticalLayout {
                         spacing: layout_spacing;
+                        padding-top: layout_spacing;
+                        padding-bottom: layout_spacing;
                         HorizontalLayout {
+                            padding-left: layout_padding;
+                            padding-right: layout_padding;
                             Rectangle {
                                 Text {
                                     text: "Persistent root filesystem";
@@ -504,138 +513,182 @@ export component AppWindow inherits Window {
             }
 
             if (page == Page.StorageEncryptionOptions): VerticalLayout {
-                ScrollView {
-                    mouse-drag-pan-enabled: true;
-                    VerticalLayout {
-                        HorizontalLayout {
+                HorizontalLayout {
+                    spacing: layout_spacing;
+                    ScrollView {
+                        mouse-drag-pan-enabled: true;
+                        width: 35%;
+                        VerticalLayout {
                             spacing: layout_spacing;
-                            ScrollView {
-                                mouse-drag-pan-enabled: true;
-                                width: 40%;
-                                VerticalLayout {
-                                    spacing: layout_spacing;
-                                    for username[index] in users_using_storage_encryption: i-user-using-encryption-button := TouchArea {
-                                        i-user-using-encryption-container := Rectangle {
-                                            border-color: item_border_color;
-                                            border-radius: radius;
-                                            border-width: 3px;
-                                            background: username == selected_encryption_user.name ? item_selected_color : #ffffff;
-                                            HorizontalLayout {
-                                                padding: 20px;
-                                                spacing: layout_spacing * 1.5;
-                                                VerticalLayout {
-                                                    alignment: center;
-                                                    Image {
-                                                        source: @image-url("../../icons/user.svg");
-                                                        height: icon_button_height * 1.15;
-                                                        width: self.height;
-                                                        colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
-                                                    }
-                                                }
-                                                i-user-using-encryption-text := Text {
-                                                    font-family: regular_font_family;
-                                                    vertical-alignment: center;
-                                                    wrap: word-wrap;
-                                                    text: username;
-                                                }
-                                                VerticalLayout {
-                                                    alignment: center;
-                                                    Image {
-                                                        source: @image-url("../../icons/key.svg");
-                                                        height: icon_button_height * 1.15;
-                                                        width: self.height;
-                                                        colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
-                                                    }
-                                                }
+                            for username[index] in users_using_storage_encryption: i-user-using-encryption-button := TouchArea {
+                                i-user-using-encryption-container := Rectangle {
+                                    border-color: item_border_color;
+                                    border-radius: radius;
+                                    border-width: 3px;
+                                    background: username == selected_encryption_user.name ? item_selected_color : #ffffff;
+                                    HorizontalLayout {
+                                        padding: 20px;
+                                        spacing: layout_spacing * 1.5;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../../icons/user.svg");
+                                                height: icon_button_height * 1.15;
+                                                width: self.height;
+                                                colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
                                             }
                                         }
 
-                                        states [
-                                            pressed when self.pressed: {
-                                                i-user-using-encryption-container.background: #000000;
-                                                i-user-using-encryption-text.color: #ffffff;
-                                            }
-                                        ]
+                                        i-user-using-encryption-text := Text {
+                                            font-family: regular_font_family;
+                                            font-size: root.default-font-size * dialog_sizes_multiplier;
+                                            vertical-alignment: center;
+                                            wrap: word-wrap;
+                                            text: username;
+                                        }
 
-                                        clicked => {
-                                            get_selected_encryption_user_details(username);
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../../icons/key.svg");
+                                                height: icon_button_height * 1.15;
+                                                width: self.height;
+                                                colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
+                                            }
                                         }
                                     }
-                                    Rectangle {}
+                                }
+
+                                states [
+                                    pressed when self.pressed: {
+                                        i-user-using-encryption-container.background: #000000;
+                                        i-user-using-encryption-text.color: #ffffff;
+                                    }
+                                ]
+
+                                clicked => {
+                                    get_selected_encryption_user_details(username);
                                 }
                             }
-                            VLine {
-                                thickness: 2px;
-                            }
-                            if (selected_encryption_user.name.is-empty): VerticalLayout {
-                                alignment: center;
+                            Rectangle { }
+                        }
+                    }
+
+                    VLine {
+                        thickness: 2px;
+                    }
+
+                    if (selected_encryption_user.name.is-empty): VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Select a user to manage its settings";
+                            horizontal-alignment: center;
+                            font-family: regular_font_family;
+                            wrap: word-wrap;
+                        }
+                    }
+                    if (!selected_encryption_user.name.is-empty): ScrollView {
+                        mouse-drag-pan-enabled: true;
+                        VerticalLayout {
+                            spacing: layout_spacing / dialog_sizes_multiplier;
+                            padding-top: self.spacing;
+                            padding-bottom: self.spacing;
+                            HorizontalLayout {
+                                padding-left: layout_padding * dialog_sizes_multiplier;
+                                padding-right: self.padding-left;
                                 Text {
-                                    text: "Select a user to manage its settings";
-                                    horizontal-alignment: center;
-                                    font-family: regular_font_family;
-                                    wrap: word-wrap;
+                                    text: "Enabled";
+                                    vertical-alignment: center;
+                                }
+
+                                Switch {
+                                    y: (parent.height - self.height) / 2;
+                                    width: switch_width * dialog_sizes_multiplier;
+                                    height: switch_height * dialog_sizes_multiplier;
+                                    border-radius: radius;
+                                    activated: selected_encryption_user.encryption;
                                 }
                             }
-                            if (!selected_encryption_user.name.is-empty): ScrollView {
-                                mouse-drag-pan-enabled: true;
-                                VerticalLayout {
-                                    spacing: layout_spacing;
-                                    HorizontalLayout {
-                                        Text {
-                                            text: "Enabled";
-                                            vertical-alignment: center;
-                                        }
-                                        Switch {
-                                            y: (parent.height - self.height) / 2;
-                                            width: switch_width * dialog_sizes_multiplier;
-                                            height: switch_height * dialog_sizes_multiplier;
-                                            border-radius: radius;
-                                            activated: selected_encryption_user.encryption;
-                                        }
+
+                            HLine {
+                                thickness: 1px;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: layout_padding * dialog_sizes_multiplier;
+                                padding-right: self.padding-left;
+                                Text {
+                                    text: "Password";
+                                    vertical-alignment: center;
+                                }
+
+                                Button {
+                                    width: button_width * dialog_sizes_multiplier;
+                                    height: button_height * dialog_sizes_multiplier;
+                                    font-family: header_font_family;
+                                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                                    border-radius: radius;
+                                    text: "Modify";
+                                    clicked => {
+                                        TextInputInterface.text-input-focused = true;
+                                        dialog = DialogType.EncryptionChangePassword;
                                     }
-                                    HLine {
-                                        thickness: 1px;
-                                    }
-                                    HorizontalLayout {
-                                        Text {
-                                            text: "Salt";
-                                            vertical-alignment: center;
-                                        }
-                                        Rectangle {
-                                            width: 50px;
-                                        }
-                                        Text {
-                                            text: selected_encryption_user.salt;
-                                            font-family: console_font_family;
-                                            font-size: console_body_font_size;
-                                            wrap: char-wrap;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: right;
-                                        }
-                                    }
-                                    HLine {
-                                        thickness: 1px;
-                                    }
-                                    HorizontalLayout {
-                                        Text {
-                                            text: "Key";
-                                            vertical-alignment: center;
-                                        }
-                                        Rectangle {
-                                            width: 50px;
-                                        }
-                                        Text {
-                                            text: selected_encryption_user.encrypted-key;
-                                            font-family: console_font_family;
-                                            font-size: console_body_font_size;
-                                            wrap: char-wrap;
-                                            vertical-alignment: center;
-                                            horizontal-alignment: right;
-                                        }
-                                    }
-                                    Rectangle {}
                                 }
                             }
+
+                            HLine {
+                                thickness: 1px;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: layout_padding * dialog_sizes_multiplier;
+                                padding-right: self.padding-left;
+                                Text {
+                                    text: "Key";
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle {
+                                    width: 50px;
+                                }
+
+                                Text {
+                                    text: selected_encryption_user.encrypted-key;
+                                    font-family: console_font_family;
+                                    font-size: console_body_font_size;
+                                    wrap: char-wrap;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: right;
+                                }
+                            }
+
+                            HLine {
+                                thickness: 1px;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: layout_padding * dialog_sizes_multiplier;
+                                padding-right: self.padding-left;
+                                Text {
+                                    text: "Salt";
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle {
+                                    width: 50px;
+                                }
+
+                                Text {
+                                    text: selected_encryption_user.salt;
+                                    font-family: console_font_family;
+                                    font-size: console_body_font_size;
+                                    wrap: char-wrap;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: right;
+                                }
+                            }
+
+                            Rectangle { }
                         }
                     }
                 }
@@ -852,7 +905,7 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiLogs && dialog != DialogType.WifiPassphrase): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiLogs && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;
         height: 0.3 * scaling_factor * root.height;
@@ -887,7 +940,7 @@ export component AppWindow inherits Window {
         }
 
         if (dialog == DialogType.WifiUI): VerticalLayout {
-            padding: layout_padding;
+            padding: layout_padding * dialog_sizes_multiplier;
             HorizontalLayout {
                 Text {
                     text: "Wi-Fi";
@@ -956,7 +1009,7 @@ export component AppWindow inherits Window {
                                     horizontal-alignment: left;
                                     vertical-alignment: center;
                                     font-family: regular_font_family;
-                                    font-size: root.default-font-size * 0.8;
+                                    font-size: root.default-font-size * dialog_sizes_multiplier;
                                     text: name;
                                     wrap: word-wrap;
                                 }
@@ -1080,6 +1133,7 @@ export component AppWindow inherits Window {
                         dialog = DialogType.WifiUI;
                     }
                 }
+
                 Text {
                     text: "Enter passphrase";
                     font-family: header_font_family;
@@ -1089,6 +1143,7 @@ export component AppWindow inherits Window {
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
+
                 Rectangle {
                     height: icon_button_height;
                     width: self.height;
@@ -1126,7 +1181,9 @@ export component AppWindow inherits Window {
                     font-size: root.default-font-size * dialog_sizes_multiplier;
                     vertical-alignment: center;
                 }
+
                 Rectangle { }
+
                 Switch {
                     y: (parent.height - self.height) / 2;
                     width: switch_width * dialog_sizes_multiplier;
@@ -1156,6 +1213,68 @@ export component AppWindow inherits Window {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.WifiUI;
                     connect_to_wifi_network(potential_wifi_network, passphrase-edit.text);
+                }
+            }
+        }
+    }
+    // Storage encryption passphrase dialog
+    if (dialog == DialogType.EncryptionConfirmPassword || dialog == DialogType.EncryptionChangePassword): Rectangle {
+        border-width: dialog_rectangle_thickness;
+        border-color: black;
+        border-radius: radius;
+        background: white;
+        width: root.width * 0.45;
+        height: root.height * 0.4;
+        x: (root.width - self.width) / 2;
+        y: root.height - self.height - (keyboard_key_height * 4.15) - 100px;
+        VerticalLayout {
+            padding: layout_padding;
+            HorizontalLayout {
+                IconButton {
+                    icon: @image-url("../../icons/arrow-back.svg");
+                    border-radius: radius;
+                    height: icon_button_height;
+                    width: self.height;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        TextInputInterface.text-input-focused = false;
+                        dialog = DialogType.None;
+                    }
+                }
+
+                Text {
+                    text: "Changing password";
+                    font-family: header_font_family;
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    font-weight: 800;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    height: icon_button_height;
+                    width: self.height;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+
+            HLine {
+                top-padding-multiplier: 4.0;
+                bottom-padding-multiplier: self.top-padding-multiplier;
+            }
+
+            Rectangle { }
+
+            Button {
+                width: 100%;
+                height: button_height * dialog_sizes_multiplier;
+                font-family: header_font_family;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                border-radius: radius;
+                text: "Confirm";
+                clicked => {
+                    TextInputInterface.text-input-focused = false;
                 }
             }
         }
