@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use libqinit::boot_config::BootConfig;
+use libqinit::brightness;
 use libqinit::recovery::soft_reset;
 use libqinit::storage_encryption;
 use libqinit::system::{
@@ -74,6 +75,7 @@ pub fn setup_gui(
 
     if get_cmdline_bool("quill_recovery")? {
         info!("Showing QuillBoot menu");
+        brightness::set_brightness_unified(&libqinit::brightness::MAX_BRIGHTNESS / 2 as i32, &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32)?;
         set_page_sender.send(Page::QuillBoot)?;
         gui.set_version_string(SharedString::from(version_string));
     } else {

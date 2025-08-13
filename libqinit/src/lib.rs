@@ -10,6 +10,7 @@ cfg_if::cfg_if! {
         pub mod systemd;
         pub mod wifi;
         pub mod storage_encryption;
+        pub mod brightness;
     }
 }
 pub mod socket;
