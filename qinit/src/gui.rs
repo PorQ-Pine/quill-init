@@ -152,13 +152,15 @@ pub fn setup_gui(
             move || {
                 if let Some(gui) = gui_weak.upgrade() {
                     if gui.get_dialog() == DialogType::Toast {
-                        let current_count = gui.get_dialog_millis_count();
-                        let future_count = current_count + toast_gc_delay;
-                        if future_count > TOAST_DURATION_MILLIS {
-                            gui.set_dialog_millis_count(0);
-                            gui.set_dialog(DialogType::None);
-                        } else {
-                            gui.set_dialog_millis_count(future_count);
+                        if !gui.get_sticky_toast() {
+                            let current_count = gui.get_dialog_millis_count();
+                            let future_count = current_count + toast_gc_delay;
+                            if future_count > TOAST_DURATION_MILLIS {
+                                gui.set_dialog_millis_count(0);
+                                gui.set_dialog(DialogType::None);
+                            } else {
+                                gui.set_dialog_millis_count(future_count);
+                            }
                         }
                     }
                 }
@@ -624,6 +626,16 @@ pub fn setup_gui(
                         gui.set_selected_encryption_user(SystemUser { encryption: true, name: user, encrypted_key: SharedString::new(), salt: SharedString::new() });
                         error_toast(&gui, "Failed to get user's details", e.into())
                     }
+                }
+            }
+        }
+    });
+
+    gui.on_change_encrypted_storage_password({
+        move |user, password| {
+            if let Some(gui) = gui_weak.upgrade() {
+                if let Err(e) = storage_encryption::change_encrypted_storage_password(&user.to_string(), &password.to_string()) {
+                    error_toast(&gui, "Failed to change password", e.into());
                 }
             }
         }

@@ -45,3 +45,8 @@ pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {
         return Ok(UserDetails { encrypted_key: not_found.to_string(), salt: not_found.to_string() })
     }
 }
+
+pub fn change_encrypted_storage_password(user: &str, password: &str) -> Result<()> {
+
+    Ok(())
+}

@@ -2,12 +2,13 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { IconButton } from "../../ui-common/iconbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
-import { ScrollView, TabWidget, TextEdit, LineEdit, CheckBox, VerticalBox } from "std-widgets.slint";
+import { ScrollView, TabWidget, TextEdit, CheckBox, VerticalBox } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
 import { Dialog } from "../../ui-common/dialog.slint";
 import { SectionButton } from "../../ui-common/sectionbutton.slint";
+import { LineEdit } from "../../ui-common/lineedit.slint";
 import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, Error }
@@ -42,6 +43,7 @@ export component AppWindow inherits Window {
     callback connect_to_wifi_network(string, string);
     callback get_users_using_storage_encryption();
     callback get_selected_encryption_user_details(string);
+    callback change_encrypted_storage_password(string, string);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -62,6 +64,7 @@ export component AppWindow inherits Window {
     in-out property <int> debug_tab_index: 0;
     in-out property <string> section_header_title;
     in-out property <image> wifi_icon;
+    in-out property <bool> sticky_toast: false;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
     // Run-time properties
@@ -628,7 +631,7 @@ export component AppWindow inherits Window {
                                     font-family: header_font_family;
                                     font-size: root.default-font-size * dialog_sizes_multiplier;
                                     border-radius: radius;
-                                    text: "Modify";
+                                    text: "Change";
                                     clicked => {
                                         TextInputInterface.text-input-focused = true;
                                         dialog = DialogType.EncryptionChangePassword;
@@ -877,8 +880,10 @@ export component AppWindow inherits Window {
         height: root.height;
         enabled: dialog == DialogType.None ? false : true;
         clicked => {
-            TextInputInterface.text-input-focused = false;
-            dialog = DialogType.None;
+            if !(dialog == DialogType.Toast && sticky_toast) {
+                TextInputInterface.text-input-focused = false;
+                dialog = DialogType.None;
+            }
         }
     }
 
@@ -1156,18 +1161,13 @@ export component AppWindow inherits Window {
                 bottom-padding-multiplier: self.top-padding-multiplier;
             }
 
-            Rectangle {
-                height: parent.height * 0.08;
-                border-width: 3px;
-                border-color: black;
+            wifi-passphrase-edit := LineEdit {
+                default-height: parent.height * 0.08;
+                scaling-factor: scaling_factor;
                 border-radius: radius;
-                passphrase-edit := LineEdit {
-                    width: parent.width * 0.99;
-                    height: parent.height * 0.925;
-                    placeholder-text: "Passphrase for “\{potential_wifi_network}”";
-                    font-size: root.default-font-size * dialog_sizes_multiplier;
-                    input-type: password;
-                }
+                placeholder-text: "Passphrase for “\{potential_wifi_network}”";
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                input-type: password;
             }
 
             Rectangle {
@@ -1189,12 +1189,12 @@ export component AppWindow inherits Window {
                     width: switch_width * dialog_sizes_multiplier;
                     height: switch_height * dialog_sizes_multiplier;
                     border-radius: radius;
-                    activated: passphrase-edit.input-type == InputType.text ? true : false;
+                    activated: wifi-passphrase-edit.input-type == InputType.text ? true : false;
                     toggled => {
-                        if (passphrase-edit.input-type == InputType.password) {
-                            passphrase-edit.input-type = InputType.text;
+                        if (wifi-passphrase-edit.input-type == InputType.password) {
+                            wifi-passphrase-edit.input-type = InputType.text;
                         } else {
-                            passphrase-edit.input-type = InputType.password;
+                            wifi-passphrase-edit.input-type = InputType.password;
                         }
                     }
                 }
@@ -1212,7 +1212,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.WifiUI;
-                    connect_to_wifi_network(potential_wifi_network, passphrase-edit.text);
+                    connect_to_wifi_network(potential_wifi_network, wifi-passphrase-edit.text);
                 }
             }
         }
@@ -1223,10 +1223,15 @@ export component AppWindow inherits Window {
         border-color: black;
         border-radius: radius;
         background: white;
-        width: root.width * 0.45;
-        height: root.height * 0.4;
+        width: scaling_factor > 1 ? root.width * 0.65 : root.width * 0.45;
+        height: scaling_factor > 1 ? root.height * 0.5 : root.height * 0.4;
         x: (root.width - self.width) / 2;
         y: root.height - self.height - (keyboard_key_height * 4.15) - 100px;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: true;
+        }
         VerticalLayout {
             padding: layout_padding;
             HorizontalLayout {
@@ -1264,6 +1269,80 @@ export component AppWindow inherits Window {
                 bottom-padding-multiplier: self.top-padding-multiplier;
             }
 
+            encryption-current-password-edit := LineEdit {
+                default-height: parent.height * 0.08;
+                scaling-factor: scaling_factor;
+                border-radius: radius;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                placeholder-text: "Current password";
+                input-type: password;
+            }
+
+            Rectangle {
+                vertical-stretch: 0.05;
+                visible: dialog == DialogType.EncryptionChangePassword;
+            }
+
+            encryption-new-password-edit := LineEdit {
+                default-height: parent.height * 0.08;
+                scaling-factor: scaling_factor;
+                border-radius: radius;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                placeholder-text: "New password";
+                visible: dialog == DialogType.EncryptionChangePassword;
+                input-type: password;
+            }
+
+            Rectangle {
+                vertical-stretch: 0.05;
+                visible: dialog == DialogType.EncryptionChangePassword;
+            }
+
+            encryption-confirm-password-edit := LineEdit {
+                default-height: parent.height * 0.08;
+                scaling-factor: scaling_factor;
+                border-radius: radius;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                placeholder-text: "Confirm new password";
+                visible: dialog == DialogType.EncryptionChangePassword;
+                input-type: password;
+            }
+            
+            Rectangle {
+                vertical-stretch: 0.15;
+                visible: dialog == DialogType.EncryptionChangePassword;
+            }
+
+            HorizontalLayout {
+                Text {
+                    font-family: regular_font_family;
+                    text: "Show passwords";
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { }
+
+                Switch {
+                    y: (parent.height - self.height) / 2;
+                    width: switch_width * dialog_sizes_multiplier;
+                    height: switch_height * dialog_sizes_multiplier;
+                    border-radius: radius;
+                    activated: encryption-current-password-edit.input-type == InputType.text ? true : false;
+                    toggled => {
+                        if (encryption-current-password-edit.input-type == InputType.password) {
+                            encryption-current-password-edit.input-type = InputType.text;
+                            encryption-new-password-edit.input-type = InputType.text;
+                            encryption-confirm-password-edit.input-type = InputType.text;
+                        } else {
+                            encryption-current-password-edit.input-type = InputType.password;
+                            encryption-new-password-edit.input-type = InputType.password;
+                            encryption-confirm-password-edit.input-type = InputType.password;
+                        }
+                    }
+                }
+            }
+
             Rectangle { }
 
             Button {
@@ -1274,6 +1353,21 @@ export component AppWindow inherits Window {
                 border-radius: radius;
                 text: "Confirm";
                 clicked => {
+                    if encryption-current-password-edit.text.is-empty {
+                        dialog_message = "Please provide current password";
+                        dialog = DialogType.Toast;
+                    } else if encryption-new-password-edit.text != encryption-confirm-password-edit.text {
+                        dialog_message = "Passwords do not match";
+                        dialog = DialogType.Toast;
+                    } else if encryption-new-password-edit.text == encryption-confirm-password-edit.text && encryption-new-password-edit.text.is-empty {
+                        dialog_message = "Cannot set empty password";
+                        dialog = DialogType.Toast;
+                    } else {
+                        dialog_message = "Setting password, please wait";
+                        sticky_toast = true;
+                        dialog = DialogType.Toast;
+                        change_encrypted_storage_password(selected_encryption_user.name, encryption-new-password-edit.text);
+                    }
                     TextInputInterface.text-input-focused = false;
                 }
             }

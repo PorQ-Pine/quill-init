@@ -2,7 +2,6 @@ import { Button } from "button.slint";
 export component Dialog inherits Rectangle {
     in property <string> text <=> i-text.text;
     in property <string> button_font_family;
-    property <length> button_width: root.width * 0.4;
     property <length> button_height: root.height * 0.15;
     callback cancel();
     callback confirm();
@@ -26,10 +25,8 @@ export component Dialog inherits Rectangle {
         Rectangle {}
         HorizontalLayout {
             spacing: 30px;
-            alignment: center;
             Button {
                 text: "Cancel";
-                width: button_width;
                 height: button_height;
                 border-radius: root.border-radius;
                 font-family: button_font_family;
@@ -39,7 +36,6 @@ export component Dialog inherits Rectangle {
             }
             Button {
                 text: "Confirm";
-                width: button_width;
                 height: button_height;
                 border-radius: root.border-radius;
                 font-family: button_font_family;
