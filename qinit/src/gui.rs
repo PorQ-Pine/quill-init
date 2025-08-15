@@ -1,5 +1,6 @@
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use anyhow::Result;
 use libqinit::boot_config::BootConfig;
@@ -631,13 +632,22 @@ pub fn setup_gui(
         }
     });
 
+    let timer = Rc::new(Timer::default());
     gui.on_change_encrypted_storage_password({
-        move |user, password| {
-            if let Some(gui) = gui_weak.upgrade() {
-                if let Err(e) = storage_encryption::change_encrypted_storage_password(&user.to_string(), &password.to_string()) {
-                    error_toast(&gui, "Failed to change password", e.into());
+        let gui_weak = gui_weak.clone();
+        move |user, old_password, new_password| {
+            let gui_weak = gui_weak.clone();
+            timer.start(TimerMode::SingleShot, std::time::Duration::from_millis(100), move || {
+                if let Some(gui) = gui_weak.upgrade() {
+                    if let Err(e) = storage_encryption::change_encrypted_storage_password(&user.to_string(), &old_password.to_string(), &new_password.to_string()) {
+                        error_toast(&gui, "Failed to change password", e.into());
+                    } else {
+                        toast(&gui, "Password set successfully");
+                    }
+                    gui.invoke_get_users_using_storage_encryption();
+                    gui.invoke_get_selected_encryption_user_details(gui.get_selected_encryption_user().name);
                 }
-            }
+            });
         }
     });
 
@@ -647,12 +657,14 @@ pub fn setup_gui(
 }
 
 fn toast(gui: &AppWindow, message: &str) {
+    gui.set_sticky_toast(false);
     gui.set_dialog_message(SharedString::from(message));
     gui.set_dialog(DialogType::Toast);
     info!("{}", &message);
 }
 
 fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
+    gui.set_sticky_toast(false);
     gui.set_dialog_message(SharedString::from(message));
     gui.set_dialog(DialogType::Toast);
     error!("{}: {}", &message, e);

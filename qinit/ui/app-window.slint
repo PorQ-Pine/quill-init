@@ -43,7 +43,7 @@ export component AppWindow inherits Window {
     callback connect_to_wifi_network(string, string);
     callback get_users_using_storage_encryption();
     callback get_selected_encryption_user_details(string);
-    callback change_encrypted_storage_password(string, string);
+    callback change_encrypted_storage_password(string, string, string);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -584,7 +584,7 @@ export component AppWindow inherits Window {
                     if (selected_encryption_user.name.is-empty): VerticalLayout {
                         alignment: center;
                         Text {
-                            text: "Select a user to manage its settings";
+                            text: users_using_storage_encryption.length == 0 ? "No users using encryption found" : "Select a user to manage its settings";
                             horizontal-alignment: center;
                             font-family: regular_font_family;
                             wrap: word-wrap;
@@ -1366,7 +1366,7 @@ export component AppWindow inherits Window {
                         dialog_message = "Setting password, please wait";
                         sticky_toast = true;
                         dialog = DialogType.Toast;
-                        change_encrypted_storage_password(selected_encryption_user.name, encryption-new-password-edit.text);
+                        change_encrypted_storage_password(selected_encryption_user.name, encryption-current-password-edit.text, encryption-new-password-edit.text);
                     }
                     TextInputInterface.text-input-focused = false;
                 }

@@ -3,6 +3,10 @@ use log::info;
 use std::fs;
 use serde_json;
 
+use crate::system::run_command;
+
+const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
+
 pub struct UserDetails {
     pub encrypted_key: String,
     pub salt: String,
@@ -20,10 +24,10 @@ pub fn get_users_using_storage_encryption() -> Result<Vec<String>> {
     for user in users {
         let user = user?;
         if fs::exists(&format!(
-            "{}/.using_encryption",
+            "{}/gocryptfs.conf",
             user.path().to_string_lossy().to_string()
         ))? {
-            users_using_storage_encryption.push(user.file_name().to_string_lossy().to_string());
+            users_using_storage_encryption.push(user.file_name().to_string_lossy()[1..].to_string());
         }
     }
     info!("List is as follows: {:?}", &users_using_storage_encryption);
@@ -46,7 +50,8 @@ pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {
     }
 }
 
-pub fn change_encrypted_storage_password(user: &str, password: &str) -> Result<()> {
+pub fn change_encrypted_storage_password(user: &str, old_password: &str, new_password: &str) -> Result<()> {
+    run_command("/bin/sh", &["-c", &format!("printf '{}\n{}' | {} -passwd {}/{}/.{}", &old_password, &new_password, &GOCRYPTFS_BINARY, &crate::MAIN_PART_MOUNTPOINT, &crate::SYSTEM_HOME_DIR, &user)])?;
 
     Ok(())
 }

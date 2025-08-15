@@ -1,0 +1,18 @@
+import { LineEdit } from "std-widgets.slint";
+
+export component LineEdit inherits Rectangle {
+    in property <string> placeholder-text <=> edit.placeholder-text;
+    in property <InputType> input-type <=> edit.input-type;
+    in property <length> font-size <=> edit.font-size;
+    out property <string> text <=> edit.text;
+    in property <length> default-height;
+    in property <int> scaling-factor;
+
+    height: scaling-factor > 1 ? default-height * 1.5 : default-height;
+    border-width: 3px;
+    border-color: black;
+    edit := LineEdit {
+        width: parent.width * 0.99;
+        height: parent.height * 0.925;
+    }
+}
