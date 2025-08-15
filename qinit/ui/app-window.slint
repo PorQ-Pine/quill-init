@@ -44,6 +44,7 @@ export component AppWindow inherits Window {
     callback get_users_using_storage_encryption();
     callback get_selected_encryption_user_details(string);
     callback change_encrypted_storage_password(string, string, string);
+    callback toggle_storage_encryption_status(string, string);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -518,7 +519,7 @@ export component AppWindow inherits Window {
             if (page == Page.StorageEncryptionOptions): VerticalLayout {
                 HorizontalLayout {
                     spacing: layout_spacing;
-                    ScrollView {
+                    if (users_using_storage_encryption.length > 0): ScrollView {
                         mouse-drag-pan-enabled: true;
                         width: 35%;
                         VerticalLayout {
@@ -577,14 +578,14 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    VLine {
+                    if (users_using_storage_encryption.length > 0): VLine {
                         thickness: 2px;
                     }
 
                     if (selected_encryption_user.name.is-empty): VerticalLayout {
                         alignment: center;
                         Text {
-                            text: users_using_storage_encryption.length == 0 ? "No users using encryption found" : "Select a user to manage its settings";
+                            text: users_using_storage_encryption.length == 0 ? "No users using storage encryption found" : "Select a user to manage its settings";
                             horizontal-alignment: center;
                             font-family: regular_font_family;
                             wrap: word-wrap;
@@ -610,6 +611,11 @@ export component AppWindow inherits Window {
                                     height: switch_height * dialog_sizes_multiplier;
                                     border-radius: radius;
                                     activated: selected_encryption_user.encryption;
+                                    toggled => {
+                                        self.activated = true;
+                                        TextInputInterface.text-input-focused = true;
+                                        dialog = DialogType.EncryptionConfirmPassword;
+                                    }
                                 }
                             }
 
@@ -1248,7 +1254,7 @@ export component AppWindow inherits Window {
                 }
 
                 Text {
-                    text: "Changing password";
+                    text: dialog == DialogType.EncryptionChangePassword ? "Changing password" : "Confirming password";
                     font-family: header_font_family;
                     font-size: root.default-font-size * dialog_sizes_multiplier;
                     font-weight: 800;
@@ -1267,6 +1273,41 @@ export component AppWindow inherits Window {
             HLine {
                 top-padding-multiplier: 4.0;
                 bottom-padding-multiplier: self.top-padding-multiplier;
+            }
+
+            HorizontalLayout {
+                Text {
+                    font-family: regular_font_family;
+                    text: dialog == DialogType.EncryptionChangePassword ? "Show passwords" : "Show password";
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { }
+
+                Switch {
+                    y: (parent.height - self.height) / 2;
+                    width: switch_width * dialog_sizes_multiplier;
+                    height: switch_height * dialog_sizes_multiplier;
+                    border-radius: radius;
+                    activated: encryption-current-password-edit.input-type == InputType.text ? true : false;
+                    toggled => {
+                        if (encryption-current-password-edit.input-type == InputType.password) {
+                            encryption-current-password-edit.input-type = InputType.text;
+                            encryption-new-password-edit.input-type = InputType.text;
+                            encryption-confirm-password-edit.input-type = InputType.text;
+                        } else {
+                            encryption-current-password-edit.input-type = InputType.password;
+                            encryption-new-password-edit.input-type = InputType.password;
+                            encryption-confirm-password-edit.input-type = InputType.password;
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 20px;
+                visible: dialog == DialogType.EncryptionChangePassword;
             }
 
             encryption-current-password-edit := LineEdit {
@@ -1307,41 +1348,6 @@ export component AppWindow inherits Window {
                 visible: dialog == DialogType.EncryptionChangePassword;
                 input-type: password;
             }
-            
-            Rectangle {
-                vertical-stretch: 0.15;
-                visible: dialog == DialogType.EncryptionChangePassword;
-            }
-
-            HorizontalLayout {
-                Text {
-                    font-family: regular_font_family;
-                    text: "Show passwords";
-                    font-size: root.default-font-size * dialog_sizes_multiplier;
-                    vertical-alignment: center;
-                }
-
-                Rectangle { }
-
-                Switch {
-                    y: (parent.height - self.height) / 2;
-                    width: switch_width * dialog_sizes_multiplier;
-                    height: switch_height * dialog_sizes_multiplier;
-                    border-radius: radius;
-                    activated: encryption-current-password-edit.input-type == InputType.text ? true : false;
-                    toggled => {
-                        if (encryption-current-password-edit.input-type == InputType.password) {
-                            encryption-current-password-edit.input-type = InputType.text;
-                            encryption-new-password-edit.input-type = InputType.text;
-                            encryption-confirm-password-edit.input-type = InputType.text;
-                        } else {
-                            encryption-current-password-edit.input-type = InputType.password;
-                            encryption-new-password-edit.input-type = InputType.password;
-                            encryption-confirm-password-edit.input-type = InputType.password;
-                        }
-                    }
-                }
-            }
 
             Rectangle { }
 
@@ -1356,17 +1362,27 @@ export component AppWindow inherits Window {
                     if encryption-current-password-edit.text.is-empty {
                         dialog_message = "Please provide current password";
                         dialog = DialogType.Toast;
-                    } else if encryption-new-password-edit.text != encryption-confirm-password-edit.text {
+                    } else if encryption-new-password-edit.text != encryption-confirm-password-edit.text && dialog == DialogType.EncryptionChangePassword {
                         dialog_message = "Passwords do not match";
                         dialog = DialogType.Toast;
-                    } else if encryption-new-password-edit.text == encryption-confirm-password-edit.text && encryption-new-password-edit.text.is-empty {
+                    } else if encryption-new-password-edit.text == encryption-confirm-password-edit.text && encryption-new-password-edit.text.is-empty && dialog == DialogType.EncryptionChangePassword {
                         dialog_message = "Cannot set empty password";
                         dialog = DialogType.Toast;
                     } else {
-                        dialog_message = "Setting password, please wait";
+                        if dialog == DialogType.EncryptionChangePassword {
+                            dialog_message = "Setting password";
+                        } else if dialog == DialogType.EncryptionConfirmPassword {
+                            dialog_message = "Disabling encrypted storage"
+                        }
+
+                        if dialog == DialogType.EncryptionChangePassword {
+                            change_encrypted_storage_password(selected_encryption_user.name, encryption-current-password-edit.text, encryption-new-password-edit.text);
+                        } else if dialog == DialogType.EncryptionConfirmPassword {
+                            toggle_storage_encryption_status(selected_encryption_user.name, encryption-current-password-edit.text);
+                        }
+
                         sticky_toast = true;
                         dialog = DialogType.Toast;
-                        change_encrypted_storage_password(selected_encryption_user.name, encryption-current-password-edit.text, encryption-new-password-edit.text);
                     }
                     TextInputInterface.text-input-focused = false;
                 }

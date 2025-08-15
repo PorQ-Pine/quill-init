@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use std::fs;
-use std::time::Duration;
-use std::thread;
 use log::debug;
+use std::fs;
+use std::thread;
+use std::time::Duration;
 
 const BACKLIGHT_COOL_NODE_W: &str = "/sys/class/backlight/backlight_cool/brightness";
 const BACKLIGHT_WARM_NODE_W: &str = "/sys/class/backlight/backlight_warm/brightness";
@@ -23,7 +23,8 @@ pub fn set_brightness_(level: i32, mode: &Mode) -> Result<()> {
         Mode::Cool => BACKLIGHT_COOL_NODE_W,
         Mode::Warm => BACKLIGHT_WARM_NODE_W,
     };
-    fs::write(&node, level.to_string()).with_context(|| format!("Failed to write to {:?} brightness sysfs node", &node))?;
+    fs::write(&node, level.to_string())
+        .with_context(|| format!("Failed to write to {:?} brightness sysfs node", &node))?;
 
     Ok(())
 }
@@ -34,7 +35,11 @@ pub fn get_brightness(mode: &Mode) -> Result<i32> {
         Mode::Warm => BACKLIGHT_WARM_NODE_R,
     };
 
-    let value: i32 = fs::read_to_string(&node).with_context(|| format!("Failed to read {:?} brightness sysfs node", &node))?.trim().parse().with_context(|| "Failed to parse brightness from {:?} brightness sysfs node")?;
+    let value: i32 = fs::read_to_string(&node)
+        .with_context(|| format!("Failed to read {:?} brightness sysfs node", &node))?
+        .trim()
+        .parse()
+        .with_context(|| "Failed to parse brightness from {:?} brightness sysfs node")?;
 
     Ok(value)
 }
@@ -58,15 +63,19 @@ pub fn set_brightness(level_to_set: i32, mode: &Mode) -> Result<()> {
 pub fn set_brightness_unified(level_cool: i32, level_warm: i32) -> Result<()> {
     let thread_cool = thread::spawn(move || -> Result<()> {
         set_brightness(level_cool, &Mode::Cool)?;
-        return Ok(())
+        return Ok(());
     });
     let thread_warm = thread::spawn(move || -> Result<()> {
         set_brightness(level_warm, &Mode::Warm)?;
-        return Ok(())
+        return Ok(());
     });
 
-    thread_cool.join().map_err(|e| anyhow::anyhow!("Thread for setting cool brightness panicked: {:?}", e))??;
-    thread_warm.join().map_err(|e| anyhow::anyhow!("Thread for setting warm brightness panicked: {:?}", e))??;
+    thread_cool
+        .join()
+        .map_err(|e| anyhow::anyhow!("Thread for setting cool brightness panicked: {:?}", e))??;
+    thread_warm
+        .join()
+        .map_err(|e| anyhow::anyhow!("Thread for setting warm brightness panicked: {:?}", e))??;
 
     Ok(())
 }

@@ -1,6 +1,6 @@
+use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
-use std::rc::Rc;
 
 use anyhow::Result;
 use libqinit::boot_config::BootConfig;
@@ -76,7 +76,12 @@ pub fn setup_gui(
 
     if get_cmdline_bool("quill_recovery")? {
         info!("Showing QuillBoot menu");
-        thread::spawn(|| brightness::set_brightness_unified(&libqinit::brightness::MAX_BRIGHTNESS / 2 as i32, &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32));
+        thread::spawn(|| {
+            brightness::set_brightness_unified(
+                &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32,
+                &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32,
+            )
+        });
         set_page_sender.send(Page::QuillBoot)?;
         gui.set_version_string(SharedString::from(version_string));
     } else {
@@ -600,10 +605,11 @@ pub fn setup_gui(
             if let Some(gui) = gui_weak.upgrade() {
                 match storage_encryption::get_users_using_storage_encryption() {
                     Ok(users_using_storage_encryption) => {
-                        let users_shared_string_vec: Vec<SharedString> = users_using_storage_encryption
-                            .iter()
-                            .map(|user| SharedString::from(user))
-                            .collect();
+                        let users_shared_string_vec: Vec<SharedString> =
+                            users_using_storage_encryption
+                                .iter()
+                                .map(|user| SharedString::from(user))
+                                .collect();
                         gui.set_users_using_storage_encryption(slint::ModelRc::new(
                             slint::VecModel::from(users_shared_string_vec),
                         ));
@@ -622,9 +628,19 @@ pub fn setup_gui(
         move |user| {
             if let Some(gui) = gui_weak.upgrade() {
                 match storage_encryption::get_encryption_user_details(&user) {
-                    Ok(details) => gui.set_selected_encryption_user(SystemUser { encryption: true, name: user, encrypted_key: SharedString::from(&details.encrypted_key), salt: SharedString::from(&details.salt) }),
+                    Ok(details) => gui.set_selected_encryption_user(SystemUser {
+                        encryption: true,
+                        name: user,
+                        encrypted_key: SharedString::from(&details.encrypted_key),
+                        salt: SharedString::from(&details.salt),
+                    }),
                     Err(e) => {
-                        gui.set_selected_encryption_user(SystemUser { encryption: true, name: user, encrypted_key: SharedString::new(), salt: SharedString::new() });
+                        gui.set_selected_encryption_user(SystemUser {
+                            encryption: true,
+                            name: user,
+                            encrypted_key: SharedString::new(),
+                            salt: SharedString::new(),
+                        });
                         error_toast(&gui, "Failed to get user's details", e.into())
                     }
                 }
@@ -632,22 +648,58 @@ pub fn setup_gui(
         }
     });
 
-    let timer = Rc::new(Timer::default());
+    let encryption_change_password_timer = Rc::new(Timer::default());
     gui.on_change_encrypted_storage_password({
         let gui_weak = gui_weak.clone();
         move |user, old_password, new_password| {
             let gui_weak = gui_weak.clone();
-            timer.start(TimerMode::SingleShot, std::time::Duration::from_millis(100), move || {
-                if let Some(gui) = gui_weak.upgrade() {
-                    if let Err(e) = storage_encryption::change_encrypted_storage_password(&user.to_string(), &old_password.to_string(), &new_password.to_string()) {
-                        error_toast(&gui, "Failed to change password", e.into());
-                    } else {
-                        toast(&gui, "Password set successfully");
+            encryption_change_password_timer.start(
+                TimerMode::SingleShot,
+                std::time::Duration::from_millis(100),
+                move || {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        if let Err(e) = storage_encryption::change_password(
+                            &user.to_string(),
+                            &old_password.to_string(),
+                            &new_password.to_string(),
+                        ) {
+                            error_toast(&gui, "Failed to change password", e.into());
+                        } else {
+                            toast(&gui, "Password set successfully");
+                        }
+                        gui.invoke_get_users_using_storage_encryption();
+                        gui.invoke_get_selected_encryption_user_details(
+                            gui.get_selected_encryption_user().name,
+                        );
                     }
-                    gui.invoke_get_users_using_storage_encryption();
-                    gui.invoke_get_selected_encryption_user_details(gui.get_selected_encryption_user().name);
-                }
-            });
+                },
+            );
+        }
+    });
+
+    let encryption_disable_timer = Rc::new(Timer::default());
+    gui.on_toggle_storage_encryption_status({
+        let gui_weak = gui_weak.clone();
+        let set_page_sender = set_page_sender.clone();
+        move |user, password| {
+            let gui_weak = gui_weak.clone();
+            let set_page_sender = set_page_sender.clone();
+            encryption_disable_timer.start(
+                TimerMode::SingleShot,
+                std::time::Duration::from_millis(100),
+                move || {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        if let Err(e) =
+                            storage_encryption::disable(&user.to_string(), &password.to_string())
+                        {
+                            error_toast(&gui, "Failed to disable encryption", e.into());
+                        } else {
+                            let _ = set_page_sender.send(Page::Options);
+                            toast(&gui, "Encryption successfully disabled");
+                        }
+                    }
+                },
+            );
         }
     });
 
