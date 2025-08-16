@@ -3458,6 +3458,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cfg-if",
+ "chrono",
  "crossterm",
  "embed-file",
  "env_logger",

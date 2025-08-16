@@ -1,4 +1,4 @@
-use crate::system::{modprobe, restart_service, run_command, stop_service};
+use crate::system::{modprobe, restart_service, run_command, stop_service, sync_time};
 use anyhow::Result;
 use log::{error, info};
 use regex::Regex;
@@ -243,6 +243,8 @@ fn connect(network: &NetworkForm) -> Result<()> {
         }
     }
 
+    let _ = sync_time();
+
     Ok(())
 }
 
@@ -250,12 +252,22 @@ fn get_status(do_ping: bool) -> Result<Status> {
     info!("Determining Wi-Fi status");
     let status;
     if fs::exists(&format!("/sys/module/{}", &WIFI_MODULE))? {
-        if do_ping && is_connected_to_internet()? {
-            status = Status {
-                status_type: StatusType::Connected,
-                list: None,
-                error: None,
-            };
+        if do_ping {
+            // Give it some time for DHCP lease acquisition
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            if is_connected_to_internet()? {
+                status = Status {
+                    status_type: StatusType::Connected,
+                    list: None,
+                    error: None,
+                };
+            } else {
+                status = Status {
+                    status_type: StatusType::NotConnected,
+                    list: None,
+                    error: None,
+                };
+            }
         } else {
             status = Status {
                 status_type: StatusType::NotConnected,

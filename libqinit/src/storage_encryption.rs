@@ -44,7 +44,19 @@ pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {
         &crate::SYSTEM_HOME_DIR,
         &user
     );
-    let json: serde_json::Value = serde_json::from_reader(fs::File::open(&config_path)?)?;
+    let json: serde_json::Value =
+        serde_json::from_reader(fs::File::open(&config_path).with_context(|| {
+            format!(
+                "Failed to open gocryptfs configuration file for user '{}'",
+                &user
+            )
+        })?)
+        .with_context(|| {
+            format!(
+                "Failed to parse gocryptfs configuration file for user '{}'",
+                &user
+            )
+        })?;
     let not_found = "Not found";
     if let Some(encrypted_key) = json.get("EncryptedKey")
         && let Some(salt_str) = json["ScryptObject"]["Salt"].as_str()
@@ -83,7 +95,13 @@ pub fn change_password(user: &str, old_password: &str, new_password: &str) -> Re
                 &user
             ),
         ],
-    )?;
+    )
+    .with_context(|| {
+        format!(
+            "Failed to change encrypted storage's password for user '{}'",
+            &user
+        )
+    })?;
 
     Ok(())
 }
@@ -95,7 +113,13 @@ pub fn disable(user: &str, password: &str) -> Result<()> {
         &crate::MAIN_PART_MOUNTPOINT,
         &crate::SYSTEM_HOME_DIR,
         &user
-    ))?;
+    ))
+    .with_context(|| {
+        format!(
+            "Failed to create file disabling encryption for user '{}'",
+            &user
+        )
+    })?;
 
     Ok(())
 }

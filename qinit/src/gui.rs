@@ -16,6 +16,7 @@ use log::{error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
 use std::{fs, thread};
+use chrono::prelude::*;
 slint::include_modules!();
 
 pub const TOAST_DURATION_MILLIS: i32 = 5000;
@@ -173,6 +174,18 @@ pub fn setup_gui(
             }
         },
     );
+
+    // Time display timer
+    let time_display_timer = Timer::default();
+    time_display_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(500), {
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                let current_time: DateTime<Local> = Local::now();
+                gui.set_current_time(SharedString::from(current_time.format("%H : %M").to_string()));
+            }
+        }
+    });
 
     // Fatal errors
     let interrupt_timer = Timer::default();
@@ -700,6 +713,30 @@ pub fn setup_gui(
                     }
                 },
             );
+        }
+    });
+
+    // Brightness
+    gui.on_set_brightness_sliders_levels({
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                // Assuming this will not fail. Otherwise, there would probably be something really wrong with the device...
+                gui.set_cool_brightness(brightness::get_brightness(&brightness::Mode::Cool).unwrap() * 100 / brightness::MAX_BRIGHTNESS);
+                gui.set_warm_brightness(brightness::get_brightness(&brightness::Mode::Warm).unwrap() * 100 / brightness::MAX_BRIGHTNESS);
+            }
+        }
+    });
+
+    gui.on_change_cool_brightness({
+        move |value| {
+            let _ = brightness::set_brightness_(value * brightness::MAX_BRIGHTNESS / 100, &brightness::Mode::Cool);
+        }
+    });
+
+    gui.on_change_warm_brightness({
+        move |value| {
+            let _ = brightness::set_brightness_(value * brightness::MAX_BRIGHTNESS / 100, &brightness::Mode::Warm);
         }
     });
 

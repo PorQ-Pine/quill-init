@@ -1,15 +1,16 @@
 export component IconButton inherits TouchArea {
-    in property<image> icon <=> i-icon.source;
-    in property<length> border-radius <=> i-container.border-radius;
-    in property<length> padding-value;
+    in property <image> icon <=> i-icon.source;
+    in property <length> border-radius <=> i-container.border-radius;
+    in property <length> padding-value;
+    in property <color> background-color;
 
     i-container := Rectangle {
-        background: #f0f0f0;
+        background: background-color;
 
         i-layout := HorizontalLayout {
             padding: padding-value;
             i-icon := Image {
-                colorize: root.pressed ? #ffffff : #000000;
+                colorize: i-container.background == #000000 ? #ffffff : #000000;
             }
         }
     }

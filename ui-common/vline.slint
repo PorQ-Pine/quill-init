@@ -2,9 +2,10 @@ export component VLine inherits HorizontalLayout {
     in property <float> left-padding-multiplier: 1;
     in property <float> right-padding-multiplier: 1;
     in property <length> thickness: 3px;
+    in property <brush> background <=> i-container.background;
     padding-left: 5px * left-padding-multiplier;
     padding-right: 5px * right-padding-multiplier;
-    Rectangle {
+    i-container := Rectangle {
         background: black;
         width: thickness;
     }

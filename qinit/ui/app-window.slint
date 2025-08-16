@@ -2,19 +2,20 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { IconButton } from "../../ui-common/iconbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
-import { ScrollView, TabWidget, TextEdit, CheckBox, VerticalBox } from "std-widgets.slint";
+import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
 import { Dialog } from "../../ui-common/dialog.slint";
 import { SectionButton } from "../../ui-common/sectionbutton.slint";
 import { LineEdit } from "../../ui-common/lineedit.slint";
+import { Slider } from "../../ui-common/slider.slint";
 import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset, WifiUI, WifiLogs, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword }
+export enum DialogType { None, Toast, SoftReset, WifiUI, Brightness, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword }
 export { VirtualKeyboardHandler, KeyModel }
 
 export struct SystemUser {
@@ -45,6 +46,9 @@ export component AppWindow inherits Window {
     callback get_selected_encryption_user_details(string);
     callback change_encrypted_storage_password(string, string, string);
     callback toggle_storage_encryption_status(string, string);
+    callback set_brightness_sliders_levels;
+    callback change_cool_brightness(int);
+    callback change_warm_brightness(int);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -64,7 +68,7 @@ export component AppWindow inherits Window {
     in-out property <image> help_uri_qr_code;
     in-out property <int> debug_tab_index: 0;
     in-out property <string> section_header_title;
-    in-out property <image> wifi_icon;
+    in-out property <image> wifi_icon: @image-url("../../icons/wifi-init.svg");
     in-out property <bool> sticky_toast: false;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
@@ -81,6 +85,9 @@ export component AppWindow inherits Window {
     in property <[bool]> wifi_network_open_vec;
     in property <[string]> users_using_storage_encryption;
     in-out property <SystemUser> selected_encryption_user;
+    in property <string> current_time;
+    in property <int> cool_brightness;
+    in property <int> warm_brightness;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -94,6 +101,8 @@ export component AppWindow inherits Window {
     property <length> button_width: root.width * wmultiplier * scaling_factor * button_scaling_multiplier;
     property <length> button_height: root.height * hmultiplier * scaling_factor * button_scaling_multiplier;
     property <length> icon_button_height: button_height * 0.5;
+    property <length> bar_button_height: button_height * 0.7;
+    property <length> slider_height: 15px * scaling_factor;
     property <length> section_button_height: button_height * 1.25;
     property <length> switch_width: button_width * 0.45;
     property <length> switch_height: button_height * 0.7;
@@ -111,6 +120,10 @@ export component AppWindow inherits Window {
     property <color> tab_rectangle_border_color: darkgrey;
     property <length> dialog_rectangle_thickness: 6px;
     property <length> keyboard_key_height: 0.055 * root.height;
+    property <length> approx_keyboard_height: keyboard_key_height * 4.15;
+    property <length> approx_bar_height: layout_padding + bar_button_height + layout_spacing + 0.5 * 5px + 3px + layout_spacing + 0.5 * 5px;
+    property <length> bar_icon_button_padding: 7.5px;
+    property <length> space_between_keyboard_and_widget: 100px;
     property <color> item_border_color: #a5a5a5;
     property <color> item_selected_color: #dbdada;
 
@@ -156,7 +169,72 @@ export component AppWindow inherits Window {
                     width: self.height;
                 }
             }
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HLine { }
+            if (page == Page.QuillBoot): HorizontalLayout {
+                spacing: layout_spacing * 1.5;
+                Text {
+                    text: current_time;
+                    vertical-alignment: center;
+                    font-family: header_font_family;
+                    font-weight: 800;
+                }
+
+                Rectangle { }
+
+                IconButton {
+                    icon: wifi_icon;
+                    border-radius: radius;
+                    height: bar_button_height;
+                    width: self.height;
+                    padding-value: bar_icon_button_padding;
+                    background-color: dialog == DialogType.WifiUI ? #000000 : #ffffff;
+                    y: (parent.height - self.height) / 2;
+                    enabled: wifi_icon == @image-url("../../icons/wifi-init.svg") ? false : true;
+                    clicked => {
+                        dialog = DialogType.WifiUI;
+                    }
+                }
+
+                VLine {
+                    thickness: 1px;
+                    left-padding-multiplier: 0.05;
+                    right-padding-multiplier: self.left-padding-multiplier;
+                }
+
+                IconButton {
+                    icon: @image-url("../../icons/brightness.svg");
+                    border-radius: radius;
+                    height: bar_button_height;
+                    width: self.height;
+                    padding-value: bar_icon_button_padding;
+                    background-color: dialog == DialogType.Brightness ? #000000 : #ffffff;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        set_brightness_sliders_levels();
+                        dialog = DialogType.Brightness;
+                    }
+                }
+
+                VLine {
+                    thickness: 1px;
+                    left-padding-multiplier: 0.05;
+                    right-padding-multiplier: self.left-padding-multiplier;
+                }
+
+                IconButton {
+                    icon: @image-url("../../icons/power.svg");
+                    border-radius: radius;
+                    height: bar_button_height;
+                    width: self.height;
+                    padding-value: bar_icon_button_padding;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        power_off();
+                    }
+                }
+            }
+            if (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HLine {
+                top-padding-multiplier: page == Page.QuillBoot ? 0.5 : 1;
+            }
 
             if (page == Page.QuillBoot): VerticalLayout {
                 padding: layout_padding;
@@ -221,36 +299,20 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                Rectangle {
-                    vertical-stretch: 0.17;
-                }
-
-                HorizontalLayout {
-                    alignment: center;
-                    Button {
-                        text: "Power off";
-                        width: button_width;
-                        height: button_height;
-                        border-radius: radius;
-                        font-family: header_font_family;
-                        clicked => {
-                            root.power_off();
-                        }
-                    }
-                }
-
                 Rectangle { }
 
                 HorizontalLayout {
-                    Button {
-                        text: "About";
-                        width: button_width;
-                        height: button_height;
-                        border-radius: radius;
-                        font-family: header_font_family;
-                        clicked => {
-                            section_header_title = "About";
-                            root.page = Page.VersionInfo;
+                    VerticalLayout {
+                        alignment: center;
+                        IconButton {
+                            icon: @image-url("../../icons/info.svg");
+                            height: switch_height;
+                            width: self.height;
+                            border-radius: radius;
+                            clicked => {
+                                section_header_title = "About";
+                                root.page = Page.VersionInfo;
+                            }
                         }
                     }
 
@@ -274,27 +336,6 @@ export component AppWindow inherits Window {
                         activated: scaling_factor > 1 ? true : false;
                         toggled => {
                             root.toggle_ui_scale();
-                        }
-                    }
-
-                    VLine {
-                        left-padding-multiplier: 5.0;
-                        right-padding-multiplier: self.left-padding-multiplier * 1 / 2;
-                    }
-
-                    IconButton {
-                        icon: wifi_icon;
-                        border-radius: radius;
-                        height: button_height;
-                        width: self.height;
-                        padding-value: 15px;
-                        y: (parent.height - self.height) / 2;
-                        clicked => {
-                            if dialog == DialogType.WifiUI {
-                                dialog = DialogType.None;
-                            } else {
-                                dialog = DialogType.WifiUI;
-                            }
                         }
                     }
                 }
@@ -916,7 +957,7 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiLogs && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword && dialog != DialogType.Brightness): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;
         height: 0.3 * scaling_factor * root.height;
@@ -942,8 +983,8 @@ export component AppWindow inherits Window {
         background: white;
         width: (scaling_factor == 1 && TextInputInterface.text-input-focused) ? 0.55 * scaling_factor * root.width : 0.45 * scaling_factor * root.width;
         height: (scaling_factor > 1 && TextInputInterface.text-input-focused) ? 0.3 * scaling_factor * root.height : scaling_factor > 1 ? 0.4 * scaling_factor * root.height : 0.45 * root.height;
-        x: (scaling_factor > 1 || TextInputInterface.text-input-focused) ? (root.width - self.width) / 2 : root.width - self.width - 60px;
-        y: (scaling_factor > 1 && !TextInputInterface.text-input-focused) ? (root.height - self.height) / 2 : TextInputInterface.text-input-focused ? root.height - self.height - (keyboard_key_height * 4.15) - 100px : root.height - self.height - 165px;
+        x: (scaling_factor > 1 || TextInputInterface.text-input-focused) ? (root.width - self.width) / 2 : root.width - self.width - layout_padding;
+        y: (scaling_factor > 1 && !TextInputInterface.text-input-focused) ? (root.height - self.height) / 2 : TextInputInterface.text-input-focused ? root.height - self.height - approx_keyboard_height - space_between_keyboard_and_widget : approx_bar_height;
         TouchArea {
             width: parent.width;
             height: parent.height;
@@ -968,6 +1009,7 @@ export component AppWindow inherits Window {
                     height: button_height * 0.65;
                     width: self.height;
                     y: (parent.height - self.height) / 2;
+                    padding-value: bar_icon_button_padding * 0.2;
                     visible: wifi_enabled && !wifi_disabling_lock;
                     enabled: !wifi_scanning_lock && !wifi_connecting_lock;
                     clicked => {
@@ -1232,12 +1274,13 @@ export component AppWindow inherits Window {
         width: scaling_factor > 1 ? root.width * 0.65 : root.width * 0.45;
         height: scaling_factor > 1 ? root.height * 0.5 : root.height * 0.4;
         x: (root.width - self.width) / 2;
-        y: root.height - self.height - (keyboard_key_height * 4.15) - 100px;
+        y: root.height - self.height - approx_keyboard_height - space_between_keyboard_and_widget;
         TouchArea {
             width: parent.width;
             height: parent.height;
             enabled: true;
         }
+
         VerticalLayout {
             padding: layout_padding;
             HorizontalLayout {
@@ -1374,17 +1417,81 @@ export component AppWindow inherits Window {
                         } else if dialog == DialogType.EncryptionConfirmPassword {
                             dialog_message = "Disabling encrypted storage"
                         }
-
                         if dialog == DialogType.EncryptionChangePassword {
                             change_encrypted_storage_password(selected_encryption_user.name, encryption-current-password-edit.text, encryption-new-password-edit.text);
                         } else if dialog == DialogType.EncryptionConfirmPassword {
                             toggle_storage_encryption_status(selected_encryption_user.name, encryption-current-password-edit.text);
                         }
-
                         sticky_toast = true;
                         dialog = DialogType.Toast;
                     }
                     TextInputInterface.text-input-focused = false;
+                }
+            }
+        }
+    }
+    // Brightness dialog
+    if (dialog == DialogType.Brightness): Rectangle {
+        border-width: dialog_rectangle_thickness;
+        border-color: black;
+        border-radius: radius;
+        background: white;
+        width: root.width * 0.5;
+        height: layout_padding + 2 * icon_button_height + layout_spacing * 2 + layout_padding;
+        x: scaling_factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - layout_padding;
+        y: scaling_factor > 1 ? (root.height - self.height) / 2 : approx_bar_height;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: true;
+        }
+
+        VerticalLayout {
+            padding: layout_padding;
+            spacing: layout_spacing * 2;
+            HorizontalLayout {
+                spacing: layout_spacing * 2;
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../icons/brightness.svg");
+                        width: icon_button_height;
+                        height: self.width;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Slider {
+                        height: slider_height;
+                        value: cool_brightness;
+                        changed(value) => {
+                            change_cool_brightness(value);
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: layout_spacing * 2;
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../icons/moon.svg");
+                        width: icon_button_height;
+                        height: self.width;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Slider {
+                        height: slider_height;
+                        value: warm_brightness;
+                        changed(value) => {
+                            change_warm_brightness(value);
+                        }
+                    }
                 }
             }
         }

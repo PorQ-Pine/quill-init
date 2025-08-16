@@ -374,3 +374,12 @@ pub fn enforce_fb() -> Result<()> {
 
     Ok(())
 }
+
+pub fn sync_time() -> Result<()> {
+    // This function assumes a working Internet connection
+    info!("Syncing time");
+    run_command("/bin/busybox", &["ntpd", "-q", "-n", "-p", "pool.ntp.org"])?;
+    run_command("/sbin/hwclock", &["--systohc"])?;
+
+    Ok(())
+}
