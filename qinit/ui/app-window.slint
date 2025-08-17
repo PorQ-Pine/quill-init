@@ -230,7 +230,7 @@ export component AppWindow inherits Window {
                     width: self.height;
                     padding-value: bar_icon_button_padding * 0.4;
                     background-color: dialog == DialogType.BatteryStatus ? #000000 : #ffffff;
-                    y: (parent.height - self.height) /2;
+                    y: (parent.height - self.height) / 2;
                     clicked => {
                         dialog = DialogType.BatteryStatus;
                     }
@@ -1545,7 +1545,9 @@ export component AppWindow inherits Window {
                     font-weight: 800;
                     vertical-alignment: center;
                 }
+
                 Rectangle { }
+
                 Text {
                     text: charger_plugged_in ? "Charging" : "Discharging";
                     font-family: regular_font_family;
@@ -1553,6 +1555,7 @@ export component AppWindow inherits Window {
                     vertical-alignment: center;
                 }
             }
+
             HorizontalLayout {
                 Text {
                     text: "Charge level";
@@ -1561,7 +1564,9 @@ export component AppWindow inherits Window {
                     font-weight: 800;
                     vertical-alignment: center;
                 }
+
                 Rectangle { }
+
                 Text {
                     text: "\{battery_level} %";
                     font-family: regular_font_family;

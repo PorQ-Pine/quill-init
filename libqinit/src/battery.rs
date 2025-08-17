@@ -15,7 +15,12 @@ pub enum BatteryState {
 }
 
 pub fn generate_svg_from_level(level: i32) -> String {
-    return format!("{}{}{}", &BATTERY_BASE_B, level * MAX_BAR_WIDTH / 100, &BATTERY_BASE_E);
+    return format!(
+        "{}{}{}",
+        &BATTERY_BASE_B,
+        level * MAX_BAR_WIDTH / 100,
+        &BATTERY_BASE_E
+    );
 }
 
 pub fn get_level() -> Result<i32> {

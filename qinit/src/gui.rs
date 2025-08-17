@@ -3,6 +3,8 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+use chrono::prelude::*;
+use libqinit::battery;
 use libqinit::boot_config::BootConfig;
 use libqinit::brightness;
 use libqinit::recovery::soft_reset;
@@ -12,12 +14,10 @@ use libqinit::system::{
     read_kernel_buffer_singleshot, reboot,
 };
 use libqinit::wifi;
-use libqinit::battery;
 use log::{error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
 use std::{fs, thread};
-use chrono::prelude::*;
 slint::include_modules!();
 
 pub const TOAST_DURATION_MILLIS: i32 = 5000;
@@ -178,15 +178,21 @@ pub fn setup_gui(
 
     // Time display timer
     let time_display_timer = Timer::default();
-    time_display_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(500), {
-        let gui_weak = gui_weak.clone();
-        move || {
-            if let Some(gui) = gui_weak.upgrade() {
-                let current_time: DateTime<Local> = Local::now();
-                gui.set_current_time(SharedString::from(current_time.format("%H : %M").to_string()));
+    time_display_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(500),
+        {
+            let gui_weak = gui_weak.clone();
+            move || {
+                if let Some(gui) = gui_weak.upgrade() {
+                    let current_time: DateTime<Local> = Local::now();
+                    gui.set_current_time(SharedString::from(
+                        current_time.format("%H : %M").to_string(),
+                    ));
+                }
             }
-        }
-    });
+        },
+    );
 
     // Fatal errors
     let interrupt_timer = Timer::default();
@@ -723,64 +729,89 @@ pub fn setup_gui(
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 // Assuming this will not fail. Otherwise, there would probably be something really wrong with the device...
-                gui.set_cool_brightness(brightness::get_brightness(&brightness::Mode::Cool).unwrap() * 100 / brightness::MAX_BRIGHTNESS);
-                gui.set_warm_brightness(brightness::get_brightness(&brightness::Mode::Warm).unwrap() * 100 / brightness::MAX_BRIGHTNESS);
+                gui.set_cool_brightness(
+                    brightness::get_brightness(&brightness::Mode::Cool).unwrap() * 100
+                        / brightness::MAX_BRIGHTNESS,
+                );
+                gui.set_warm_brightness(
+                    brightness::get_brightness(&brightness::Mode::Warm).unwrap() * 100
+                        / brightness::MAX_BRIGHTNESS,
+                );
             }
         }
     });
 
     gui.on_change_cool_brightness({
         move |value| {
-            let _ = brightness::set_brightness_(value * brightness::MAX_BRIGHTNESS / 100, &brightness::Mode::Cool);
+            let _ = brightness::set_brightness_(
+                value * brightness::MAX_BRIGHTNESS / 100,
+                &brightness::Mode::Cool,
+            );
         }
     });
 
     gui.on_change_warm_brightness({
         move |value| {
-            let _ = brightness::set_brightness_(value * brightness::MAX_BRIGHTNESS / 100, &brightness::Mode::Warm);
+            let _ = brightness::set_brightness_(
+                value * brightness::MAX_BRIGHTNESS / 100,
+                &brightness::Mode::Warm,
+            );
         }
     });
 
     // Battery status timer
     let battery_status_timer = Timer::default();
-    battery_status_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(100), {
-        let gui_weak = gui_weak.clone();
-        let mut current_level: i32 = -1;
-        let mut current_plug_status = false;
-        move || {
-            if let Ok(new_level) = battery::get_level() {
-                if let Some(gui) = gui_weak.upgrade() {
-                    gui.set_battery_level(new_level);
-                    if let Ok(charger_plugged_in) = battery::charger_plugged_in() {
-                        let new_plug_status = charger_plugged_in;
-                        if charger_plugged_in {
-                            gui.set_charger_plugged_in(new_plug_status);
-                            if new_plug_status != current_plug_status {
-                                if let Ok(icon) = Image::load_from_svg_data(include_bytes!("../../icons/battery-charging.svg")) {
-                                    info!("Setting 'Charging' battery icon");
-                                    gui.set_battery_icon(icon);
+    battery_status_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(100),
+        {
+            let gui_weak = gui_weak.clone();
+            let mut current_level: i32 = -1;
+            let mut current_plug_status = false;
+            move || {
+                if let Ok(new_level) = battery::get_level() {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        gui.set_battery_level(new_level);
+                        if let Ok(charger_plugged_in) = battery::charger_plugged_in() {
+                            let new_plug_status = charger_plugged_in;
+                            if charger_plugged_in {
+                                gui.set_charger_plugged_in(new_plug_status);
+                                if new_plug_status != current_plug_status {
+                                    if let Ok(icon) = Image::load_from_svg_data(include_bytes!(
+                                        "../../icons/battery-charging.svg"
+                                    )) {
+                                        info!("Setting 'Charging' battery icon");
+                                        gui.set_battery_icon(icon);
+                                    }
+                                }
+                            } else {
+                                gui.set_charger_plugged_in(new_plug_status);
+                                if current_level != new_level
+                                    || new_plug_status != current_plug_status
+                                {
+                                    if let Ok(icon) = Image::load_from_svg_data(
+                                        battery::generate_svg_from_level(new_level).as_bytes(),
+                                    ) {
+                                        info!(
+                                            "Changing battery icon for charge level {}",
+                                            new_level
+                                        );
+                                        gui.set_battery_icon(icon);
+                                    }
                                 }
                             }
+                            current_level = new_level;
+                            current_plug_status = new_plug_status;
                         } else {
-                            gui.set_charger_plugged_in(new_plug_status);
-                            if current_level != new_level || new_plug_status != current_plug_status {
-                                if let Ok(icon) = Image::load_from_svg_data(battery::generate_svg_from_level(new_level).as_bytes()) {
-                                    info!("Changing battery icon for charge level {}", new_level);
-                                    gui.set_battery_icon(icon);
-                                }
-                            }
+                            error!("Could not get battery status");
                         }
-                        current_level = new_level;
-                        current_plug_status = new_plug_status;
-                    } else {
-                        error!("Could not get battery status");
                     }
+                } else {
+                    error!("Could not get battery level");
                 }
-            } else {
-                error!("Could not get battery level");
             }
-        }
-    });
+        },
+    );
 
     gui.run()?;
 
