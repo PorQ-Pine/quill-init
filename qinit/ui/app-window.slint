@@ -15,7 +15,7 @@ import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-comm
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset, WifiUI, Brightness, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword }
+export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword, Brightness, BatteryStatus }
 export { VirtualKeyboardHandler, KeyModel }
 
 export struct SystemUser {
@@ -69,6 +69,7 @@ export component AppWindow inherits Window {
     in-out property <int> debug_tab_index: 0;
     in-out property <string> section_header_title;
     in-out property <image> wifi_icon: @image-url("../../icons/wifi-init.svg");
+    in-out property <image> battery_icon;
     in-out property <bool> sticky_toast: false;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
@@ -88,6 +89,8 @@ export component AppWindow inherits Window {
     in property <string> current_time;
     in property <int> cool_brightness;
     in property <int> warm_brightness;
+    in property <int> battery_level;
+    in property <bool> charger_plugged_in;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -211,6 +214,25 @@ export component AppWindow inherits Window {
                     clicked => {
                         set_brightness_sliders_levels();
                         dialog = DialogType.Brightness;
+                    }
+                }
+
+                VLine {
+                    thickness: 1px;
+                    left-padding-multiplier: 0.05;
+                    right-padding-multiplier: self.left-padding-multiplier;
+                }
+
+                IconButton {
+                    icon: battery_icon;
+                    border-radius: radius;
+                    height: bar_button_height;
+                    width: self.height;
+                    padding-value: bar_icon_button_padding * 0.4;
+                    background-color: dialog == DialogType.BatteryStatus ? #000000 : #ffffff;
+                    y: (parent.height - self.height) /2;
+                    clicked => {
+                        dialog = DialogType.BatteryStatus;
                     }
                 }
 
@@ -957,7 +979,7 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword && dialog != DialogType.Brightness): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword && dialog != DialogType.Brightness && dialog != DialogType.BatteryStatus): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;
         height: 0.3 * scaling_factor * root.height;
@@ -1492,6 +1514,59 @@ export component AppWindow inherits Window {
                             change_warm_brightness(value);
                         }
                     }
+                }
+            }
+        }
+    }
+    // Battery status dialog
+    if (dialog == DialogType.BatteryStatus): Rectangle {
+        border-width: dialog_rectangle_thickness;
+        border-color: black;
+        border-radius: radius;
+        background: white;
+        width: scaling_factor > 1 ? root.width * 0.65 : root.width * 0.35;
+        height: scaling_factor > 1 ? root.height * 0.15 : root.height * 0.1;
+        x: scaling_factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - layout_padding;
+        y: scaling_factor > 1 ? (root.height - self.height) / 2 : approx_bar_height;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: true;
+        }
+
+        VerticalLayout {
+            padding: layout_padding;
+            spacing: layout_spacing * 2;
+            HorizontalLayout {
+                Text {
+                    text: "Status";
+                    font-family: header_font_family;
+                    font-size: root.default-font-size * dialog_sizes_multiplier * 0.95;
+                    font-weight: 800;
+                    vertical-alignment: center;
+                }
+                Rectangle { }
+                Text {
+                    text: charger_plugged_in ? "Charging" : "Discharging";
+                    font-family: regular_font_family;
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    vertical-alignment: center;
+                }
+            }
+            HorizontalLayout {
+                Text {
+                    text: "Charge level";
+                    font-family: header_font_family;
+                    font-size: root.default-font-size * dialog_sizes_multiplier * 0.95;
+                    font-weight: 800;
+                    vertical-alignment: center;
+                }
+                Rectangle { }
+                Text {
+                    text: "\{battery_level} %";
+                    font-family: regular_font_family;
+                    font-size: root.default-font-size * dialog_sizes_multiplier;
+                    vertical-alignment: center;
                 }
             }
         }

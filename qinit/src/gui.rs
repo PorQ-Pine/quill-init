@@ -12,6 +12,7 @@ use libqinit::system::{
     read_kernel_buffer_singleshot, reboot,
 };
 use libqinit::wifi;
+use libqinit::battery;
 use log::{error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
@@ -737,6 +738,47 @@ pub fn setup_gui(
     gui.on_change_warm_brightness({
         move |value| {
             let _ = brightness::set_brightness_(value * brightness::MAX_BRIGHTNESS / 100, &brightness::Mode::Warm);
+        }
+    });
+
+    // Battery status timer
+    let battery_status_timer = Timer::default();
+    battery_status_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(100), {
+        let gui_weak = gui_weak.clone();
+        let mut current_level: i32 = -1;
+        let mut current_plug_status = false;
+        move || {
+            if let Ok(new_level) = battery::get_level() {
+                if let Some(gui) = gui_weak.upgrade() {
+                    gui.set_battery_level(new_level);
+                    if let Ok(charger_plugged_in) = battery::charger_plugged_in() {
+                        let new_plug_status = charger_plugged_in;
+                        if charger_plugged_in {
+                            gui.set_charger_plugged_in(new_plug_status);
+                            if new_plug_status != current_plug_status {
+                                if let Ok(icon) = Image::load_from_svg_data(include_bytes!("../../icons/battery-charging.svg")) {
+                                    info!("Setting 'Charging' battery icon");
+                                    gui.set_battery_icon(icon);
+                                }
+                            }
+                        } else {
+                            gui.set_charger_plugged_in(new_plug_status);
+                            if current_level != new_level || new_plug_status != current_plug_status {
+                                if let Ok(icon) = Image::load_from_svg_data(battery::generate_svg_from_level(new_level).as_bytes()) {
+                                    info!("Changing battery icon for charge level {}", new_level);
+                                    gui.set_battery_icon(icon);
+                                }
+                            }
+                        }
+                        current_level = new_level;
+                        current_plug_status = new_plug_status;
+                    } else {
+                        error!("Could not get battery status");
+                    }
+                }
+            } else {
+                error!("Could not get battery level");
+            }
         }
     });
 
