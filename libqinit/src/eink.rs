@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use libqinit::system::{modprobe, run_command, start_service};
+use crate::system::{modprobe, run_command, start_service};
 use log::info;
 use std::fs;
 use std::fs::File;
@@ -13,17 +13,17 @@ pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");
     let waveform_path = format!(
         "{}/{}",
-        &libqinit::system::WAVEFORM_DIR_PATH,
+        &crate::system::WAVEFORM_DIR_PATH,
         &WAVEFORM_FILE
     );
     let waveform_customwf_path = format!(
         "{}/{}",
-        &libqinit::system::WAVEFORM_DIR_PATH,
+        &crate::system::WAVEFORM_DIR_PATH,
         &CUSTOMWF_FILE
     );
     let waveform_backup_dir_path = format!(
         "{}/{}",
-        &libqinit::BOOT_PART_MOUNTPOINT,
+        &crate::BOOT_PART_MOUNTPOINT,
         &FIRMWARE_DIR
     );
     let waveform_backup_ebcwbf_path = format!("{}/{}", &waveform_backup_dir_path, &WAVEFORM_FILE);

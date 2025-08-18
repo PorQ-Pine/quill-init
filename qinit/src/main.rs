@@ -31,7 +31,7 @@ cfg_if::cfg_if! {
     } else {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
-                mod eink;
+                use libqinit::eink;
                 use libqinit::system::{mount_base_filesystems, mount_base_partitions, mount_firmware, set_workdir, run_command};
                 use libqinit::rootfs;
                 use libqinit::systemd;

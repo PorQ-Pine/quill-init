@@ -12,6 +12,7 @@ cfg_if::cfg_if! {
         pub mod storage_encryption;
         pub mod brightness;
         pub mod battery;
+        pub mod eink;
     }
 }
 pub mod socket;
