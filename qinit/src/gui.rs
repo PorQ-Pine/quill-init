@@ -7,6 +7,7 @@ use chrono::prelude::*;
 use libqinit::battery;
 use libqinit::boot_config::BootConfig;
 use libqinit::brightness;
+use libqinit::networking;
 use libqinit::recovery::soft_reset;
 use libqinit::storage_encryption;
 use libqinit::system::{
@@ -14,7 +15,7 @@ use libqinit::system::{
     read_kernel_buffer_singleshot, reboot,
 };
 use libqinit::wifi;
-use log::{error, info};
+use log::{debug, error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
 use std::{fs, thread};
@@ -115,10 +116,10 @@ pub fn setup_gui(
                             let _ = set_page_sender.send(Page::BootSplash);
                         }
                         if display_progress_bar {
-                            /* info!(
+                            debug!(
                                 "Setting boot progress bar's value to {} %",
                                 (progress * 100.0) as i32
-                            );*/
+                            );
                             gui.set_boot_progress(progress);
                         }
                         if progress == libqinit::READY_PROGRESS_VALUE {
@@ -346,6 +347,11 @@ pub fn setup_gui(
                             wifi::StatusType::Connected => {
                                 gui.set_wifi_enabled(true);
                                 gui.set_wifi_connected(true);
+                                if let Ok(ip_address) =
+                                    networking::get_if_ip_address(&wifi::WIFI_IF)
+                                {
+                                    gui.set_wifi_ip_address(SharedString::from(&ip_address));
+                                }
                                 gui.set_wifi_icon(wifi_connected_icon.to_owned());
                             }
                             wifi::StatusType::Error => {

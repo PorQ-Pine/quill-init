@@ -1,5 +1,5 @@
-use anyhow::{Context, Result};
 use crate::system::{modprobe, run_command, start_service};
+use anyhow::{Context, Result};
 use log::info;
 use std::fs;
 use std::fs::File;
@@ -11,21 +11,10 @@ const FIRMWARE_DIR: &str = "firmware/";
 
 pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");
-    let waveform_path = format!(
-        "{}/{}",
-        &crate::system::WAVEFORM_DIR_PATH,
-        &WAVEFORM_FILE
-    );
-    let waveform_customwf_path = format!(
-        "{}/{}",
-        &crate::system::WAVEFORM_DIR_PATH,
-        &CUSTOMWF_FILE
-    );
-    let waveform_backup_dir_path = format!(
-        "{}/{}",
-        &crate::BOOT_PART_MOUNTPOINT,
-        &FIRMWARE_DIR
-    );
+    let waveform_path = format!("{}/{}", &crate::system::WAVEFORM_DIR_PATH, &WAVEFORM_FILE);
+    let waveform_customwf_path =
+        format!("{}/{}", &crate::system::WAVEFORM_DIR_PATH, &CUSTOMWF_FILE);
+    let waveform_backup_dir_path = format!("{}/{}", &crate::BOOT_PART_MOUNTPOINT, &FIRMWARE_DIR);
     let waveform_backup_ebcwbf_path = format!("{}/{}", &waveform_backup_dir_path, &WAVEFORM_FILE);
     let waveform_backup_customwf_path = format!("{}/{}", &waveform_backup_dir_path, &CUSTOMWF_FILE);
 

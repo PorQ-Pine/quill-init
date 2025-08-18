@@ -13,6 +13,7 @@ cfg_if::cfg_if! {
         pub mod brightness;
         pub mod battery;
         pub mod eink;
+        pub mod networking;
     }
 }
 pub mod socket;

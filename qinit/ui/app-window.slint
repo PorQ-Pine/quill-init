@@ -81,6 +81,7 @@ export component AppWindow inherits Window {
     in property <bool> wifi_enabling_lock;
     in property <bool> wifi_disabling_lock;
     in property <string> wifi_connected_name;
+    in property <string> wifi_ip_address;
     in-out property <string> potential_wifi_network;
     in property <[string]> wifi_network_names;
     in property <[bool]> wifi_network_open_vec;
@@ -490,7 +491,7 @@ export component AppWindow inherits Window {
                     }
 
                     SectionButton {
-                        text: "Boot configuration";
+                        text: "System & boot configuration";
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
@@ -549,10 +550,10 @@ export component AppWindow inherits Window {
                     VerticalLayout {
                         spacing: layout_spacing;
                         padding-top: layout_spacing;
-                        padding-bottom: layout_spacing;
+                        padding-bottom: self.padding-top;
                         HorizontalLayout {
                             padding-left: layout_padding;
-                            padding-right: layout_padding;
+                            padding-right: self.padding-left;
                             Rectangle {
                                 Text {
                                     text: "Persistent root filesystem";
@@ -1126,7 +1127,10 @@ export component AppWindow inherits Window {
                         ]
 
                         clicked => {
-                            if wifi_network_open_vec[index] {
+                            if name == wifi_connected_name {
+                                dialog_message = "IP address: \{wifi_ip_address}";
+                                dialog = DialogType.Toast;
+                            } else if wifi_network_open_vec[index] {
                                 connect_to_wifi_network(name, "");
                             } else {
                                 potential_wifi_network = name;

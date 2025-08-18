@@ -6,8 +6,9 @@ use std::fs;
 use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender};
 
+pub const WIFI_IF: &str = "wlan0";
+
 const WIFI_MODULE: &str = "brcmfmac_wcc";
-const WIFI_IF: &str = "wlan0";
 const IWCTL_PATH: &str = "/usr/bin/iwctl";
 const IWD_SERVICE: &str = "iwd";
 const MAX_SCAN_RETRIES: i32 = 30;
