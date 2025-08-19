@@ -388,7 +388,8 @@ pub fn sync_time() -> Result<()> {
 pub fn set_timezone(timezone: &str) -> Result<()> {
     let timezone_data = format!("/usr/share/zoneinfo/{}", &timezone);
     if fs::exists(&&timezone_data)? {
-        symlink(&timezone_data, "/etc/localtime").with_context(|| "Failed to symlink timezone data to /etc/localtime")?;
+        symlink(&timezone_data, "/etc/localtime")
+            .with_context(|| "Failed to symlink timezone data to /etc/localtime")?;
         info!("Setting timezone to '{}'", &timezone);
     } else {
         info!("Setting timezone to 'UTC'")

@@ -2,7 +2,7 @@ import { ProgressBar } from "../../ui-common/progressbar.slint";
 import { Button } from "../../ui-common/button.slint";
 import { IconButton } from "../../ui-common/iconbutton.slint";
 import { Switch } from "../../ui-common/switch.slint";
-import { ScrollView, TabWidget, TextEdit } from "std-widgets.slint";
+import { ScrollView, TabWidget, TextEdit, HorizontalBox } from "std-widgets.slint";
 import { MovingDots } from "../../ui-common/moving-dots.slint";
 import { HLine } from "../../ui-common/hline.slint";
 import { VLine } from "../../ui-common/vline.slint";
@@ -12,7 +12,7 @@ import { LineEdit } from "../../ui-common/lineedit.slint";
 import { Slider } from "../../ui-common/slider.slint";
 import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, Error }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword, Brightness, BatteryStatus }
@@ -92,6 +92,7 @@ export component AppWindow inherits Window {
     in property <int> warm_brightness;
     in property <int> battery_level;
     in property <bool> charger_plugged_in;
+    in property <string> default_user: "";
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -137,7 +138,7 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: layout_padding;
             spacing: layout_spacing;
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HorizontalLayout {
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.Error): HorizontalLayout {
                 IconButton {
                     icon: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -255,7 +256,7 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if (page != Page.BootSplash) && (page != Page.None) && (page != Page.Error): HLine {
+            if (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.Error): HLine {
                 top-padding-multiplier: page == Page.QuillBoot ? 0.5 : 1;
             }
 
@@ -471,6 +472,7 @@ export component AppWindow inherits Window {
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
+                        icon: @image-url("../../icons/recovery.svg");
                         clicked => {
                             section_header_title = self.text;
                             page = Page.RecoveryOptions;
@@ -482,6 +484,7 @@ export component AppWindow inherits Window {
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
+                        icon: @image-url("../../icons/key.svg");
                         clicked => {
                             get_users_using_storage_encryption();
                             section_header_title = self.text;
@@ -495,6 +498,7 @@ export component AppWindow inherits Window {
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
+                        icon: @image-url("../../icons/settings.svg");
                         clicked => {
                             section_header_title = self.text;
                             page = Page.BootConfiguration;
@@ -761,9 +765,182 @@ export component AppWindow inherits Window {
                                 }
                             }
 
+                            HLine {
+                                thickness: 1px;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: layout_padding * dialog_sizes_multiplier;
+                                padding-right: self.padding-left;
+                                Text {
+                                    text: "Default user";
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle {
+                                    width: 50px;
+                                }
+
+                                Text {
+                                    text: default_user == selected_encryption_user.name ? "Yes" : "No";
+                                    font-family: console_font_family;
+                                    font-size: console_body_font_size;
+                                    wrap: char-wrap;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: right;
+                                }
+                            }
+
                             Rectangle { }
                         }
                     }
+                }
+            }
+
+            if (page == Page.UserLogin): VerticalLayout {
+                alignment: center;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../../branding/quillos.svg");
+                        width: root.width * 0.3;
+                        height: self.width;
+                    }
+                }
+
+                Rectangle {
+                    height: root.height * 0.05;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    IconButton {
+                        icon: @image-url("../../icons/recovery-alt.svg");
+                        border-radius: radius;
+                        height: button_height;
+                        width: self.height;
+                        y: (parent.height - self.height) / 2;
+                        padding-value: bar_icon_button_padding * 0.2;
+                        clicked => {
+                            TextInputInterface.text-input-focused = false;
+                            page = Page.QuillBoot;
+                        }
+                    }
+
+                    Rectangle {
+                        width: root.width * 0.0425;
+                    }
+
+                    VerticalLayout {
+                        spacing: layout_spacing * 2.5;
+                        HorizontalLayout {
+                            alignment: center;
+                            login-user-edit := LineEdit {
+                                default-height: root.height * 0.035;
+                                width: scaling_factor > 1 ? root.width * 0.6 : root.width * 0.35;
+                                scaling-factor: scaling_factor;
+                                border-radius: radius;
+                                placeholder-text: "Username";
+                                text: default_user;
+                                font-size: root.default-font-size * dialog_sizes_multiplier;
+                                input-type: text;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            login-password-edit := LineEdit {
+                                default-height: root.height * 0.035;
+                                width: scaling_factor > 1 ? root.width * 0.6 : root.width * 0.35;
+                                scaling-factor: scaling_factor;
+                                border-radius: radius;
+                                placeholder-text: "Password";
+                                font-size: root.default-font-size * dialog_sizes_multiplier;
+                                input-type: password;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: root.width * 0.035;
+                    }
+
+                    IconButton {
+                        icon: @image-url("../../icons/login.svg");
+                        border-radius: radius;
+                        height: button_height;
+                        width: self.height;
+                        y: (parent.height - self.height) / 2;
+                        padding-value: bar_icon_button_padding * 0.2;
+                        enabled: !login-user-edit.text.is-empty && !login-password-edit.text.is-empty;
+                    }
+                }
+
+                Rectangle {
+                    height: root.height * 0.02;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        width: scaling_factor > 1 ? root.width * 0.6 : root.width * 0.35;
+                        Text {
+                            font-family: regular_font_family;
+                            text: "Show password";
+                            font-size: root.default-font-size * dialog_sizes_multiplier;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle { }
+
+                        Switch {
+                            y: (parent.height - self.height) / 2;
+                            width: switch_width * dialog_sizes_multiplier;
+                            height: switch_height * dialog_sizes_multiplier;
+                            border-radius: radius;
+                            activated: login-password-edit.input-type == InputType.text ? true : false;
+                            toggled => {
+                                if (login-password-edit.input-type == InputType.password) {
+                                    login-password-edit.input-type = InputType.text;
+                                } else {
+                                    login-password-edit.input-type = InputType.password;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: root.height * 0.01;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        width: scaling_factor > 1 ? root.width * 0.6 : root.width * 0.35;
+                        Text {
+                            font-family: regular_font_family;
+                            text: "Scale GUI";
+                            font-size: root.default-font-size * dialog_sizes_multiplier;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle { }
+
+                        Switch {
+                            y: (parent.height - self.height) / 2;
+                            width: switch_width * dialog_sizes_multiplier;
+                            height: switch_height * dialog_sizes_multiplier;
+                            border-radius: radius;
+                            activated: scaling_factor > 1 ? true : false;
+                            toggled => {
+                                root.toggle_ui_scale();
+                            }
+                        }
+                    }
+                }
+                if (TextInputInterface.text-input-focused): Rectangle {
+                    height: root.height * 0.25;
                 }
             }
 

@@ -19,6 +19,7 @@ pub struct RootFS {
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct System {
+    pub default_user: Option<String>,
     pub timezone: String,
 }
 

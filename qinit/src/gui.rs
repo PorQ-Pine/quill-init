@@ -41,6 +41,19 @@ pub fn setup_gui(
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
 
+    // Boot configuration
+    let boot_config_mutex = boot_config_mutex.clone();
+    let boot_config_guard = boot_config_mutex.lock().unwrap();
+
+    let default_user = boot_config_guard.system.default_user.clone();
+    if let Some(default_user) = default_user.clone() {
+        info!(
+            "Found default user in boot configuration: '{}'",
+            &default_user
+        );
+        gui.set_default_user(SharedString::from(&default_user));
+    }
+
     // Channels
     let (set_page_sender, set_page_receiver): (Sender<Page>, Receiver<Page>) = channel();
     let (wifi_status_sender, wifi_status_receiver): (Sender<wifi::Status>, Receiver<wifi::Status>) =
@@ -89,16 +102,11 @@ pub fn setup_gui(
         gui.set_version_string(SharedString::from(version_string));
     } else {
         // Trigger normal boot automatically
-        boot_sender.send(BootCommand::NormalBoot)?;
+        boot_normal(&boot_sender, &set_page_sender, &default_user)?;
     }
 
     // Activating switches if needed
-    {
-        let boot_config_mutex = boot_config_mutex.clone();
-        let boot_config_guard = boot_config_mutex.lock().unwrap();
-
-        gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
-    }
+    gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
 
     // Boot progress bar timer
     let progress_timer = Timer::default();
@@ -248,7 +256,7 @@ pub fn setup_gui(
                         let mut lines_to_keep_qr = 100;
                         let mut compressed_size = 0;
                         let mut compressed_data = vec![];
-                        // Yes, it is very specific: one byte more, and the QR code seems to shrink
+                        // Yes, it is very specific: one more byte, and the QR code seems to shrink
                         let ideal_size = 2563;
                         info!("Attempting to optimize QR code data");
                         loop {
@@ -511,9 +519,10 @@ pub fn setup_gui(
     // System command
     gui.on_boot_default({
         let boot_sender = boot_sender.clone();
+        let set_page_sender = set_page_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = boot_sender.send(BootCommand::NormalBoot) {
+            if let Err(e) = boot_normal(&boot_sender, &set_page_sender, &default_user) {
                 if let Some(gui) = gui_weak.upgrade() {
                     error_toast(&gui, "Failed to send boot command", e.into());
                 }
@@ -526,6 +535,7 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
+                // Can be blocking because these operations should be relatively fast
                 if let Err(e) = soft_reset() {
                     error_toast(&gui, "Failed to soft-reset", e.into());
                 }
@@ -836,4 +846,25 @@ fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
     gui.set_dialog_message(SharedString::from(message));
     gui.set_dialog(DialogType::Toast);
     error!("{}: {}", &message, e);
+}
+
+fn boot_normal(
+    boot_sender: &Sender<BootCommand>,
+    set_page_sender: &Sender<Page>,
+    default_user: &Option<String>,
+) -> Result<()> {
+    let encryption_users = storage_encryption::get_users_using_storage_encryption()?;
+    if let Some(default_user) = default_user {
+        if !encryption_users.contains(&default_user) {
+            boot_sender.send(BootCommand::NormalBoot)?;
+        } else {
+            set_page_sender.send(Page::UserLogin)?;
+        }
+    } else if encryption_users.is_empty() {
+        boot_sender.send(BootCommand::NormalBoot)?;
+    } else {
+        set_page_sender.send(Page::UserLogin)?;
+    }
+
+    Ok(())
 }

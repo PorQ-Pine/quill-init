@@ -4,7 +4,7 @@ export component LineEdit inherits Rectangle {
     in property <string> placeholder-text <=> edit.placeholder-text;
     in property <InputType> input-type <=> edit.input-type;
     in property <length> font-size <=> edit.font-size;
-    out property <string> text <=> edit.text;
+    in-out property <string> text <=> edit.text;
     in property <length> default-height;
     in property <int> scaling-factor;
 
