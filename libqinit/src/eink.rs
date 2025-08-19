@@ -7,7 +7,7 @@ use std::fs::File;
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";
 const CUSTOMWF_FILE: &str = "custom_wf.bin";
-const FIRMWARE_DIR: &str = "firmware/";
+const FIRMWARE_DIR: &str = "waveform/";
 
 pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");

@@ -32,7 +32,7 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
                 use libqinit::eink;
-                use libqinit::system::{mount_base_filesystems, mount_base_partitions, mount_firmware, set_workdir, run_command};
+                use libqinit::system::{mount_base_filesystems, mount_base_partitions, mount_firmware, set_workdir, run_command, set_timezone};
                 use libqinit::rootfs;
                 use libqinit::systemd;
 
@@ -153,7 +153,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT).with_context(|| "Failed to create default mountpoint's directory")?;
 
                 mount_base_partitions()?;
-                mount_firmware(&pubkey)?;
+                let _ = mount_firmware(&pubkey);
             }
 
             // Read boot configuration
@@ -169,6 +169,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 eink::load_waveform()?;
                 eink::load_modules()?;
                 eink::setup_touchscreen()?;
+
+                set_timezone(&boot_config.system.timezone)?;
 
                 println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", &kernel_version, &kernel_commit);
                 print!("(initrd) Hit any key to stop auto-boot ... ");

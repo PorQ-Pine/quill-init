@@ -7,6 +7,7 @@ use regex::Regex;
 use rmesg;
 use sha256;
 use std::env;
+use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
@@ -130,19 +131,19 @@ pub fn modprobe(args: &[&str]) -> Result<()> {
 }
 
 pub fn mount_base_partitions() -> Result<()> {
-    info!("Mounting data partition");
+    info!("Mounting boot partition");
     fs::create_dir_all(&crate::BOOT_PART_MOUNTPOINT)
-        .with_context(|| "Failed to create data partition mountpoint's directory")?;
+        .with_context(|| "Failed to create boot partition mountpoint's directory")?;
     wait_for_path(&crate::BOOT_PART)?;
     Mount::builder()
         .fstype("ext4")
         .data("rw")
         .mount(&crate::BOOT_PART, &crate::BOOT_PART_MOUNTPOINT)
-        .with_context(|| "Failed to mount data partition")?;
+        .with_context(|| "Failed to mount boot partition")?;
 
     info!("Mounting main partition");
     fs::create_dir_all(&crate::MAIN_PART_MOUNTPOINT)
-        .with_context(|| "Failed to create main partition mountpoint's directory")?;
+        .with_context(|| "Failed to create boot partition mountpoint's directory")?;
     wait_for_path(&crate::MAIN_PART)?;
     Mount::builder()
         .fstype("ext4")
@@ -380,6 +381,19 @@ pub fn sync_time() -> Result<()> {
     info!("Syncing time");
     run_command("/bin/busybox", &["ntpd", "-q", "-n", "-p", "pool.ntp.org"])?;
     run_command("/sbin/hwclock", &["--systohc"])?;
+
+    Ok(())
+}
+
+pub fn set_timezone(timezone: &str) -> Result<()> {
+    let timezone_data = format!("/usr/share/zoneinfo/{}", &timezone);
+    if fs::exists(&&timezone_data)? {
+        symlink(&timezone_data, "/etc/localtime").with_context(|| "Failed to symlink timezone data to /etc/localtime")?;
+        info!("Setting timezone to '{}'", &timezone);
+    } else {
+        info!("Setting timezone to 'UTC'")
+    }
+    // If nothing is symlinked, the OS will just default to the UTC timezone
 
     Ok(())
 }

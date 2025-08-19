@@ -17,6 +17,11 @@ pub struct RootFS {
     pub persistent_storage: bool,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
+pub struct System {
+    pub timezone: String,
+}
+
 #[cfg(feature = "debug")]
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Debug {
@@ -28,6 +33,7 @@ pub struct Debug {
 pub struct BootConfig {
     pub flags: BootFlags,
     pub rootfs: RootFS,
+    pub system: System,
     #[cfg(feature = "debug")]
     pub debug: Debug,
 }
@@ -40,6 +46,8 @@ impl BootConfig {
         boot_config.flags.first_boot_done = false;
         // Root filesystem
         boot_config.rootfs.persistent_storage = false;
+        // Timezone (default to UTC)
+        boot_config.system.timezone = "UTC".to_string();
 
         return boot_config;
     }
