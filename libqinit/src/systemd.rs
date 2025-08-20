@@ -57,22 +57,27 @@ pub fn get_targets_total(boot_config: &mut BootConfig) -> Result<Option<i32>> {
         &crate::SYSTEM_DIR,
         &crate::ROOTFS_FILE
     );
-    let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)
-        .with_context(|| "Failed to retrieve root filesystem SquashFS archive's metadata")?
-        .mtime();
-    if current_rootfs_timestamp == boot_config.rootfs.timestamp {
-        if let Some(systemd_targets_total) = boot_config.rootfs.systemd_targets_total {
-            info!("Displaying boot progress bar");
-            return Ok(Some(systemd_targets_total));
+    if fs::exists(&rootfs_file_path)? {
+        let current_rootfs_timestamp = fs::metadata(&rootfs_file_path)
+            .with_context(|| "Failed to retrieve root filesystem SquashFS archive's metadata")?
+            .mtime();
+        if current_rootfs_timestamp == boot_config.rootfs.timestamp {
+            if let Some(systemd_targets_total) = boot_config.rootfs.systemd_targets_total {
+                info!("Displaying boot progress bar");
+                return Ok(Some(systemd_targets_total));
+            } else {
+                warn!(
+                    "Could not determine number of systemd targets from boot configuration: not displaying progress bar"
+                );
+                return Ok(None);
+            }
         } else {
-            warn!(
-                "Could not determine number of systemd targets from boot configuration: not displaying progress bar"
-            );
+            boot_config.rootfs.timestamp = current_rootfs_timestamp;
+            info!("Not displaying boot progress bar: number of systemd targets is not yet known");
             return Ok(None);
         }
     } else {
-        boot_config.rootfs.timestamp = current_rootfs_timestamp;
-        info!("Not displaying boot progress bar: number of systemd targets is not yet known");
+        warn!("Could not find root filesystem SquashFS archive");
         return Ok(None);
     }
 }

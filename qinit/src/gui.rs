@@ -42,16 +42,20 @@ pub fn setup_gui(
     let gui_weak = gui.as_weak();
 
     // Boot configuration
-    let boot_config_mutex = boot_config_mutex.clone();
-    let boot_config_guard = boot_config_mutex.lock().unwrap();
+    {
+        let boot_config_mutex = boot_config_mutex.clone();
+        let boot_config_guard = boot_config_mutex.lock().unwrap();
 
-    let default_user = boot_config_guard.system.default_user.clone();
-    if let Some(default_user) = default_user.clone() {
-        info!(
-            "Found default user in boot configuration: '{}'",
-            &default_user
-        );
-        gui.set_default_user(SharedString::from(&default_user));
+        if let Some(default_user) = &boot_config_guard.system.default_user {
+            info!(
+                "Found default user in boot configuration: '{}'",
+                &default_user
+            );
+            gui.set_default_user(SharedString::from(format!("{}", &default_user)));
+        }
+
+        // Activate switches if needed
+        gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
     }
 
     // Channels
@@ -77,6 +81,9 @@ pub fn setup_gui(
                     if gui.get_page() == Page::Error {
                         error!("Denying request: current page is '{:?}'", Page::Error);
                     } else {
+                        if page == Page::UserLogin {
+                            gui.set_login_captive_portal(true);
+                        }
                         gui.set_page(page);
                     }
                 }
@@ -102,11 +109,8 @@ pub fn setup_gui(
         gui.set_version_string(SharedString::from(version_string));
     } else {
         // Trigger normal boot automatically
-        boot_normal(&boot_sender, &set_page_sender, &default_user)?;
+        boot_normal(&boot_sender, &set_page_sender)?;
     }
-
-    // Activating switches if needed
-    gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
 
     // Boot progress bar timer
     let progress_timer = Timer::default();
@@ -120,7 +124,7 @@ pub fn setup_gui(
             move || {
                 if let Ok(progress) = progress_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
-                        if progress == 0.0 {
+                        if progress == 0.0 && !gui.get_login_captive_portal() {
                             let _ = set_page_sender.send(Page::BootSplash);
                         }
                         if display_progress_bar {
@@ -522,7 +526,7 @@ pub fn setup_gui(
         let set_page_sender = set_page_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = boot_normal(&boot_sender, &set_page_sender, &default_user) {
+            if let Err(e) = boot_normal(&boot_sender, &set_page_sender) {
                 if let Some(gui) = gui_weak.upgrade() {
                     error_toast(&gui, "Failed to send boot command", e.into());
                 }
@@ -829,6 +833,22 @@ pub fn setup_gui(
         },
     );
 
+    gui.on_login({
+        let gui_weak = gui_weak.clone();
+        let set_page_sender = set_page_sender.clone();
+        move |username, password| {
+            if let Some(gui) = gui_weak.upgrade() {
+                if let Some(gui) = gui_weak.upgrade() {
+                    if let Err(e) = storage_encryption::mount_storage(&username, &password) {
+                        error_toast(&gui, "Login failed: please try again", e.into());
+                    } else {
+                        let _ = set_page_sender.send(Page::BootSplash);
+                    }
+                }
+        }
+        }
+    });
+
     gui.run()?;
 
     Ok(())
@@ -851,20 +871,12 @@ fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
 fn boot_normal(
     boot_sender: &Sender<BootCommand>,
     set_page_sender: &Sender<Page>,
-    default_user: &Option<String>,
 ) -> Result<()> {
-    let encryption_users = storage_encryption::get_users_using_storage_encryption()?;
-    if let Some(default_user) = default_user {
-        if !encryption_users.contains(&default_user) {
-            boot_sender.send(BootCommand::NormalBoot)?;
-        } else {
-            set_page_sender.send(Page::UserLogin)?;
-        }
-    } else if encryption_users.is_empty() {
-        boot_sender.send(BootCommand::NormalBoot)?;
-    } else {
+    if !storage_encryption::get_users_using_storage_encryption()?.is_empty() {
         set_page_sender.send(Page::UserLogin)?;
     }
+
+    boot_sender.send(BootCommand::NormalBoot)?;
 
     Ok(())
 }

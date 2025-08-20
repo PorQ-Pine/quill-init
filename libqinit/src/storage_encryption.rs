@@ -80,6 +80,28 @@ pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {
     }
 }
 
+pub fn mount_storage(user: &str, password: &str) -> Result<()> {
+    run_command(
+        "/bin/sh",
+        &[
+            "-c",
+            &format!(
+                "printf '{}' | {} -allow_other {}/{}/.{} {}/{}/{}",
+                &password,
+                &GOCRYPTFS_BINARY,
+                &crate::MAIN_PART_MOUNTPOINT,
+                &crate::SYSTEM_HOME_DIR,
+                &user,
+                &crate::MAIN_PART_MOUNTPOINT,
+                &crate::SYSTEM_HOME_DIR,
+                &user
+            ),
+        ],
+    )?;
+
+    Ok(())
+}
+
 pub fn change_password(user: &str, old_password: &str, new_password: &str) -> Result<()> {
     run_command(
         "/bin/sh",
