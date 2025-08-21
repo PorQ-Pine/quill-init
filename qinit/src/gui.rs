@@ -838,12 +838,10 @@ pub fn setup_gui(
         let set_page_sender = set_page_sender.clone();
         move |username, password| {
             if let Some(gui) = gui_weak.upgrade() {
-                if let Some(gui) = gui_weak.upgrade() {
-                    if let Err(e) = storage_encryption::mount_storage(&username, &password) {
-                        error_toast(&gui, "Login failed: please try again", e.into());
-                    } else {
-                        let _ = set_page_sender.send(Page::BootSplash);
-                    }
+                if let Err(e) = storage_encryption::mount_storage(&username, &password) {
+                    error_toast(&gui, "Login failed: please try again", e.into());
+                } else {
+                    let _ = set_page_sender.send(Page::BootSplash);
                 }
             }
         }
