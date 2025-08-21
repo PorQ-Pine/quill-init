@@ -13,6 +13,7 @@ use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
 
 use crate::signing::check_signature;
+use crate::boot_config::BootConfig;
 
 pub const MODULES_DIR_PATH: &str = "/lib/modules";
 pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";
@@ -248,7 +249,7 @@ pub fn reboot() -> Result<()> {
     Ok(())
 }
 
-pub fn generate_version_string(kernel_commit: &str) -> String {
+pub fn generate_version_string(boot_config: &mut BootConfig, kernel_commit: &str) -> String {
     cfg_if::cfg_if! {
         if #[cfg(feature = "free_roam")] {
             let signing_state = "Package signing protection: disabled";
@@ -263,9 +264,17 @@ pub fn generate_version_string(kernel_commit: &str) -> String {
             let debug_state = "Debug mode: disabled";
         }
     }
+
+    let recovery_features_state;
+    if boot_config.system.recovery_features {
+        recovery_features_state = "Recovery features: enabled";
+    } else {
+        recovery_features_state = "Recovery features: disabled";
+    }
+
     let version_string = format!(
-        "Kernel commit: {}\n{}\n{}",
-        &kernel_commit, &signing_state, &debug_state
+        "Kernel commit: {}\n{}\n{}\n{}",
+        &kernel_commit, &recovery_features_state, &signing_state, &debug_state
     );
 
     return version_string;

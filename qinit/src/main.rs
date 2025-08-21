@@ -141,8 +141,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             // Boot info
             let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
             let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
-            let version_string = generate_version_string(&kernel_commit);
-            let short_version_string = generate_short_version_string(&kernel_commit, &kernel_version);
 
             // Decode public key embedded in kernel command line
             let pubkey = read_public_key()?;
@@ -160,6 +158,10 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let original_boot_config = BootConfig::read()?;
             info!("Original boot configuration: {:?}", &original_boot_config);
             let mut boot_config = original_boot_config.clone();
+
+            // Version strings
+            let version_string = generate_version_string(&mut boot_config, &kernel_commit);
+            let short_version_string = generate_short_version_string(&kernel_commit, &kernel_version);
 
             #[cfg(not(feature = "gui_only"))]
             {

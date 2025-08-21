@@ -21,6 +21,8 @@ pub struct RootFS {
 pub struct System {
     pub default_user: Option<String>,
     pub timezone: String,
+    // The following option is always enabled by default. If a user chooses to disable it, the "Recovery options" submenu in the GUI will be hidden
+    pub recovery_features: bool,
 }
 
 #[cfg(feature = "debug")]
@@ -47,8 +49,9 @@ impl BootConfig {
         boot_config.flags.first_boot_done = false;
         // Root filesystem
         boot_config.rootfs.persistent_storage = false;
-        // Timezone (default to UTC)
+        // System
         boot_config.system.timezone = "UTC".to_string();
+        boot_config.system.recovery_features = true;
 
         return boot_config;
     }

@@ -56,6 +56,7 @@ pub fn setup_gui(
 
         // Activate switches if needed
         gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
+        gui.set_recovery_features(boot_config_guard.system.recovery_features);
     }
 
     // Channels

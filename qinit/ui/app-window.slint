@@ -74,6 +74,7 @@ export component AppWindow inherits Window {
     in-out property <bool> sticky_toast: false;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
+    in property <bool> recovery_features;
     // Run-time properties
     in property <bool> wifi_enabled;
     in property <bool> wifi_connected;
@@ -293,7 +294,7 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     Text {
-                        text: "Diagnostics & Recovery";
+                        text: recovery_features ? "Diagnostics & Recovery" : "Diagnostics";
                         font-size: 1rem;
                     }
                 }
@@ -472,7 +473,7 @@ export component AppWindow inherits Window {
                 mouse-drag-pan-enabled: true;
                 VerticalLayout {
                     spacing: layout_spacing;
-                    SectionButton {
+                    if (recovery_features): SectionButton {
                         text: "Recovery options";
                         height: section_button_height;
                         border-radius: radius;
