@@ -1,8 +1,9 @@
 use crate::system::{modprobe, run_command, start_service};
 use anyhow::{Context, Result};
-use log::info;
+use log::{info, warn};
 use std::fs;
 use std::fs::File;
+use std::process::Command;
 
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";
@@ -62,7 +63,15 @@ pub fn backup_waveform_files(
     waveform_backup_dir_path: &str,
     waveform_backup_ebcwbf_path: &str,
 ) -> Result<()> {
-    let waveform = fs::read(&WAVEFORM_PART).with_context(|| "Failed to read waveform")?;
+    let mut waveform = fs::read(&WAVEFORM_PART).with_context(|| "Failed to read waveform")?;
+    if waveform.is_empty() {
+        warn!("Waveform data is empty, trying again with dd");
+        waveform = Command::new("/bin/dd").args(&[&format!("if={}", &WAVEFORM_PART)]).output().with_context(|| "Failed to collect dd output")?.stdout;
+    }
+    if waveform.is_empty() {
+        return Err(anyhow::anyhow!("Failed to read waveform using dd: waveform data is still empty"));
+    }
+
     fs::create_dir_all(&waveform_backup_dir_path)?;
     fs::write(&waveform_backup_ebcwbf_path, &waveform)
         .with_context(|| "Failed to write waveform to file")?;
