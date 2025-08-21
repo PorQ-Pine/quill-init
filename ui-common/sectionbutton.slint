@@ -2,14 +2,16 @@ export component SectionButton inherits TouchArea {
     in property <string> text <=> i-text.text;
     in property <length> border-radius <=> i-container.border-radius;
     in property <string> font-family <=> i-text.font-family;
+    in property <length> font-size <=> i-text.font-size;
     in property <image> icon <=> i-icon.source;
+    in property <float> scaling-factor;
 
     i-container := Rectangle {
         background: #dbdada;
 
-        HorizontalLayout {  
-            padding-left: 27.5px;
-            spacing: 21px;
+        HorizontalLayout {
+            padding-left: scaling-factor > 1 ? 15px : 27.5px;
+            spacing: scaling-factor > 1 ? 5px : 21px;
 
             i-icon := Image {
                 height: parent.height * 0.6;

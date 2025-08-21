@@ -478,6 +478,7 @@ export component AppWindow inherits Window {
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
+                        scaling-factor: scaling_factor;
                         icon: @image-url("../../icons/recovery.svg");
                         clicked => {
                             section_header_title = self.text;
@@ -490,6 +491,7 @@ export component AppWindow inherits Window {
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
+                        scaling-factor: scaling_factor;
                         icon: @image-url("../../icons/key.svg");
                         clicked => {
                             get_users_using_storage_encryption();
@@ -504,6 +506,7 @@ export component AppWindow inherits Window {
                         height: section_button_height;
                         border-radius: radius;
                         font-family: header_font_family;
+                        scaling-factor: scaling_factor;
                         icon: @image-url("../../icons/settings.svg");
                         clicked => {
                             section_header_title = self.text;
