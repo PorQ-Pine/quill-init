@@ -845,7 +845,7 @@ pub fn setup_gui(
                         let _ = set_page_sender.send(Page::BootSplash);
                     }
                 }
-        }
+            }
         }
     });
 
@@ -868,10 +868,7 @@ fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
     error!("{}: {}", &message, e);
 }
 
-fn boot_normal(
-    boot_sender: &Sender<BootCommand>,
-    set_page_sender: &Sender<Page>,
-) -> Result<()> {
+fn boot_normal(boot_sender: &Sender<BootCommand>, set_page_sender: &Sender<Page>) -> Result<()> {
     if !storage_encryption::get_users_using_storage_encryption()?.is_empty() {
         set_page_sender.send(Page::UserLogin)?;
     }

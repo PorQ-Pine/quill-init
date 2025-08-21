@@ -285,9 +285,10 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
-                    systemd::wait_for_targets(systemd_targets_total, progress_sender)?;
+                    systemd::wait_for_targets(&mut boot_config, systemd_targets_total, progress_sender)?;
                 } else {
-                    systemd::wait_and_count_targets(&mut boot_config, progress_sender)?;
+                    // Only runs on first boot or when boot configuration is cleared/corrupted
+                    systemd::wait_and_count_targets(Some(&mut boot_config), Some(progress_sender), None)?;
                 }
 
                 // Wait until systemd startup has completed
