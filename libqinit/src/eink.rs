@@ -1,6 +1,8 @@
+use crate::boot_config::BootConfig;
 use crate::system::{modprobe, run_command, start_service};
 use anyhow::{Context, Result};
 use log::{info, warn};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::File;
 use std::process::Command;
@@ -9,6 +11,21 @@ const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";
 const CUSTOMWF_FILE: &str = "custom_wf.bin";
 const FIRMWARE_DIR: &str = "waveform/";
+
+const UDEV_RULES_PATH: &str = "/etc/udev/rules.d/";
+const LIBINPUT_CW_0: &str = r#"ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1""#;
+const LIBINPUT_CW_90: &str = r#"ENV{LIBINPUT_CALIBRATION_MATRIX}="0 -1 1 1 0 0""#;
+const LIBINPUT_CW_180: &str = r#"ENV{LIBINPUT_CALIBRATION_MATRIX}="1 0 0 0 1 0""#;
+const LIBINPUT_CW_270: &str = r#"ENV{LIBINPUT_CALIBRATION_MATRIX}="0 1 0 -1 0 1""#;
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Default)]
+pub enum ScreenRotation {
+    Cw0,
+    Cw90,
+    Cw180,
+    #[default]
+    Cw270,
+}
 
 pub fn load_waveform() -> Result<()> {
     info!("Loading waveform from MMC");
@@ -53,12 +70,6 @@ pub fn load_modules() -> Result<()> {
     Ok(())
 }
 
-pub fn create_custom_waveform(_waveform_path: &str, _workdir: &str) -> Result<()> {
-    // TODO: Decide what we do with this
-
-    Ok(())
-}
-
 pub fn backup_waveform_files(
     waveform_backup_dir_path: &str,
     waveform_backup_ebcwbf_path: &str,
@@ -66,23 +77,40 @@ pub fn backup_waveform_files(
     let mut waveform = fs::read(&WAVEFORM_PART).with_context(|| "Failed to read waveform")?;
     if waveform.is_empty() {
         warn!("Waveform data is empty, trying again with dd");
-        waveform = Command::new("/bin/dd").args(&[&format!("if={}", &WAVEFORM_PART)]).output().with_context(|| "Failed to collect dd output")?.stdout;
+        waveform = Command::new("/bin/dd")
+            .args(&[&format!("if={}", &WAVEFORM_PART)])
+            .output()
+            .with_context(|| "Failed to collect dd output")?
+            .stdout;
     }
     if waveform.is_empty() {
-        return Err(anyhow::anyhow!("Failed to read waveform using dd: waveform data is still empty"));
+        return Err(anyhow::anyhow!(
+            "Failed to read waveform using dd: waveform data is still empty"
+        ));
     }
 
     fs::create_dir_all(&waveform_backup_dir_path)?;
     fs::write(&waveform_backup_ebcwbf_path, &waveform)
         .with_context(|| "Failed to write waveform to file")?;
-    info!("Creating custom waveform: this could take a while");
-    create_custom_waveform(&waveform_backup_ebcwbf_path, &waveform_backup_dir_path)?;
 
     Ok(())
 }
 
-pub fn setup_touchscreen() -> Result<()> {
+pub fn setup_touchscreen(boot_config: &mut BootConfig) -> Result<()> {
     info!("Setting up touchscreen input");
+
+    fs::create_dir_all(&UDEV_RULES_PATH)?;
+    let libinput_rules_path = format!("{}/libinput.rules", &UDEV_RULES_PATH);
+
+    if boot_config.system.initial_screen_rotation == ScreenRotation::Cw0 {
+        fs::write(&libinput_rules_path, &LIBINPUT_CW_0)?;
+    } else if boot_config.system.initial_screen_rotation == ScreenRotation::Cw90 {
+        fs::write(&libinput_rules_path, &LIBINPUT_CW_90)?;
+    } else if boot_config.system.initial_screen_rotation == ScreenRotation::Cw180 {
+        fs::write(&libinput_rules_path, &LIBINPUT_CW_180)?;
+    } else {
+        fs::write(&libinput_rules_path, &LIBINPUT_CW_270)?;
+    }
 
     run_command("/sbin/openrc", &[])?;
     File::create("/run/openrc/softlevel")?;

@@ -26,13 +26,15 @@ cfg_if::cfg_if! {
         use signal_hook::{iterator::Signals, consts::signal::*};
         use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
         use nix::unistd::Pid;
+        use libqinit::eink::ScreenRotation;
+        use libqinit::system::{mount_base_filesystems, mount_base_partitions};
 
         pub const QINIT_PATH: &str = "/etc/init.d/qinit";
     } else {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
                 use libqinit::eink;
-                use libqinit::system::{mount_base_filesystems, mount_base_partitions, mount_firmware, set_workdir, run_command, set_timezone};
+                use libqinit::system::{mount_firmware, set_workdir, run_command, set_timezone};
                 use libqinit::rootfs;
                 use libqinit::systemd;
 
@@ -47,7 +49,6 @@ cfg_if::cfg_if! {
 
         use libqinit::signing::{read_public_key};
         use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb, power_off, reboot, BootCommand};
-        use libqinit::boot_config::BootConfig;
         use std::time::Duration;
         use std::thread;
         use std::sync::{Arc, Mutex};
@@ -58,6 +59,7 @@ cfg_if::cfg_if! {
 }
 
 use anyhow::{Context, Result};
+use libqinit::boot_config::BootConfig;
 use libqinit::socket;
 use log::{error, info};
 use postcard::{from_bytes, to_allocvec};
@@ -113,9 +115,25 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
             let boot_unix_listener = socket::bind(&BOOT_SOCKET_PATH)?;
 
+            mount_base_filesystems()?;
+            mount_base_partitions()?;
+            let rotation_env_var_base = "SLINT_KMS_ROTATION=";
+            let rotation_env_var;
+            let boot_config = BootConfig::read()?;
+            if boot_config.system.initial_screen_rotation == ScreenRotation::Cw0 {
+                rotation_env_var = format!("{}0", &rotation_env_var_base);
+            } else if boot_config.system.initial_screen_rotation == ScreenRotation::Cw90 {
+                rotation_env_var = format!("{}90", &rotation_env_var_base);
+            } else if boot_config.system.initial_screen_rotation == ScreenRotation::Cw180 {
+                rotation_env_var = format!("{}180", &rotation_env_var_base);
+            } else {
+                rotation_env_var = format!("{}270", &rotation_env_var_base);
+            }
+            first_stage_info(&format!("Initial screen rotation is {:?}", &boot_config.system.initial_screen_rotation));
+
             first_stage_info("Spawning second stage qinit binary");
             fs::create_dir_all(&QINIT_LOG_DIR)?;
-            Command::new("/bin/sh").args(&["-c", &format!("{} 2>&1 | tee -a {}", &QINIT_PATH, &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE))]).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
+            Command::new("/bin/sh").args(&["-c", &format!("env {} {} 2>&1 | tee -a {}", &rotation_env_var, &QINIT_PATH, &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE))]).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
 
             first_stage_info("Waiting for status message from second stage qinit binary");
             let status = from_bytes::<OverlayStatus>(socket::read(boot_unix_listener)?.deref())?;
@@ -133,7 +151,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             info!("(Second stage) qinit binary starting");
             #[cfg(not(feature = "gui_only"))]
             {
-                mount_base_filesystems()?;
                 sethostname("pinenote").with_context(|| "Failed to set device's hostname")?;
                 run_command("/sbin/ifconfig", &["lo", "up"]).with_context(|| "Failed to set loopback network device up")?;
             }
@@ -150,7 +167,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 set_workdir("/").with_context(|| "Failed to set current directory to / (not in chroot)")?;
                 fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT).with_context(|| "Failed to create default mountpoint's directory")?;
 
-                mount_base_partitions()?;
                 let _ = mount_firmware(&pubkey);
             }
 
@@ -170,7 +186,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 eink::load_waveform()?;
                 eink::load_modules()?;
-                eink::setup_touchscreen()?;
+                eink::setup_touchscreen(&mut boot_config)?;
 
                 set_timezone(&boot_config.system.timezone)?;
 

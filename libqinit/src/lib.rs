@@ -2,21 +2,21 @@ use cfg_if;
 
 cfg_if::cfg_if! {
     if #[cfg(not(feature = "init_wrapper"))] {
-        pub mod boot_config;
         pub mod recovery;
         pub mod rootfs;
-        pub mod signing;
-        pub mod system;
         pub mod systemd;
         pub mod wifi;
         pub mod storage_encryption;
         pub mod brightness;
         pub mod battery;
-        pub mod eink;
         pub mod networking;
     }
 }
+pub mod boot_config;
+pub mod eink;
+pub mod signing;
 pub mod socket;
+pub mod system;
 
 pub const BOOT_PART: &str = "/dev/mmcblk0p7";
 pub const MAIN_PART: &str = "/dev/mmcblk0p9";

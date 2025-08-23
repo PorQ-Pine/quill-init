@@ -26,7 +26,7 @@ pub fn read(unix_listener: UnixListener) -> Result<Vec<u8>> {
     info!("Listening on UNIX socket at {:?}", &unix_listener);
     let (mut unix_stream, _socket_address) = unix_listener
         .accept()
-        .with_context(|| " Failed to accept connection on UNIX socket")?;
+        .with_context(|| "Failed to accept connection on UNIX socket")?;
     let mut message_bytes = Vec::new();
     unix_stream
         .read_to_end(&mut message_bytes)

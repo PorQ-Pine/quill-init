@@ -12,8 +12,8 @@ use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
 
-use crate::signing::check_signature;
 use crate::boot_config::BootConfig;
+use crate::signing::check_signature;
 
 pub const MODULES_DIR_PATH: &str = "/lib/modules";
 pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";

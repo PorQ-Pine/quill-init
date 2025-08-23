@@ -1,3 +1,4 @@
+use crate::eink;
 use anyhow::{Context, Result};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ pub struct System {
     pub timezone: String,
     // The following option is always enabled by default. If a user chooses to disable it, the "Recovery options" submenu in the GUI will be hidden
     pub recovery_features: bool,
+    pub initial_screen_rotation: eink::ScreenRotation,
 }
 
 #[cfg(feature = "debug")]
