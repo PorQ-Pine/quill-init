@@ -1,5 +1,7 @@
 export component MinorButton inherits TouchArea {
     in property <string> text <=> i-text.text;
+    in property <string> font-family <=> i-text.font-family;
+    in property <int> font-weight <=> i-text.font-weight;
 
     i-container := Rectangle {
         border-radius: 10px;

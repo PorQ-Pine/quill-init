@@ -1,0 +1,37 @@
+import { MinorButton } from "minorbutton.slint";
+
+export component HList inherits HorizontalLayout {
+    in property <[string]> list;
+    in property <length> button-width;
+    in property <float> scaling-factor;
+    property <int> index;
+    //spacing: 10px;
+    MinorButton {
+        text: "◀";
+        font-family: "Inter";
+        font-weight: 800;
+        width: button-width;
+        enabled: index > 0;
+        clicked => {
+            index = index - 1;
+        }
+    }
+    element := HorizontalLayout {
+        width: 100px * scaling-factor;
+        Text {
+            text: list[index];
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+    MinorButton {
+        text: "▶";
+        font-family: "Inter";
+        font-weight: 800;
+        width: button-width;
+        enabled: index < list.length - 1;
+        clicked => {
+            index = index + 1;
+        }
+    }
+}

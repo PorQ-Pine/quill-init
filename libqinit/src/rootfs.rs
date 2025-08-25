@@ -57,19 +57,6 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         run_command("/bin/mount", &[&rootfs_file_path, &ro_mountpoint])
             .with_context(|| "Failed to mount root filesystem's SquashFS archive")?;
 
-        let unrestricted_rootfs_file_path = format!("{}/.unrestricted", &ro_mountpoint);
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "debug")] {
-                if !fs::exists(&unrestricted_rootfs_file_path)? {
-                    return Err(anyhow::anyhow!("Root filesystem type has to match the currently-defined 'unrestricted' profile compiled in the kernel"))
-                }
-            } else {
-                if fs::exists(&unrestricted_rootfs_file_path)? {
-                    return Err(anyhow::anyhow!("Root filesystem type has to match the currently-defined 'restricted' profile compiled in the kernel"));
-                }
-            }
-        }
-
         info!("Setting up fuse-overlayfs overlay");
         run_command(
             "/usr/bin/fuse-overlayfs",

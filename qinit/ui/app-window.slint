@@ -11,6 +11,7 @@ import { SectionButton } from "../../ui-common/sectionbutton.slint";
 import { LineEdit } from "../../ui-common/lineedit.slint";
 import { Slider } from "../../ui-common/slider.slint";
 import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
+import { HList } from "../../ui-common/hlist.slint";
 
 export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, Error }
 export enum QrCodePage { QrCode, NotAvailable }
@@ -72,6 +73,7 @@ export component AppWindow inherits Window {
     in-out property <image> wifi_icon: @image-url("../../icons/wifi-init.svg");
     in-out property <image> battery_icon;
     in-out property <bool> sticky_toast: false;
+    property <[string]> orientations_list: ["0", "90", "180", "270"];
     // Configuration properties
     in-out property <bool> persistent_rootfs;
     in property <bool> recovery_features;
@@ -589,6 +591,28 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
+                        HorizontalLayout {
+                            padding-left: layout_padding;
+                            padding-right: self.padding-left;
+                            spacing: layout_spacing;
+                            Rectangle {
+                                Text {
+                                    text: "Initial screen rotation (degrees)";
+                                    font-family: regular_font_family;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle { }
+
+                            HList {
+                                button-width: button_width * 0.2;
+                                scaling-factor: scaling_factor;
+                                height: switch_height;
+                                list: orientations_list;
+                            }
+                        }
+                        Rectangle {}
                     }
                 }
             }
