@@ -6,6 +6,7 @@ use std::fs;
 use crate::system::run_command;
 
 const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
+const DISABLED_MODE_FILE: &str = "encryption_disabled";
 const DISABLED_MODE_PASSWORD: &str = "ENCRYPTION DISABLED";
 
 pub struct UserDetails {
@@ -26,7 +27,7 @@ pub fn get_users_using_storage_encryption() -> Result<Vec<String>> {
         let user = user?;
         let user_path = user.path().to_string_lossy().to_string();
         if fs::exists(&format!("{}/gocryptfs.conf", &user_path))?
-            && !fs::exists(&format!("{}/encryption_disabled", &user_path))?
+            && !fs::exists(&format!("{}/{}", &user_path, &DISABLED_MODE_FILE))?
         {
             users_using_storage_encryption
                 .push(user.file_name().to_string_lossy()[1..].to_string());
@@ -35,6 +36,16 @@ pub fn get_users_using_storage_encryption() -> Result<Vec<String>> {
     info!("List is as follows: {:?}", &users_using_storage_encryption);
 
     Ok(users_using_storage_encryption)
+}
+
+pub fn get_user_storage_encryption_status(user: &str) -> Result<bool> {
+    Ok(!fs::exists(format!(
+        "{}/{}/.{}/{}",
+        &crate::MAIN_PART_MOUNTPOINT,
+        &crate::SYSTEM_HOME_DIR,
+        &user,
+        &DISABLED_MODE_FILE
+    ))?)
 }
 
 pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {

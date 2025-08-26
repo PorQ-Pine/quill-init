@@ -41,18 +41,17 @@ pub fn setup_gui(
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
+    let mut default_user = String::new();
 
     // Boot configuration
     {
         let boot_config_mutex = boot_config_mutex.clone();
         let boot_config_guard = boot_config_mutex.lock().unwrap();
 
-        if let Some(default_user) = &boot_config_guard.system.default_user {
-            info!(
-                "Found default user in boot configuration: '{}'",
-                &default_user
-            );
-            gui.set_default_user(SharedString::from(format!("{}", &default_user)));
+        if let Some(user) = &boot_config_guard.system.default_user {
+            info!("Found default user in boot configuration: '{}'", &user);
+            default_user = user.to_string();
+            gui.set_default_user(SharedString::from(format!("{}", &user)));
         }
 
         // Activate switches if needed
@@ -117,7 +116,7 @@ pub fn setup_gui(
         gui.set_version_string(SharedString::from(version_string));
     } else {
         // Trigger normal boot automatically
-        boot_normal(&boot_sender, &set_page_sender)?;
+        boot_normal(&boot_sender, &set_page_sender, &default_user)?;
     }
 
     // Boot progress bar timer
@@ -534,7 +533,7 @@ pub fn setup_gui(
         let set_page_sender = set_page_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = boot_normal(&boot_sender, &set_page_sender) {
+            if let Err(e) = boot_normal(&boot_sender, &set_page_sender, &default_user) {
                 if let Some(gui) = gui_weak.upgrade() {
                     error_toast(&gui, "Failed to send boot command", e.into());
                 }
@@ -887,12 +886,30 @@ fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
     error!("{}: {}", &message, e);
 }
 
-fn boot_normal(boot_sender: &Sender<BootCommand>, set_page_sender: &Sender<Page>) -> Result<()> {
-    if !storage_encryption::get_users_using_storage_encryption()?.is_empty() {
-        set_page_sender.send(Page::UserLogin)?;
+fn boot_normal(
+    boot_sender: &Sender<BootCommand>,
+    set_page_sender: &Sender<Page>,
+    default_user: &str,
+) -> Result<()> {
+    let encryption_users_list = storage_encryption::get_users_using_storage_encryption()?;
+    let mut wait_for_login = false;
+    if !encryption_users_list.is_empty() {
+        if !default_user.is_empty() && encryption_users_list.contains(&default_user.to_string()) {
+            wait_for_login = storage_encryption::get_user_storage_encryption_status(&default_user)?;
+        } else {
+            wait_for_login = true;
+        }
+    } else {
+        if default_user.is_empty() {
+            wait_for_login = true;
+        }
     }
 
-    boot_sender.send(BootCommand::NormalBoot)?;
+    if wait_for_login {
+        set_page_sender.send(Page::UserLogin)?;
+    } else {
+        boot_sender.send(BootCommand::NormalBoot)?;
+    }
 
     Ok(())
 }
