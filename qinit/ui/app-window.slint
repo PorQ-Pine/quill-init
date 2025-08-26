@@ -914,7 +914,7 @@ export component AppWindow inherits Window {
                         width: self.height;
                         y: (parent.height - self.height) / 2;
                         padding-value: bar_icon_button_padding * 0.2;
-                        enabled: !login-user-edit.text.is-empty && !login-password-edit.text.is-empty;
+                        enabled: !login-user-edit.text.is-empty;
                         clicked => {
                             TextInputInterface.text-input-focused = false;
                             login(login-user-edit.text, login-password-edit.text);
