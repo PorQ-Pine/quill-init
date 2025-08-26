@@ -1,37 +1,66 @@
 import { MinorButton } from "minorbutton.slint";
+import { VLine } from "vline.slint";
 
 export component HList inherits HorizontalLayout {
     in property <[string]> list;
     in property <length> button-width;
-    in property <float> scaling-factor;
-    property <int> index;
-    //spacing: 10px;
+    in property <length> element-width;
+    in property <length> border-radius <=> rectangle.border-radius;
+    in-out property <int> index: 0;
+    callback index_changed(int);
+    rectangle := Rectangle {
+        border-width: 3px;
+        border-color: black;
+        width: element-width;
+        HorizontalLayout {
+            width: element-width;
+            Text {
+                text: list[index];
+                font-family: "Inter";
+                font-weight: 800;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    Rectangle {
+        width: 5px;
+    }
+
     MinorButton {
         text: "◀";
         font-family: "Inter";
         font-weight: 800;
         width: button-width;
-        enabled: index > 0;
         clicked => {
-            index = index - 1;
+            if index - 1 >= 0 {
+                index = index - 1;
+            } else {
+                index = list.length - 1;
+            }
+            index_changed(index);
         }
     }
-    element := HorizontalLayout {
-        width: 100px * scaling-factor;
-        Text {
-            text: list[index];
-            vertical-alignment: center;
-            horizontal-alignment: center;
-        }
+
+    VLine {
+        thickness: 2px;
+        top-padding-multiplier: 0.8;
+        bottom-padding-multiplier: self.top-padding-multiplier;
     }
+
     MinorButton {
         text: "▶";
         font-family: "Inter";
         font-weight: 800;
         width: button-width;
-        enabled: index < list.length - 1;
         clicked => {
-            index = index + 1;
+            if index + 1 <= list.length - 1 {
+                index = index + 1;
+            } else {
+                index = 0;
+            }
+            index_changed(index);
         }
     }
 }

@@ -7,6 +7,7 @@ use chrono::prelude::*;
 use libqinit::battery;
 use libqinit::boot_config::BootConfig;
 use libqinit::brightness;
+use libqinit::eink::ScreenRotation;
 use libqinit::networking;
 use libqinit::recovery::soft_reset;
 use libqinit::storage_encryption;
@@ -57,6 +58,12 @@ pub fn setup_gui(
         // Activate switches if needed
         gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
         gui.set_recovery_features(boot_config_guard.system.recovery_features);
+        match boot_config_guard.system.initial_screen_rotation {
+            ScreenRotation::Cw0 => gui.set_orientations_list_index(0),
+            ScreenRotation::Cw90 => gui.set_orientations_list_index(1),
+            ScreenRotation::Cw180 => gui.set_orientations_list_index(2),
+            ScreenRotation::Cw270 => gui.set_orientations_list_index(3),
+        }
     }
 
     // Channels
@@ -844,6 +851,19 @@ pub fn setup_gui(
                 } else {
                     let _ = set_page_sender.send(Page::BootSplash);
                 }
+            }
+        }
+    });
+
+    gui.on_change_initial_screen_rotation({
+        let boot_config_mutex = boot_config_mutex.clone();
+        move |index| {
+            let mut locked_boot_config = boot_config_mutex.lock().unwrap();
+            match index {
+                0 => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw0,
+                1 => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw90,
+                2 => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw180,
+                3 | _ => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw270,
             }
         }
     });
