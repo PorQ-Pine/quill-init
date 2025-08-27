@@ -50,7 +50,7 @@ impl BootConfig {
         // Flags
         boot_config.flags.first_boot_done = false;
         // Root filesystem
-        boot_config.rootfs.persistent_storage = false;
+        boot_config.rootfs.persistent_storage = true;
         // System
         boot_config.system.timezone = "UTC".to_string();
         boot_config.system.recovery_features = true;
