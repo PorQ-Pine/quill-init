@@ -104,6 +104,8 @@ pub fn setup_gui(
         gui.set_progress_widget(ProgressWidget::MovingDots);
     }
 
+    gui.set_version_string(SharedString::from(version_string));
+
     if get_cmdline_bool("quill_recovery")? {
         info!("Showing QuillBoot menu");
         thread::spawn(|| {
@@ -113,7 +115,6 @@ pub fn setup_gui(
             )
         });
         set_page_sender.send(Page::QuillBoot)?;
-        gui.set_version_string(SharedString::from(version_string));
     } else {
         // Trigger normal boot automatically
         boot_normal(&boot_sender, &set_page_sender, &default_user)?;
@@ -676,14 +677,15 @@ pub fn setup_gui(
             if let Some(gui) = gui_weak.upgrade() {
                 match storage_encryption::get_encryption_user_details(&user) {
                     Ok(details) => gui.set_selected_encryption_user(SystemUser {
-                        encryption: true,
+                        encryption: details.encryption_enabled,
                         name: user,
                         encrypted_key: SharedString::from(&details.encrypted_key),
                         salt: SharedString::from(&details.salt),
                     }),
                     Err(e) => {
                         gui.set_selected_encryption_user(SystemUser {
-                            encryption: true,
+                            // Default to false if there is an error, I guess
+                            encryption: false,
                             name: user,
                             encrypted_key: SharedString::new(),
                             salt: SharedString::new(),
@@ -698,13 +700,17 @@ pub fn setup_gui(
     let encryption_change_password_timer = Rc::new(Timer::default());
     gui.on_change_encrypted_storage_password({
         let gui_weak = gui_weak.clone();
-        move |user, old_password, new_password| {
+        move |user, mut old_password, new_password, encrypted_storage_was_disabled| {
             let gui_weak = gui_weak.clone();
             encryption_change_password_timer.start(
                 TimerMode::SingleShot,
                 std::time::Duration::from_millis(100),
                 move || {
                     if let Some(gui) = gui_weak.upgrade() {
+                        if encrypted_storage_was_disabled {
+                            old_password =
+                                SharedString::from(storage_encryption::DISABLED_MODE_PASSWORD);
+                        }
                         if let Err(e) = storage_encryption::change_password(
                             &user.to_string(),
                             &old_password.to_string(),
@@ -714,10 +720,7 @@ pub fn setup_gui(
                         } else {
                             toast(&gui, "Password set successfully");
                         }
-                        gui.invoke_get_users_using_storage_encryption();
-                        gui.invoke_get_selected_encryption_user_details(
-                            gui.get_selected_encryption_user().name,
-                        );
+                        refresh_storage_encryption_ui(&gui);
                     }
                 },
             );
@@ -725,12 +728,10 @@ pub fn setup_gui(
     });
 
     let encryption_disable_timer = Rc::new(Timer::default());
-    gui.on_toggle_storage_encryption_status({
+    gui.on_disable_storage_encryption({
         let gui_weak = gui_weak.clone();
-        let set_page_sender = set_page_sender.clone();
         move |user, password| {
             let gui_weak = gui_weak.clone();
-            let set_page_sender = set_page_sender.clone();
             encryption_disable_timer.start(
                 TimerMode::SingleShot,
                 std::time::Duration::from_millis(100),
@@ -741,9 +742,9 @@ pub fn setup_gui(
                         {
                             error_toast(&gui, "Failed to disable encryption", e.into());
                         } else {
-                            let _ = set_page_sender.send(Page::Options);
                             toast(&gui, "Encryption successfully disabled");
                         }
+                        refresh_storage_encryption_ui(&gui);
                     }
                 },
             );
@@ -886,6 +887,11 @@ fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
     error!("{}: {}", &message, e);
 }
 
+fn refresh_storage_encryption_ui(gui: &AppWindow) {
+    gui.invoke_get_users_using_storage_encryption();
+    gui.invoke_get_selected_encryption_user_details(gui.get_selected_encryption_user().name);
+}
+
 fn boot_normal(
     boot_sender: &Sender<BootCommand>,
     set_page_sender: &Sender<Page>,
@@ -893,12 +899,10 @@ fn boot_normal(
 ) -> Result<()> {
     let encryption_users_list = storage_encryption::get_users_using_storage_encryption()?;
     let mut wait_for_login = false;
-    if !encryption_users_list.is_empty() {
-        if !default_user.is_empty() && encryption_users_list.contains(&default_user.to_string()) {
-            wait_for_login = storage_encryption::get_user_storage_encryption_status(&default_user)?;
-        } else {
-            wait_for_login = true;
-        }
+    if !encryption_users_list.is_empty()
+        && encryption_users_list.contains(&default_user.to_string())
+    {
+        wait_for_login = true;
     } else {
         if default_user.is_empty() {
             wait_for_login = true;
@@ -907,9 +911,9 @@ fn boot_normal(
 
     if wait_for_login {
         set_page_sender.send(Page::UserLogin)?;
-    } else {
-        boot_sender.send(BootCommand::NormalBoot)?;
     }
+
+    boot_sender.send(BootCommand::NormalBoot)?;
 
     Ok(())
 }

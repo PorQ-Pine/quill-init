@@ -57,6 +57,15 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
         run_command("/bin/mount", &[&rootfs_file_path, &ro_mountpoint])
             .with_context(|| "Failed to mount root filesystem's SquashFS archive")?;
 
+        bind_mount(
+            &system::MODULES_DIR_PATH,
+            &format!("{}/{}", &ro_mountpoint, &system::MODULES_DIR_PATH),
+        )?;
+        bind_mount(
+            &system::FIRMWARE_DIR_PATH,
+            &format!("{}/{}", &ro_mountpoint, &system::FIRMWARE_DIR_PATH),
+        )?;
+
         info!("Setting up fuse-overlayfs overlay");
         run_command(
             "/usr/bin/fuse-overlayfs",
@@ -107,22 +116,6 @@ pub fn setup_mounts() -> Result<()> {
     bind_mount(
         &format!("{}", &crate::BOOT_PART_MOUNTPOINT),
         &format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::BOOT_DIR),
-    )?;
-    bind_mount(
-        &system::MODULES_DIR_PATH,
-        &format!(
-            "{}/{}",
-            &crate::OVERLAY_MOUNTPOINT,
-            &system::MODULES_DIR_PATH
-        ),
-    )?;
-    bind_mount(
-        &system::FIRMWARE_DIR_PATH,
-        &format!(
-            "{}/{}",
-            &crate::OVERLAY_MOUNTPOINT,
-            &system::FIRMWARE_DIR_PATH
-        ),
     )?;
 
     Ok(())

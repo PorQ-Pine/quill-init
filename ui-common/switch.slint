@@ -1,7 +1,8 @@
 export component Switch {
-    in property<length> border-radius <=> i-container.border-radius;
-    in-out property<bool> activated;
-    in-out property<bool> enabled <=> touch-area.enabled;
+    in property <length> border-radius <=> i-container.border-radius;
+    in-out property <bool> activated;
+    in-out property <bool> enabled <=> touch-area.enabled;
+    in-out property <bool> special-activation;
     property<float> handle_width_multiplier: 0.85;
     property<float> handle_height_multiplier: 0.8 * handle_width_multiplier;
     callback toggled;
@@ -26,7 +27,9 @@ export component Switch {
             }
         }
         clicked => {
-            activated = !activated;
+            if !special-activation {
+                activated = !activated;
+            }
             toggled();
         }
     }
