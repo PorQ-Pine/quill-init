@@ -700,7 +700,7 @@ pub fn setup_gui(
     });
 
     let encryption_change_password_timer = Rc::new(Timer::default());
-    gui.on_change_encrypted_storage_password({
+    gui.on_change_user_password({
         let gui_weak = gui_weak.clone();
         move |user, mut old_password, new_password, encrypted_storage_was_disabled| {
             let gui_weak = gui_weak.clone();
@@ -716,7 +716,7 @@ pub fn setup_gui(
                         if let Err(e) = storage_encryption::change_password(
                             &user.to_string(),
                             &old_password.to_string(),
-                            &new_password.to_string(),
+                            &new_password.to_string()
                         ) {
                             error_toast(&gui, "Failed to change password", e.into());
                         } else {

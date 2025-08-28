@@ -45,7 +45,7 @@ export component AppWindow inherits Window {
     callback connect_to_wifi_network(string, string);
     callback get_users_using_storage_encryption();
     callback get_selected_encryption_user_details(string);
-    callback change_encrypted_storage_password(string, string, string, bool);
+    callback change_user_password(string, string, string, bool);
     callback disable_storage_encryption(string, string);
     callback set_brightness_sliders_levels;
     callback change_cool_brightness(int);
@@ -1672,7 +1672,7 @@ export component AppWindow inherits Window {
                             dialog_message = "Disabling encrypted storage"
                         }
                         if dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword {
-                            change_encrypted_storage_password(selected_encryption_user.name, encryption-current-password-edit.text, encryption-new-password-edit.text, !selected_encryption_user.encryption);
+                            change_user_password(selected_encryption_user.name, encryption-current-password-edit.text, encryption-new-password-edit.text, !selected_encryption_user.encryption);
                         } else if dialog == DialogType.EncryptionConfirmPassword {
                             disable_storage_encryption(selected_encryption_user.name, encryption-current-password-edit.text);
                         }

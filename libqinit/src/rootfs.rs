@@ -145,7 +145,12 @@ pub fn run_chroot_command(command: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub fn change_user_password(pubkey: &PKey<Public>, user: &str, old_password: &str, new_password: &str) -> Result<()> {
+pub fn change_user_password(
+    pubkey: &PKey<Public>,
+    user: &str,
+    old_password: &str,
+    new_password: &str,
+) -> Result<()> {
     let rw_write_dir_path = format!(
         "{}/{}/{}/{}",
         &crate::MAIN_PART_MOUNTPOINT,
@@ -169,7 +174,10 @@ pub fn change_user_password(pubkey: &PKey<Public>, user: &str, old_password: &st
             &crate::ROOTFS_FILE
         );
         if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
-            run_command("/bin/mount", &[&rootfs_file_path, &crate::DEFAULT_MOUNTPOINT])?;
+            run_command(
+                "/bin/mount",
+                &[&rootfs_file_path, &crate::DEFAULT_MOUNTPOINT],
+            )?;
             let passwd_ro_path = format!("{}/{}", &crate::DEFAULT_MOUNTPOINT, &passwd_path_base);
             fs::copy(&passwd_ro_path, &passwd_path)?;
             run_command("/bin/umount", &[&crate::DEFAULT_MOUNTPOINT])?;
