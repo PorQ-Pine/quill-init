@@ -159,7 +159,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
             let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
 
-            // Decode public key embedded in kernel command line
             let pubkey = read_public_key()?;
 
             #[cfg(not(feature = "gui_only"))]
@@ -223,8 +222,9 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
                 let boot_config_mutex = boot_config_mutex.clone();
+                let pubkey = pubkey.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex)
+                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey)
                 }
             });
 

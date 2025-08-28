@@ -10,6 +10,8 @@ use crate::signing::check_signature;
 use crate::system::{self, bind_mount, run_command};
 
 pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
+const RW_WRITE_DIR: &str = "write/";
+const RW_WORK_DIR: &str = "work/";
 
 pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> {
     info!("Mounting root filesystem SquashFS archive");
@@ -29,28 +31,30 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
             .with_context(|| "Failed to mount tmpfs at overlay work directory")?;
 
         let ro_mountpoint = format!("{}/{}", &crate::OVERLAY_WORKDIR, "read");
-        let rw_writedir;
-        let rw_workdir;
+        let rw_write_dir_path;
+        let rw_work_dir_path;
         if boot_config.rootfs.persistent_storage {
-            rw_writedir = format!(
-                "{}/{}/{}/write",
+            rw_write_dir_path = format!(
+                "{}/{}/{}/{}",
                 &crate::MAIN_PART_MOUNTPOINT,
                 &crate::SYSTEM_DIR,
-                &crate::ROOTFS_DIR
+                &crate::ROOTFS_DIR,
+                &RW_WRITE_DIR,
             );
-            rw_workdir = format!(
-                "{}/{}/{}/work",
+            rw_work_dir_path = format!(
+                "{}/{}/{}/{}",
                 &crate::MAIN_PART_MOUNTPOINT,
                 &crate::SYSTEM_DIR,
-                &crate::ROOTFS_DIR
+                &crate::ROOTFS_DIR,
+                &RW_WORK_DIR,
             );
         } else {
-            rw_writedir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
-            rw_workdir = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");
+            rw_write_dir_path = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
+            rw_work_dir_path = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");
         }
         fs::create_dir_all(&ro_mountpoint)?;
-        fs::create_dir_all(&rw_writedir)?;
-        fs::create_dir_all(&rw_workdir)?;
+        fs::create_dir_all(&rw_write_dir_path)?;
+        fs::create_dir_all(&rw_work_dir_path)?;
         fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)
             .with_context(|| "Failed to create overlay mountpoint's directory")?;
 
@@ -73,7 +77,7 @@ pub fn setup(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Result<()> 
                 "-o",
                 &format!(
                     "allow_other,lowerdir={},upperdir={},workdir={}",
-                    &ro_mountpoint, &rw_writedir, &rw_workdir
+                    &ro_mountpoint, &rw_write_dir_path, &rw_work_dir_path
                 ),
                 &crate::OVERLAY_MOUNTPOINT,
             ],
@@ -137,6 +141,53 @@ pub fn run_chroot_command(command: &[&str]) -> Result<()> {
     args.extend_from_slice(&command);
 
     run_command("/usr/sbin/chroot", &args)?;
+
+    Ok(())
+}
+
+pub fn change_user_password(pubkey: &PKey<Public>, user: &str, old_password: &str, new_password: &str) -> Result<()> {
+    let rw_write_dir_path = format!(
+        "{}/{}/{}/{}",
+        &crate::MAIN_PART_MOUNTPOINT,
+        &crate::SYSTEM_DIR,
+        &crate::ROOTFS_DIR,
+        &RW_WRITE_DIR
+    );
+    fs::create_dir_all(&rw_write_dir_path)?;
+
+    let password_temp_chroot = "/tmp/password";
+    let musl_lib_path = "/lib/ld-musl-aarch64.so.1";
+    let busybox_path = "/bin/busybox";
+    let passwd_path_base = "/etc/passwd";
+    let passwd_path = format!("{}/{}", &rw_write_dir_path, &passwd_path_base);
+
+    if !fs::exists(&passwd_path)? {
+        let rootfs_file_path = format!(
+            "{}/{}/{}",
+            &crate::MAIN_PART_MOUNTPOINT,
+            &crate::SYSTEM_DIR,
+            &crate::ROOTFS_FILE
+        );
+        if fs::exists(&rootfs_file_path)? && check_signature(&pubkey, &rootfs_file_path)? {
+            run_command("/bin/mount", &[&rootfs_file_path, &crate::DEFAULT_MOUNTPOINT])?;
+            let passwd_ro_path = format!("{}/{}", &crate::DEFAULT_MOUNTPOINT, &passwd_path_base);
+            fs::copy(&passwd_ro_path, &passwd_path)?;
+            run_command("/bin/umount", &[&crate::DEFAULT_MOUNTPOINT])?;
+        }
+    }
+
+    let chroot_musl_lib_path = format!("{}/{}", &password_temp_chroot, &musl_lib_path);
+    let chroot_busybox_path = format!("{}/{}", &password_temp_chroot, &busybox_path);
+    let chroot_passwd_path = format!("{}/{}", &password_temp_chroot, &passwd_path_base);
+
+    fs::create_dir_all(format!("{}/lib", &password_temp_chroot))?;
+    fs::create_dir_all(format!("{}/bin", &password_temp_chroot))?;
+    fs::create_dir_all(format!("{}/etc", &password_temp_chroot))?;
+    bind_mount(&musl_lib_path, &chroot_musl_lib_path)?;
+    bind_mount(&busybox_path, &chroot_busybox_path)?;
+    bind_mount(&passwd_path, &chroot_passwd_path)?;
+
+    run_command("/usr/sbin/chroot", &[&password_temp_chroot, "/bin/busybox"])?;
 
     Ok(())
 }

@@ -16,8 +16,6 @@ pub struct UserDetails {
 }
 
 // In Quill OS, either the user sets a password and is forced to use storage encryption, either it does not set a password and cannot use storage encryption.
-// Thus, the users in the list returned by this function have all set a password, but some may have chosen to "disable" their encrypted storage for some reason.
-// In this case, even if these users will have to login with his password at boot, it might be useful to have left encryption disabled in case it is necessary to retrieve data for recovery purposes and/or if user does not want to lose data in case the account's password has been forgotten.
 pub fn get_users_using_storage_encryption() -> Result<Vec<String>> {
     info!("Building list of users using storage encryption");
     let users = fs::read_dir(&format!(

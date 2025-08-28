@@ -17,6 +17,7 @@ use libqinit::system::{
 };
 use libqinit::wifi;
 use log::{debug, error, info};
+use openssl::pkey::{PKey, Public};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
 use std::{fs, thread};
@@ -38,6 +39,7 @@ pub fn setup_gui(
     short_version_string: String,
     display_progress_bar: bool,
     boot_config_mutex: Arc<Mutex<BootConfig>>,
+    pubkey: &PKey<Public>,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();

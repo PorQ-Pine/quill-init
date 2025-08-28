@@ -24,9 +24,14 @@ pub fn generate_svg_from_level(level: i32) -> String {
 }
 
 pub fn get_level() -> Result<i32> {
-    Ok(fs::read_to_string(&LEVEL_PATH)?.trim().parse::<i32>()?)
+    Ok(fs::read_to_string(&LEVEL_PATH)?
+        .trim()
+        .parse::<i32>()
+        .with_context(|| "Failed to read battery level")?)
 }
 
 pub fn charger_plugged_in() -> Result<bool> {
-    Ok(fs::read_to_string(&CHARGER_ONLINE_PATH)?.contains("1"))
+    Ok(fs::read_to_string(&CHARGER_ONLINE_PATH)
+        .with_context(|| "Failed to read charger status")?
+        .contains("1"))
 }
