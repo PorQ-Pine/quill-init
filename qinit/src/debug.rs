@@ -11,8 +11,8 @@ use regex::Regex;
 use std::fs;
 use std::process::Command;
 
-const IP_ADDR: &str = "192.168.2.2";
-const IP_POOL_END: &str = "192.168.2.254";
+const IP_ADDR: &str = "192.168.3.2";
+const IP_POOL_END: &str = "192.168.3.254";
 const UDHCPD_CONF_PATH: &str = "/etc/udhcpd.conf";
 const DROPBEAR_RSA_KEY_FILE: &str = "rsa_hkey";
 const DEBUG_SETUP_SCRIPT: &str = "debug-setup.sh";
