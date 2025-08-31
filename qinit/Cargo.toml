@@ -28,7 +28,7 @@ chrono = { version = "0.4.41", features = ["std"], default-features = false }
 slint-build = "1.12.1"
 
 [features]
-debug = []
-free_roam = []
-gui_only = []
-init_wrapper = []
+debug = ["libqinit/debug"]
+free_roam = ["libqinit/free_roam"]
+gui_only = ["libqinit/gui_only"]
+init_wrapper = ["libqinit/init_wrapper"]
