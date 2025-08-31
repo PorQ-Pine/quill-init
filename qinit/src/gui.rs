@@ -10,6 +10,7 @@ use libqinit::brightness;
 use libqinit::eink::ScreenRotation;
 use libqinit::networking;
 use libqinit::recovery::soft_reset;
+use libqinit::rootfs::change_user_password;
 use libqinit::storage_encryption;
 use libqinit::system::{
     BootCommand, compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
@@ -44,6 +45,7 @@ pub fn setup_gui(
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
     let mut default_user = String::new();
+    let pubkey = pubkey.to_owned();
 
     // Boot configuration
     {
@@ -704,6 +706,7 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         move |user, mut old_password, new_password, encrypted_storage_was_disabled| {
             let gui_weak = gui_weak.clone();
+            let pubkey = pubkey.clone();
             encryption_change_password_timer.start(
                 TimerMode::SingleShot,
                 std::time::Duration::from_millis(100),
@@ -713,12 +716,19 @@ pub fn setup_gui(
                             old_password =
                                 SharedString::from(storage_encryption::DISABLED_MODE_PASSWORD);
                         }
+
+                        if let Err(e) =
+                            change_user_password(&pubkey, &user, &old_password, &new_password)
+                        {
+                            error_toast(&gui, "Failed to change user password", e.into());
+                        }
+
                         if let Err(e) = storage_encryption::change_password(
                             &user.to_string(),
                             &old_password.to_string(),
-                            &new_password.to_string()
+                            &new_password.to_string(),
                         ) {
-                            error_toast(&gui, "Failed to change password", e.into());
+                            error_toast(&gui, "Failed to change encryption password", e.into());
                         } else {
                             toast(&gui, "Password set successfully");
                         }

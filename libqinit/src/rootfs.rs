@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
 use log::info;
+use log::warn;
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use std::fs;
-use sys_mount::Mount;
+use std::os::unix::fs::symlink;
+use sys_mount::UnmountFlags;
+use sys_mount::{Mount, unmount};
 
 use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
@@ -151,6 +154,11 @@ pub fn change_user_password(
     old_password: &str,
     new_password: &str,
 ) -> Result<()> {
+    info!(
+        "Attempting to change system user password for user '{}'",
+        &user
+    );
+
     let rw_write_dir_path = format!(
         "{}/{}/{}/{}",
         &crate::MAIN_PART_MOUNTPOINT,
@@ -161,12 +169,19 @@ pub fn change_user_password(
     fs::create_dir_all(&rw_write_dir_path)?;
 
     let password_temp_chroot = "/tmp/password";
+    fs::remove_dir_all(&password_temp_chroot)?;
+    fs::create_dir_all(&password_temp_chroot)?;
+
     let musl_lib_path = "/lib/ld-musl-aarch64.so.1";
     let busybox_path = "/bin/busybox";
+    let sh_path = "/bin/sh";
+    let shadow_path_base = "/etc/shadow";
     let passwd_path_base = "/etc/passwd";
+    let shadow_path = format!("{}/{}", &rw_write_dir_path, &shadow_path_base);
     let passwd_path = format!("{}/{}", &rw_write_dir_path, &passwd_path_base);
 
-    if !fs::exists(&passwd_path)? {
+    if !fs::exists(&passwd_path)? || !fs::exists(&shadow_path)? {
+        warn!("Reading passwd file from root filesystem's SquashFS archive");
         let rootfs_file_path = format!(
             "{}/{}/{}",
             &crate::MAIN_PART_MOUNTPOINT,
@@ -177,25 +192,56 @@ pub fn change_user_password(
             run_command(
                 "/bin/mount",
                 &[&rootfs_file_path, &crate::DEFAULT_MOUNTPOINT],
-            )?;
+            )
+            .with_context(|| "Failed to mount read-only rootfs at default mountpoint")?;
             let passwd_ro_path = format!("{}/{}", &crate::DEFAULT_MOUNTPOINT, &passwd_path_base);
-            fs::copy(&passwd_ro_path, &passwd_path)?;
-            run_command("/bin/umount", &[&crate::DEFAULT_MOUNTPOINT])?;
+            let shadow_ro_path = format!("{}/{}", &crate::DEFAULT_MOUNTPOINT, &shadow_path_base);
+            fs::copy(&passwd_ro_path, &passwd_path).with_context(
+                || "Failed to copy passwd file from read-only root filesystem to password chroot",
+            )?;
+            fs::copy(&shadow_ro_path, &shadow_path).with_context(
+                || "Failed to copy shadow file from read-only root filesystem to password chroot",
+            )?;
+            run_command("/bin/umount", &[&crate::DEFAULT_MOUNTPOINT])
+                .with_context(|| "Failed to unmount default mountpoint")?;
         }
     }
+
+    fs::create_dir_all(format!("{}/lib", &password_temp_chroot))
+        .with_context(|| "Failed to create 'lib' directory in password chroot")?;
+    fs::create_dir_all(format!("{}/bin", &password_temp_chroot))
+        .with_context(|| "Failed to create 'bin' directory in password chroot")?;
+    fs::create_dir_all(format!("{}/etc", &password_temp_chroot))
+        .with_context(|| "Failed to create 'etc' directory in password chroot")?;
 
     let chroot_musl_lib_path = format!("{}/{}", &password_temp_chroot, &musl_lib_path);
     let chroot_busybox_path = format!("{}/{}", &password_temp_chroot, &busybox_path);
     let chroot_passwd_path = format!("{}/{}", &password_temp_chroot, &passwd_path_base);
+    let chroot_shadow_path = format!("{}/{}", &password_temp_chroot, &shadow_path_base);
+    let chroot_sh_path = format!("{}/{}", &password_temp_chroot, &sh_path);
 
-    fs::create_dir_all(format!("{}/lib", &password_temp_chroot))?;
-    fs::create_dir_all(format!("{}/bin", &password_temp_chroot))?;
-    fs::create_dir_all(format!("{}/etc", &password_temp_chroot))?;
-    bind_mount(&musl_lib_path, &chroot_musl_lib_path)?;
-    bind_mount(&busybox_path, &chroot_busybox_path)?;
-    bind_mount(&passwd_path, &chroot_passwd_path)?;
+    fs::copy(&musl_lib_path, &chroot_musl_lib_path)
+        .with_context(|| "Failed to copy musl lib to password chroot")?;
+    fs::copy(&busybox_path, &chroot_busybox_path)
+        .with_context(|| "Failed to copy busybox binary to password chroot")?;
+    fs::copy(&passwd_path, &chroot_passwd_path)
+        .with_context(|| "Failed to copy passwd file to password chroot")?;
+    fs::copy(&shadow_path, &chroot_shadow_path)
+        .with_context(|| "Failed to copy shadow file to password chroot")?;
+    symlink(&busybox_path, &chroot_sh_path)?;
 
-    run_command("/usr/sbin/chroot", &[&password_temp_chroot, "/bin/busybox"])?;
+    run_command(
+        "/usr/sbin/chroot",
+        &[
+            &password_temp_chroot,
+            "/bin/busybox",
+            "sh",
+            "-c",
+            &format!(r#"{} chmod u+s {} && {} su -s /bin/sh -c "printf '{}\n{}\n{}' | {} passwd {}" {} && {} chmod u-s {}"#, &busybox_path, &busybox_path, &busybox_path, &old_password, &new_password, &new_password, &busybox_path, &user, &user, &busybox_path, &busybox_path),
+        ],
+    ).with_context(|| "Provided login credentials were incorrect")?;
+
+    fs::remove_dir_all(&password_temp_chroot)?;
 
     Ok(())
 }
