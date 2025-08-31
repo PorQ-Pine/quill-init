@@ -1,11 +1,12 @@
 use anyhow::{Context, Result};
 use log::info;
-use std::fs;
+
+use crate::system::rm_dir_all;
 
 pub fn soft_reset() -> Result<()> {
     info!("Starting soft reset process");
 
-    fs::remove_dir_all(format!(
+    rm_dir_all(&format!(
         "{}{}{}",
         &crate::MAIN_PART_MOUNTPOINT,
         &crate::SYSTEM_DIR,

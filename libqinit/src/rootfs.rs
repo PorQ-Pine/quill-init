@@ -1,16 +1,14 @@
 use anyhow::{Context, Result};
-use log::info;
-use log::warn;
+use log::{error, info, warn};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use std::fs;
 use std::os::unix::fs::symlink;
-use sys_mount::UnmountFlags;
-use sys_mount::{Mount, unmount};
+use sys_mount::Mount;
 
 use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
-use crate::system::{self, bind_mount, run_command};
+use crate::system::{self, bind_mount, generate_random_string, rm_dir_all, run_command};
 
 pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 const RW_WRITE_DIR: &str = "write/";
@@ -148,6 +146,41 @@ pub fn run_chroot_command(command: &[&str]) -> Result<()> {
     Ok(())
 }
 
+fn change_user_password_chroot_command(
+    password_temp_chroot_path: &str,
+    busybox_path: &str,
+    user: &str,
+    old_password: &str,
+    new_password: &str,
+    verify: bool,
+) -> Result<()> {
+    if verify {
+        run_command(
+            "/usr/sbin/chroot",
+            &[
+                &password_temp_chroot_path,
+                "/bin/busybox",
+                "sh",
+                "-c",
+                &format!(r#"{} chmod u+s {} && {} su -s /bin/sh -c "printf '{}\n{}\n{}' | {} passwd {}" {} && {} chmod u-s {}"#, &busybox_path, &busybox_path, &busybox_path, &old_password, &new_password, &new_password, &busybox_path, &user, &user, &busybox_path, &busybox_path),
+            ],
+        ).with_context(|| "Provided login credentials were incorrect")?;
+    } else {
+        run_command(
+            "/usr/sbin/chroot",
+            &[
+                &password_temp_chroot_path,
+                "/bin/busybox",
+                "sh",
+                "-c",
+                &format!(r#"{} chmod u+s {} && {} /bin/sh -c "printf '{}\n{}' | {} passwd {}" && {} chmod u-s {}"#, &busybox_path, &busybox_path, &busybox_path, &new_password, &new_password, &busybox_path, &user, &busybox_path, &busybox_path),
+            ],
+        ).with_context(|| "Error setting password")?;
+    }
+
+    Ok(())
+}
+
 pub fn change_user_password(
     pubkey: &PKey<Public>,
     user: &str,
@@ -159,6 +192,9 @@ pub fn change_user_password(
         &user
     );
 
+    let temporary_password = generate_random_string(1024)?;
+    info!("Temporary password is '{}'", &temporary_password);
+
     let rw_write_dir_path = format!(
         "{}/{}/{}/{}",
         &crate::MAIN_PART_MOUNTPOINT,
@@ -168,9 +204,9 @@ pub fn change_user_password(
     );
     fs::create_dir_all(&rw_write_dir_path)?;
 
-    let password_temp_chroot = "/tmp/password";
-    fs::remove_dir_all(&password_temp_chroot)?;
-    fs::create_dir_all(&password_temp_chroot)?;
+    let password_temp_chroot_path = "/tmp/password";
+    rm_dir_all(&password_temp_chroot_path)?;
+    fs::create_dir_all(&password_temp_chroot_path)?;
 
     let musl_lib_path = "/lib/ld-musl-aarch64.so.1";
     let busybox_path = "/bin/busybox";
@@ -207,18 +243,18 @@ pub fn change_user_password(
         }
     }
 
-    fs::create_dir_all(format!("{}/lib", &password_temp_chroot))
+    fs::create_dir_all(format!("{}/lib", &password_temp_chroot_path))
         .with_context(|| "Failed to create 'lib' directory in password chroot")?;
-    fs::create_dir_all(format!("{}/bin", &password_temp_chroot))
+    fs::create_dir_all(format!("{}/bin", &password_temp_chroot_path))
         .with_context(|| "Failed to create 'bin' directory in password chroot")?;
-    fs::create_dir_all(format!("{}/etc", &password_temp_chroot))
+    fs::create_dir_all(format!("{}/etc", &password_temp_chroot_path))
         .with_context(|| "Failed to create 'etc' directory in password chroot")?;
 
-    let chroot_musl_lib_path = format!("{}/{}", &password_temp_chroot, &musl_lib_path);
-    let chroot_busybox_path = format!("{}/{}", &password_temp_chroot, &busybox_path);
-    let chroot_passwd_path = format!("{}/{}", &password_temp_chroot, &passwd_path_base);
-    let chroot_shadow_path = format!("{}/{}", &password_temp_chroot, &shadow_path_base);
-    let chroot_sh_path = format!("{}/{}", &password_temp_chroot, &sh_path);
+    let chroot_musl_lib_path = format!("{}/{}", &password_temp_chroot_path, &musl_lib_path);
+    let chroot_busybox_path = format!("{}/{}", &password_temp_chroot_path, &busybox_path);
+    let chroot_passwd_path = format!("{}/{}", &password_temp_chroot_path, &passwd_path_base);
+    let chroot_shadow_path = format!("{}/{}", &password_temp_chroot_path, &shadow_path_base);
+    let chroot_sh_path = format!("{}/{}", &password_temp_chroot_path, &sh_path);
 
     fs::copy(&musl_lib_path, &chroot_musl_lib_path)
         .with_context(|| "Failed to copy musl lib to password chroot")?;
@@ -230,18 +266,41 @@ pub fn change_user_password(
         .with_context(|| "Failed to copy shadow file to password chroot")?;
     symlink(&busybox_path, &chroot_sh_path)?;
 
-    run_command(
-        "/usr/sbin/chroot",
-        &[
-            &password_temp_chroot,
-            "/bin/busybox",
-            "sh",
-            "-c",
-            &format!(r#"{} chmod u+s {} && {} su -s /bin/sh -c "printf '{}\n{}\n{}' | {} passwd {}" {} && {} chmod u-s {}"#, &busybox_path, &busybox_path, &busybox_path, &old_password, &new_password, &new_password, &busybox_path, &user, &user, &busybox_path, &busybox_path),
-        ],
-    ).with_context(|| "Provided login credentials were incorrect")?;
+    let mut do_error = false;
+    info!("Setting temporary password for verification");
+    if let Err(e) = change_user_password_chroot_command(
+        &password_temp_chroot_path,
+        &busybox_path,
+        &user,
+        &old_password,
+        &temporary_password,
+        true,
+    ) {
+        do_error = true;
+        error!("{}", &e);
+    } else {
+        info!("Setting new requested password");
+        if let Err(e) = change_user_password_chroot_command(
+            &password_temp_chroot_path,
+            &busybox_path,
+            &user,
+            &temporary_password,
+            &new_password,
+            false,
+        ) {
+            do_error = true;
+            error!("{}", &e);
+        }
+    }
 
-    fs::remove_dir_all(&password_temp_chroot)?;
+    rm_dir_all(&password_temp_chroot_path)?;
+
+    if do_error {
+        return Err(anyhow::anyhow!(
+            "Failed to set new password for user '{}'",
+            &user
+        ));
+    }
 
     Ok(())
 }

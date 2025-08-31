@@ -3,6 +3,8 @@ use base64::prelude::*;
 use log::{debug, info, warn};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
+use rand::Rng;
+use rand::distr::Alphanumeric;
 use regex::Regex;
 use rmesg;
 use sha256;
@@ -299,7 +301,7 @@ pub fn clean_copy_dir_recursively(source: &str, target: &str) -> Result<()> {
         "Recursively copying directory '{}' to '{}'",
         &source, &target
     );
-    fs::remove_dir_all(&target)?;
+    rm_dir_all(&target)?;
     run_command("/bin/cp", &["-r", &source, &target])?;
     // This does not seem to work with /overlay/etc/ssh directory (permission issues?)
     /* fs::create_dir_all(&target)?;
@@ -404,6 +406,23 @@ pub fn set_timezone(timezone: &str) -> Result<()> {
         info!("Setting timezone to 'UTC'")
     }
     // If nothing is symlinked, the OS will just default to the UTC timezone
+
+    Ok(())
+}
+
+pub fn generate_random_string(length: i32) -> Result<String> {
+    let mut rng = rand::rng();
+    let chars: String = (0..length)
+        .map(|_| rng.sample(Alphanumeric) as char)
+        .collect();
+
+    Ok(chars)
+}
+
+pub fn rm_dir_all(path: &str) -> Result<()> {
+    if fs::exists(&path)? {
+        fs::remove_dir_all(&path)?;
+    }
 
     Ok(())
 }
