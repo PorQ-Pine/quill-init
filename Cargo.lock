@@ -364,14 +364,14 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.71.1"
+version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
+checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
 dependencies = [
  "bitflags 2.9.3",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.12.1",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -724,8 +724,7 @@ dependencies = [
 [[package]]
 name = "const-field-offset"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91fcde4ca1211b5a94b573083c472ee19e86b19a441913f66e1cc5c41daf0255"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "const-field-offset-macro",
  "field-offset",
@@ -734,8 +733,7 @@ dependencies = [
 [[package]]
 name = "const-field-offset-macro"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5387f5bbc9e9e6c96436ea125afa12614cebf8ac67f49abc08c1e7a891466c90"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1747,9 +1745,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-backend-linuxkms"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7245ddc95cd0ae039b8dbb53449eb94110b24cbd47a32082970a25ad31b77f8d"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "bytemuck",
  "calloop 0.14.3",
@@ -1764,9 +1761,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-backend-selector"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50166eb0f0f63ffa514069cdad5465d1d4c711c57dbd495f16f0a4ee14b82e46"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "cfg-if",
  "i-slint-backend-linuxkms",
@@ -1778,9 +1774,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-backend-winit"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c3b5697d3fbbc7ae0fcba4592c76f39d13a25fad055064a31855f2234fd82ba"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -1802,6 +1797,7 @@ dependencies = [
  "scoped-tls-hkt",
  "scopeguard",
  "softbuffer",
+ "strum",
  "vtable",
  "wasm-bindgen",
  "web-sys",
@@ -1811,9 +1807,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-common"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c400c33bd6bc68397adefa1be2abaf77cdd90c216ad88b1be2ebdb0003ea996"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "cfg-if",
  "derive_more",
@@ -1824,9 +1819,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-compiler"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1eafbcc08babe8bb24967193a7796c0e26170d0a6cdf09236cc2fdb63dded502"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "by_address",
  "codemap",
@@ -1854,9 +1848,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-core"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc384a0a106e7bc1aaf6fbf06d5a4d0d8e51a4bc5ff5ce36dbe559620aef4533"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "auto_enums",
  "bitflags 2.9.3",
@@ -1902,9 +1895,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-core-macros"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81504739c60f11af98f80f287624379514923888ecdf37e0bc43c5dc1cadafa5"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "quote",
  "serde_json",
@@ -1913,9 +1905,8 @@ dependencies = [
 
 [[package]]
 name = "i-slint-renderer-skia"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "687126d7e82d447e15bc2666053f7653fa562e11dc6a9799e6dd0186a7927142"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "bytemuck",
  "cfg-if",
@@ -1942,7 +1933,10 @@ dependencies = [
  "softbuffer",
  "unicode-segmentation",
  "vtable",
- "windows",
+ "windows 0.58.0",
+ "windows 0.61.3",
+ "windows-core 0.58.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -1957,7 +1951,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -2192,15 +2186,6 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -3460,7 +3445,7 @@ version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edce586971a4dfaa28950c6f18ed55e0406c1ab88bbce2c6f6293a7aaba73d35"
 dependencies = [
- "toml_edit",
+ "toml_edit 0.22.27",
 ]
 
 [[package]]
@@ -4092,15 +4077,16 @@ checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
 name = "skia-bindings"
-version = "0.86.1"
+version = "0.87.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2bf215f640b53293844d441e93448b437ca4937595f60e3317fbb03d7ac6783"
+checksum = "704242769235d2ffe66a2a0a3002661262fc4af08d32807c362d7b0160ee703c"
 dependencies = [
  "bindgen",
  "cc",
  "flate2",
  "heck",
  "lazy_static",
+ "pkg-config",
  "regex",
  "serde_json",
  "tar",
@@ -4109,14 +4095,14 @@ dependencies = [
 
 [[package]]
 name = "skia-safe"
-version = "0.86.1"
+version = "0.87.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e372258f52414e04de007326fa497581617c9fa872a3225dca5e42212723c426"
+checksum = "0f7d94f3e7537c71ad4cf132eb26e3be8c8a886ed3649c4525c089041fc312b2"
 dependencies = [
  "bitflags 2.9.3",
  "lazy_static",
  "skia-bindings",
- "windows",
+ "windows 0.61.3",
 ]
 
 [[package]]
@@ -4127,8 +4113,8 @@ checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
 
 [[package]]
 name = "slint"
-version = "1.12.1"
-source = "git+https://github.com/PorQ-Pine/slint-package.git#4267086e54226e1babd6e13970860e80e1087cbd"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "const-field-offset",
  "i-slint-backend-selector",
@@ -4145,21 +4131,19 @@ dependencies = [
 
 [[package]]
 name = "slint-build"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0f58adfef3f956cc3c124cb19154cf29b510badf2a06b3a3521c6fdb97a47a4"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "derive_more",
  "i-slint-compiler",
  "spin_on",
- "toml_edit",
+ "toml_edit 0.23.4",
 ]
 
 [[package]]
 name = "slint-macros"
-version = "1.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33e4f639260309e13e8f8dc40ec905d57a15dc512d8d50c52ad650088cc7e1e2"
+version = "1.13.0"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "i-slint-compiler",
  "proc-macro2",
@@ -4533,8 +4517,8 @@ checksum = "dc1beb996b9d83529a9e75c17a1686767d148d70663143c7854d8b4a09ced362"
 dependencies = [
  "serde",
  "serde_spanned",
- "toml_datetime",
- "toml_edit",
+ "toml_datetime 0.6.11",
+ "toml_edit 0.22.27",
 ]
 
 [[package]]
@@ -4542,6 +4526,15 @@ name = "toml_datetime"
 version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22cddaf88f4fbc13c51aebbf5f8eceb5c7c5a9da2ac40a13519eb5b0a0e8f11c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bade1c3e902f58d73d3f294cd7f20391c1cb2fbcb643b73566bc773971df91e3"
 dependencies = [
  "serde",
 ]
@@ -4555,8 +4548,30 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_spanned",
- "toml_datetime",
+ "toml_datetime 0.6.11",
  "toml_write",
+ "winnow",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.23.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7211ff1b8f0d3adae1663b7da9ffe396eabe1ca25f0b0bee42b0da29a9ddce93"
+dependencies = [
+ "indexmap",
+ "toml_datetime 0.7.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow",
+]
+
+[[package]]
+name = "toml_parser"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b551886f449aa90d4fe2bdaa9f4a2577ad2dde302c61ecf262d80b116db95c10"
+dependencies = [
  "winnow",
 ]
 
@@ -4565,6 +4580,12 @@ name = "toml_write"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
+
+[[package]]
+name = "toml_writer"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc842091f2def52017664b53082ecbbeb5c7731092bad69d2c63050401dfd64"
 
 [[package]]
 name = "tracing"
@@ -4807,8 +4828,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vtable"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "753be81c38dff787d177b5939af1fa16f72f0d0d21a6b7d74ae56e29cd26f2a6"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "const-field-offset",
  "portable-atomic",
@@ -4819,8 +4839,7 @@ dependencies = [
 [[package]]
 name = "vtable-macro"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cfcf6171aa2b0f85718ca5888ca32f6edf61d1849f8e4b3786ad890e5b68f68"
+source = "git+https://github.com/PorQ-Pine/slint.git#0207510596e9824358b900248674b28c40e10cf1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4982,12 +5001,22 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
+dependencies = [
+ "windows-core 0.58.0",
+ "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows"
 version = "0.61.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9babd3a767a4c1aef6900409f85f5d53ce2544ccdfaa86dad48c91782c6d6893"
 dependencies = [
  "windows-collections",
- "windows-core",
+ "windows-core 0.61.2",
  "windows-future",
  "windows-link",
  "windows-numerics",
@@ -4999,7 +5028,20 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3beeceb5e5cfd9eb1d76b381630e82c4241ccd0d27f1a39ed41b2760b255c5e8"
 dependencies = [
- "windows-core",
+ "windows-core 0.61.2",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
+dependencies = [
+ "windows-implement 0.58.0",
+ "windows-interface 0.58.0",
+ "windows-result 0.2.0",
+ "windows-strings 0.1.0",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5008,11 +5050,11 @@ version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0fdd3ddb90610c7638aa2b3a3ab2904fb9e5cdbecc643ddb3647212781c4ae3"
 dependencies = [
- "windows-implement",
- "windows-interface",
+ "windows-implement 0.60.0",
+ "windows-interface 0.59.1",
  "windows-link",
- "windows-result",
- "windows-strings",
+ "windows-result 0.3.4",
+ "windows-strings 0.4.2",
 ]
 
 [[package]]
@@ -5021,9 +5063,20 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc6a41e98427b19fe4b73c550f060b59fa592d7d686537eebf9385621bfbad8e"
 dependencies = [
- "windows-core",
+ "windows-core 0.61.2",
  "windows-link",
  "windows-threading",
+]
+
+[[package]]
+name = "windows-implement"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bbd5b46c938e506ecbce286b6628a02171d56153ba733b6c741fc627ec9579b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -5031,6 +5084,17 @@ name = "windows-implement"
 version = "0.60.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a47fddd13af08290e67f4acabf4b459f647552718f683a7b415d290ac744a836"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
+]
+
+[[package]]
+name = "windows-interface"
+version = "0.58.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5060,8 +5124,17 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9150af68066c4c5c07ddc0ce30421554771e528bde427614c61038bc2c92c2b1"
 dependencies = [
- "windows-core",
+ "windows-core 0.61.2",
  "windows-link",
+]
+
+[[package]]
+name = "windows-result"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d1043d8214f791817bab27572aaa8af63732e11bf84aa21a45a78d6c317ae0e"
+dependencies = [
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5071,6 +5144,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56f42bd332cc6c8eac5af113fc0c1fd6a8fd2aa08a0119358686e5160d0586c6"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "windows-strings"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd9b125c486025df0eabcb585e62173c6c9eddcec5d117d3b6e8c30e2ee4d10"
+dependencies = [
+ "windows-result 0.2.0",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]

@@ -2,9 +2,6 @@
 resolver = "2"
 members = ["qinit", "libqinit"]
 
-[patch.crates-io]
-slint = { git = "https://github.com/PorQ-Pine/slint-package.git" }
-
 [profile.release]
 strip = true
 opt-level = "z"
