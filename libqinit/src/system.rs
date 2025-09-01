@@ -374,19 +374,6 @@ pub fn compress_string_to_xz(string: &str) -> Result<Vec<u8>> {
     Ok(data)
 }
 
-pub fn enforce_fb() -> Result<()> {
-    // Prevent Slint from defaulting to DRM backend
-    // Note: this does *not* prevent access to DRM resources from the main root filesystem
-    let empty_directory_path = "/.empty";
-    let dri_directory_path = "/dev/dri/";
-    fs::create_dir_all(&empty_directory_path)?;
-    if fs::exists(&format!("{}/card0", &dri_directory_path))? {
-        bind_mount(&empty_directory_path, &dri_directory_path)?;
-    }
-
-    Ok(())
-}
-
 pub fn sync_time() -> Result<()> {
     // This function assumes a working Internet connection
     info!("Syncing time");

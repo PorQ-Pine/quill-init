@@ -48,7 +48,7 @@ cfg_if::cfg_if! {
         mod gui;
 
         use libqinit::signing::{read_public_key};
-        use libqinit::system::{generate_version_string, generate_short_version_string, enforce_fb, power_off, reboot, BootCommand};
+        use libqinit::system::{generate_version_string, generate_short_version_string, power_off, reboot, BootCommand};
         use std::time::Duration;
         use std::thread;
         use std::sync::{Arc, Mutex};
@@ -217,7 +217,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
-            enforce_fb()?;
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
