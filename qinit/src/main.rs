@@ -278,7 +278,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             #[cfg(not(feature = "gui_only"))]
             {
                 // Resume boot
-                rootfs::setup(&pubkey, &mut boot_config)?;
+                rootfs::setup(&pubkey, boot_config.rootfs.persistent_storage)?;
+                rootfs::setup_misc(&mut boot_config)?;
             }
 
             // Socket used for binaries inside the chroot wishing to invoke a 'Fatal error' splash

@@ -103,8 +103,12 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
             format!("Failed to set IP address {} for {}", &IP_ADDR, &iface_name)
         })?;
     }
+    // DHCP server
     run_command("/usr/sbin/udhcpd", &[&UDHCPD_CONF_PATH])
         .with_context(|| "Failed to start DHCP server")?;
+
+    // FTP server
+    Command::new("/usr/bin/tcpsvd").args(&["-vE", "0.0.0.0", "2221", "/usr/sbin/ftpd", "-A", "-w", "/"]).spawn().with_context(|| "Failed to start FTP server")?;
 
     Ok(())
 }

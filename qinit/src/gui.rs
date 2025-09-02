@@ -704,6 +704,7 @@ pub fn setup_gui(
     let encryption_change_password_timer = Rc::new(Timer::default());
     gui.on_change_user_password({
         let gui_weak = gui_weak.clone();
+        let pubkey = pubkey.clone();
         move |user, mut old_password, new_password, encrypted_storage_was_disabled| {
             let gui_weak = gui_weak.clone();
             let pubkey = pubkey.clone();
@@ -742,13 +743,21 @@ pub fn setup_gui(
     let encryption_disable_timer = Rc::new(Timer::default());
     gui.on_disable_storage_encryption({
         let gui_weak = gui_weak.clone();
+        let pubkey = pubkey.clone();
         move |user, password| {
             let gui_weak = gui_weak.clone();
+            let pubkey = pubkey.clone();
             encryption_disable_timer.start(
                 TimerMode::SingleShot,
                 std::time::Duration::from_millis(100),
                 move || {
                     if let Some(gui) = gui_weak.upgrade() {
+                        if let Err(e) =
+                            change_user_password(&pubkey, &user, &password.to_string(), &String::new())
+                        {
+                            error_toast(&gui, "Failed to change user password", e.into());
+                        }
+
                         if let Err(e) =
                             storage_encryption::disable(&user.to_string(), &password.to_string())
                         {

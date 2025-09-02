@@ -1187,7 +1187,7 @@ export component AppWindow inherits Window {
 
     // Toasts/dialogs
     if (dialog == DialogType.Toast): Rectangle {
-        width: scaling_factor > 1 ? 0.45 * scaling_factor * root.width : 0.5 * scaling_factor * root.width;
+        width: scaling_factor > 1 ? 0.5 * scaling_factor * root.width : 0.6 * scaling_factor * root.width;
         height: 0.07 * scaling_factor * root.height;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;

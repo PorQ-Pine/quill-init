@@ -12,7 +12,7 @@ use std::env;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
-use sys_mount::{Mount, UnmountFlags, unmount};
+use sys_mount::{Mount, unmount, UnmountFlags};
 
 use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
@@ -192,9 +192,9 @@ pub fn mount_firmware(pubkey: &PKey<Public>) -> Result<()> {
 pub fn unmount_base_partitions() -> Result<()> {
     sync_disks()?;
     info!("Unmounting main partition");
-    unmount(&crate::MAIN_PART_MOUNTPOINT, UnmountFlags::DETACH)?;
+    bulletproof_unmount(&crate::MAIN_PART_MOUNTPOINT)?;
     info!("Unmounting data partition");
-    unmount(&crate::BOOT_PART_MOUNTPOINT, UnmountFlags::DETACH)?;
+    bulletproof_unmount(&crate::BOOT_PART_MOUNTPOINT)?;
 
     Ok(())
 }
@@ -397,6 +397,7 @@ pub fn set_timezone(timezone: &str) -> Result<()> {
     Ok(())
 }
 
+// https://docs.rs/rand/latest/rand/distr/struct.Alphanumeric.html
 pub fn generate_random_string(length: i32) -> Result<String> {
     let mut rng = rand::rng();
     let chars: String = (0..length)
@@ -410,6 +411,12 @@ pub fn rm_dir_all(path: &str) -> Result<()> {
     if fs::exists(&path)? {
         fs::remove_dir_all(&path)?;
     }
+
+    Ok(())
+}
+
+pub fn bulletproof_unmount(path: &str) -> Result<()> {
+    unmount(&path, UnmountFlags::DETACH | UnmountFlags::FORCE)?;
 
     Ok(())
 }
