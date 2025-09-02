@@ -752,9 +752,12 @@ pub fn setup_gui(
                 std::time::Duration::from_millis(100),
                 move || {
                     if let Some(gui) = gui_weak.upgrade() {
-                        if let Err(e) =
-                            change_user_password(&pubkey, &user, &password.to_string(), &String::new())
-                        {
+                        if let Err(e) = change_user_password(
+                            &pubkey,
+                            &user,
+                            &password.to_string(),
+                            &String::new(),
+                        ) {
                             error_toast(&gui, "Failed to change user password", e.into());
                         }
 

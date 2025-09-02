@@ -1,8 +1,9 @@
 use crate::eink;
 use anyhow::{Context, Result};
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use chrono;
 
 const BOOT_CONFIG_FILE: &str = "boot_config.ron";
 
@@ -69,10 +70,17 @@ impl BootConfig {
                 info!("Found valid boot configuration");
                 boot_config_to_return = boot_config;
             } else {
-                info!(
+                warn!(
                     "Found invalid boot configuration (possibly corrupted or incomplete?): returning default configuration, but enabling 'first_boot_done'"
                 );
+                let backup_path = format!("{}.{}.bak", &path, chrono::offset::Utc::now().timestamp());
+                info!("Backing old configuration up to path '{}'", &backup_path);
+                fs::copy(&path, &backup_path)?;
+
                 boot_config_to_return.flags.first_boot_done = true;
+
+                info!("Writing new boot configuration");
+                BootConfig::write(&boot_config_to_return)?;
             }
         } else {
             info!("Did not find a valid boot configuration: returning the default one");
