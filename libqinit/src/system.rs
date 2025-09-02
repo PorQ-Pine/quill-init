@@ -251,7 +251,7 @@ pub fn reboot() -> Result<()> {
     Ok(())
 }
 
-pub fn generate_version_string(boot_config: &mut BootConfig, kernel_commit: &str) -> String {
+pub fn generate_version_string(boot_config: &mut BootConfig, qinit_commit: &str, kernel_commit: &str) -> String {
     cfg_if::cfg_if! {
         if #[cfg(feature = "free_roam")] {
             let signing_state = "Package signing protection: disabled";
@@ -275,8 +275,8 @@ pub fn generate_version_string(boot_config: &mut BootConfig, kernel_commit: &str
     }
 
     let version_string = format!(
-        "Kernel commit: {}\n{}\n{}\n{}",
-        &kernel_commit, &recovery_features_state, &signing_state, &debug_state
+        "Kernel commit: {}\nGUI commit: {}\n{}\n{}\n{}",
+        &kernel_commit, &qinit_commit, &recovery_features_state, &signing_state, &debug_state
     );
 
     return version_string;

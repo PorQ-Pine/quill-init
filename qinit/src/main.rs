@@ -175,7 +175,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let mut boot_config = original_boot_config.clone();
 
             // Version strings
-            let version_string = generate_version_string(&mut boot_config, &kernel_commit);
+            let version_string = generate_version_string(&mut boot_config, &git_const::git_hash!()[0..12], &kernel_commit);
             let short_version_string = generate_short_version_string(&kernel_commit, &kernel_version);
 
             #[cfg(not(feature = "gui_only"))]
