@@ -98,10 +98,14 @@ pub fn setup(pubkey: &PKey<Public>, persistent: bool) -> Result<()> {
 pub fn tear_down() -> Result<()> {
     info!("Unmounting root filesystem overlay and cleaning up");
 
-    bulletproof_unmount(&crate::OVERLAY_MOUNTPOINT).with_context(|| "Failed to unmount root filesystem overlay directory")?;
-    bulletproof_unmount(&format!("{}", &crate::OVERLAY_WORKDIR)).with_context(|| "Failed to unmount root filesystem overlay's work directory")?;
-    rm_dir_all(&crate::OVERLAY_MOUNTPOINT).with_context(|| "Failed to remove overlay mountpoint's directory")?;
-    rm_dir_all(&crate::OVERLAY_WORKDIR).with_context(|| "Failed to remove overlay's work directory")?;
+    bulletproof_unmount(&crate::OVERLAY_MOUNTPOINT)
+        .with_context(|| "Failed to unmount root filesystem overlay directory")?;
+    bulletproof_unmount(&format!("{}", &crate::OVERLAY_WORKDIR))
+        .with_context(|| "Failed to unmount root filesystem overlay's work directory")?;
+    rm_dir_all(&crate::OVERLAY_MOUNTPOINT)
+        .with_context(|| "Failed to remove overlay mountpoint's directory")?;
+    rm_dir_all(&crate::OVERLAY_WORKDIR)
+        .with_context(|| "Failed to remove overlay's work directory")?;
 
     Ok(())
 }
@@ -174,10 +178,14 @@ fn change_user_password_chroot_command(
                 "-s",
                 "/bin/sh",
                 "-c",
-                &format!("printf '{}\n{}\n{}' | {} {}", &old_password, &new_password, &new_password, &passwd_path, &user),
-                &user
+                &format!(
+                    "printf '{}\n{}\n{}' | {} {}",
+                    &old_password, &new_password, &new_password, &passwd_path, &user
+                ),
+                &user,
             ],
-        ).with_context(|| "Provided login credentials were incorrect")?;
+        )
+        .with_context(|| "Provided login credentials were incorrect")?;
     } else {
         run_command(
             "/usr/sbin/chroot",
@@ -185,9 +193,13 @@ fn change_user_password_chroot_command(
                 &chroot_path,
                 "/bin/sh",
                 "-c",
-                &format!("printf '{}\n{}' | {} {}", &new_password, &new_password, &passwd_path, &user)
+                &format!(
+                    "printf '{}\n{}' | {} {}",
+                    &new_password, &new_password, &passwd_path, &user
+                ),
             ],
-        ).with_context(|| "Error setting password")?;
+        )
+        .with_context(|| "Error setting password")?;
     }
 
     Ok(())

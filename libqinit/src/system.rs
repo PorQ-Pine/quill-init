@@ -12,7 +12,7 @@ use std::env;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
-use sys_mount::{Mount, unmount, UnmountFlags};
+use sys_mount::{Mount, UnmountFlags, unmount};
 
 use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
@@ -251,7 +251,11 @@ pub fn reboot() -> Result<()> {
     Ok(())
 }
 
-pub fn generate_version_string(boot_config: &mut BootConfig, qinit_commit: &str, kernel_commit: &str) -> String {
+pub fn generate_version_string(
+    boot_config: &mut BootConfig,
+    qinit_commit: &str,
+    kernel_commit: &str,
+) -> String {
     cfg_if::cfg_if! {
         if #[cfg(feature = "free_roam")] {
             let signing_state = "Package signing protection: disabled";

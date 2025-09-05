@@ -119,7 +119,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             mount_base_partitions()?;
             let rotation_env_var_base = "SLINT_KMS_ROTATION=";
             let rotation_env_var;
-            let boot_config = BootConfig::read()?;
+            let (boot_config, _) = BootConfig::read()?;
             if boot_config.system.initial_screen_rotation == ScreenRotation::Cw0 {
                 rotation_env_var = format!("{}0", &rotation_env_var_base);
             } else if boot_config.system.initial_screen_rotation == ScreenRotation::Cw90 {
@@ -170,7 +170,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
 
             // Read boot configuration
-            let original_boot_config = BootConfig::read()?;
+            let (original_boot_config, boot_config_valid) = BootConfig::read()?;
             info!("Original boot configuration: {:?}", &original_boot_config);
             let mut boot_config = original_boot_config.clone();
 
@@ -223,7 +223,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 let boot_config_mutex = boot_config_mutex.clone();
                 let pubkey = pubkey.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey)
+                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey, boot_config_valid)
                 }
             });
 
@@ -245,7 +245,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 if boot_command == BootCommand::NormalBoot {
                     boot_command = BootCommand::Reboot;
                     toast_sender.send("Applying changes".to_string())?;
-                    BootConfig::write(&mut boot_config)?;
+                    BootConfig::write(&mut boot_config, false)?;
                     std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
                     reboot()?;
                 }
@@ -257,8 +257,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
 
             if boot_command != BootCommand::NormalBoot {
-                if boot_config != original_boot_config {
-                    BootConfig::write(&mut boot_config)?;
+                if !boot_config_valid || boot_config != original_boot_config {
+                    BootConfig::write(&mut boot_config, false)?;
                 } else {
                     info!("Boot configuration did not change: not writing it back");
                 }
@@ -312,8 +312,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 // Wait until systemd startup has completed
                 boot_receiver.recv()?;
                 info!("systemd startup complete");
-                if boot_config != original_boot_config {
-                    BootConfig::write(&mut boot_config)?;
+                if !boot_config_valid || boot_config != original_boot_config {
+                    BootConfig::write(&mut boot_config, false)?;
                 }
             }
         }

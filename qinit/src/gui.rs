@@ -41,6 +41,7 @@ pub fn setup_gui(
     display_progress_bar: bool,
     boot_config_mutex: Arc<Mutex<BootConfig>>,
     pubkey: &PKey<Public>,
+    boot_config_valid: bool,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
@@ -110,7 +111,14 @@ pub fn setup_gui(
 
     gui.set_version_string(SharedString::from(version_string));
 
-    if get_cmdline_bool("quill_recovery")? {
+    let quill_recovery = get_cmdline_bool("quill_recovery")?;
+    gui.set_quill_recovery(quill_recovery);
+
+    if !boot_config_valid {
+        set_page_sender.send(Page::InvalidBootConfig)?;
+    }
+
+    if boot_config_valid && quill_recovery {
         info!("Showing QuillBoot menu");
         thread::spawn(|| {
             brightness::set_brightness_unified(
@@ -119,7 +127,7 @@ pub fn setup_gui(
             )
         });
         set_page_sender.send(Page::QuillBoot)?;
-    } else {
+    } else if boot_config_valid {
         // Trigger normal boot automatically
         boot_normal(&boot_sender, &set_page_sender, &default_user)?;
     }
@@ -477,6 +485,18 @@ pub fn setup_gui(
                     if display_error {
                         error_toast(&gui, "Failed to power off", e.into());
                     }
+                }
+            }
+        }
+    });
+
+    // System
+    gui.on_direct_power_off({
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                if let Err(e) = power_off() {
+                    error_toast(&gui, "Failed to power off", e.into());
                 }
             }
         }

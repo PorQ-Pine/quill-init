@@ -13,7 +13,7 @@ import { Slider } from "../../ui-common/slider.slint";
 import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 import { HList } from "../../ui-common/hlist.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, Error }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, InvalidBootConfig, Error }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword, EncryptionNewPassword, Brightness, BatteryStatus }
@@ -35,6 +35,7 @@ export component AppWindow inherits Window {
     page: Page.None;
     // Callbacks
     callback power_off();
+    callback direct_power_off();
     callback reboot();
     callback toggle_ui_scale();
     callback toggle_persistent_rootfs();
@@ -100,6 +101,7 @@ export component AppWindow inherits Window {
     in property <bool> charger_plugged_in;
     in property <string> default_user: "";
     in property <bool> login_captive_portal: false;
+    in property <bool> quill_recovery;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -145,7 +147,7 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: layout_padding;
             spacing: layout_spacing;
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.Error): HorizontalLayout {
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HorizontalLayout {
                 IconButton {
                     icon: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -265,7 +267,7 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.Error): HLine {
+            if (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
                 top-padding-multiplier: page == Page.QuillBoot ? 0.5 : 1;
             }
 
@@ -993,6 +995,75 @@ export component AppWindow inherits Window {
                 if (TextInputInterface.text-input-focused): Rectangle {
                     height: root.height * 0.25;
                 }
+            }
+
+            if (page == Page.InvalidBootConfig): VerticalLayout {
+                alignment: center;
+                spacing: layout_spacing;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../icons/warning.svg");
+                        width: logo_width * 0.9;
+                        height: self.width;
+                    }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    Text {
+                        text: "Warning";
+                        horizontal-alignment: center;
+                        font-family: header_font_family;
+                        font-size: header_font_size;
+                        font-weight: 800;
+                    }
+                }
+                Rectangle {
+                    height: root.height * 0.025;
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    Text {
+                        text: "The boot configuration which was found on this device is invalid: it might possibly have been corrupted. A new, working one has been written for reference alongside the current one.\n\nPress 'Continue' to overwrite the current configuration (leaving the backup in place) and replace it with the default one.\n\nPress 'Power off' to edit the configuration manually on your computer and retry the boot process again.";
+                        width: root.width * 0.55;
+                        wrap: word-wrap;
+                        horizontal-alignment: center;
+                    }
+                }
+                Rectangle {
+                    height: root.height * 0.05;
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: layout_spacing * 4;
+                    Button {
+                        text: "Power off";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        font-family: header_font_family;
+                        clicked => {
+                            direct_power_off();
+                        }
+                    }
+
+                    Button {
+                        text: "Continue";
+                        width: button_width;
+                        height: button_height;
+                        border-radius: radius;
+                        font-family: header_font_family;
+                        clicked => {
+                            if quill_recovery {
+                                root.page = Page.QuillBoot;
+                            } else {
+                                root.page = Page.None;
+                                boot_default();
+                            }
+                        }
+                    }
+                }
+
             }
 
             if (page == Page.Error): VerticalLayout {
