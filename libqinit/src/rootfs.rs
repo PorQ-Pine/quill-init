@@ -136,7 +136,17 @@ pub fn setup_mounts() -> Result<()> {
     bind_mount(
         &format!("{}", &crate::BOOT_PART_MOUNTPOINT),
         &format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::BOOT_DIR),
-    )?;
+    )
+    .with_context(|| "Failed to bind-mount boot partition to overlay")?;
+    bind_mount(
+        &format!(
+            "{}/{}",
+            &crate::MAIN_PART_MOUNTPOINT,
+            &crate::SYSTEM_HOME_DIR
+        ),
+        &format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::SYSTEM_HOME_DIR),
+    )
+    .with_context(|| "Failed to bind-mount system home directory to overlay")?;
 
     Ok(())
 }

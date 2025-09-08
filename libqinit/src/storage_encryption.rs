@@ -3,7 +3,7 @@ use log::info;
 use serde_json;
 use std::fs;
 
-use crate::system::run_command;
+use crate::system::{is_mountpoint, run_command};
 
 const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
 const DISABLED_MODE_FILE: &str = "encryption_disabled";
@@ -99,23 +99,26 @@ pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {
 
 pub fn mount_storage(user: &str, password: &str) -> Result<()> {
     info!("Attempting to mount encrypted storage for user '{}'", &user);
-    run_command(
-        "/bin/sh",
-        &[
-            "-c",
-            &format!(
-                "printf '{}' | {} -allow_other {}/{}/.{} {}/{}/{}",
-                &password,
-                &GOCRYPTFS_BINARY,
-                &crate::MAIN_PART_MOUNTPOINT,
-                &crate::SYSTEM_HOME_DIR,
-                &user,
-                &crate::MAIN_PART_MOUNTPOINT,
-                &crate::SYSTEM_HOME_DIR,
-                &user
-            ),
-        ],
-    )?;
+    let home_path_base = format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::SYSTEM_HOME_DIR);
+    let home_path_encrypted = format!("{}/.{}", &home_path_base, &user);
+    let home_mountpoint_path = format!("{}/{}", &home_path_base, &user);
+
+    if !is_mountpoint(&home_mountpoint_path)? {
+        run_command(
+            "/bin/sh",
+            &[
+                "-c",
+                &format!(
+                    "printf '{}' | {} -allow_other {} {}",
+                    &password, &GOCRYPTFS_BINARY, &home_path_encrypted, &home_mountpoint_path,
+                ),
+            ],
+        )?;
+    } else {
+        return Err(anyhow::anyhow!(
+            "User home directory seems to be already mounted"
+        ));
+    }
 
     Ok(())
 }
