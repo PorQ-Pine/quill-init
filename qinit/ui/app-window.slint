@@ -185,7 +185,7 @@ export component AppWindow inherits Window {
                     width: self.height;
                 }
             }
-            if (page == Page.QuillBoot): HorizontalLayout {
+            if (page == Page.QuillBoot || page == Page.UserLogin): HorizontalLayout {
                 spacing: layout_spacing * 1.5;
                 Text {
                     text: current_time;
@@ -196,7 +196,7 @@ export component AppWindow inherits Window {
 
                 Rectangle { }
 
-                IconButton {
+                if (page != Page.UserLogin): IconButton {
                     icon: wifi_icon;
                     border-radius: radius;
                     height: bar_button_height;
@@ -210,7 +210,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                VLine {
+                if (page != Page.UserLogin): VLine {
                     thickness: 1px;
                     left-padding-multiplier: 0.05;
                     right-padding-multiplier: self.left-padding-multiplier;
@@ -267,7 +267,7 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
+            if (page != Page.BootSplash) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
                 top-padding-multiplier: page == Page.QuillBoot ? 0.5 : 1;
             }
 
