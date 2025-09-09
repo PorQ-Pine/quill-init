@@ -47,11 +47,14 @@ pub fn setup_gui(
     let gui_weak = gui.as_weak();
     let mut default_user = String::new();
     let pubkey = pubkey.to_owned();
+    let first_boot_done;
 
     // Boot configuration
     {
         let boot_config_mutex = boot_config_mutex.clone();
         let boot_config_guard = boot_config_mutex.lock().unwrap();
+
+        first_boot_done = boot_config_guard.flags.first_boot_done;
 
         if let Some(user) = &boot_config_guard.system.default_user {
             info!("Found default user in boot configuration: '{}'", &user);
@@ -129,7 +132,12 @@ pub fn setup_gui(
         set_page_sender.send(Page::QuillBoot)?;
     } else if boot_config_valid {
         // Trigger normal boot automatically
-        boot_normal(&boot_sender, &set_page_sender, &default_user)?;
+        boot_normal(
+            &boot_sender,
+            &set_page_sender,
+            &default_user,
+            first_boot_done,
+        )?;
     }
 
     // Boot progress bar timer
@@ -558,7 +566,12 @@ pub fn setup_gui(
         let set_page_sender = set_page_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = boot_normal(&boot_sender, &set_page_sender, &default_user) {
+            if let Err(e) = boot_normal(
+                &boot_sender,
+                &set_page_sender,
+                &default_user,
+                first_boot_done,
+            ) {
                 if let Some(gui) = gui_weak.upgrade() {
                     error_toast(&gui, "Failed to send boot command", e.into());
                 }
@@ -940,21 +953,25 @@ fn boot_normal(
     boot_sender: &Sender<BootCommand>,
     set_page_sender: &Sender<Page>,
     default_user: &str,
+    first_boot_done: bool,
 ) -> Result<()> {
-    let encryption_users_list = storage_encryption::get_users_using_storage_encryption()?;
     let mut wait_for_login = false;
-    if !encryption_users_list.is_empty()
-        && encryption_users_list.contains(&default_user.to_string())
-    {
-        wait_for_login = true;
-    } else {
-        if default_user.is_empty() {
-            wait_for_login = true;
-        }
-    }
 
-    if wait_for_login {
-        set_page_sender.send(Page::UserLogin)?;
+    if first_boot_done {
+        let encryption_users_list = storage_encryption::get_users_using_storage_encryption()?;
+        if !encryption_users_list.is_empty()
+            && encryption_users_list.contains(&default_user.to_string())
+        {
+            wait_for_login = true;
+        } else {
+            if default_user.is_empty() {
+                wait_for_login = true;
+            }
+        }
+
+        if wait_for_login {
+            set_page_sender.send(Page::UserLogin)?;
+        }
     }
 
     boot_sender.send(BootCommand::NormalBoot)?;
