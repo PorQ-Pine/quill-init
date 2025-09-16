@@ -263,7 +263,11 @@ export component AppWindow inherits Window {
                     padding-value: bar_icon_button_padding;
                     y: (parent.height - self.height) / 2;
                     clicked => {
-                        power_off();
+                        if page == Page.UserLogin {
+                            direct_power_off();
+                        } else {
+                            power_off();
+                        }
                     }
                 }
             }
