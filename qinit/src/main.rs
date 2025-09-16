@@ -60,7 +60,7 @@ cfg_if::cfg_if! {
 
 use anyhow::{Context, Result};
 use libqinit::boot_config::BootConfig;
-use libqinit::socket;
+use libquillcom::socket;
 use log::{error, info};
 use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
