@@ -302,6 +302,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
                 socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
 
+                thread::spawn(move || rootfs_socket::initialize());
+
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
                     systemd::wait_for_targets(&mut boot_config, systemd_targets_total, progress_sender)?;
@@ -309,8 +311,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     // Only runs on first boot or when boot configuration is cleared/corrupted
                     systemd::wait_and_count_targets(Some(&mut boot_config), Some(progress_sender), None)?;
                 }
-
-                thread::spawn(move || rootfs_socket::initialize());
 
                 // Wait until systemd startup has completed
                 boot_receiver.recv()?;
