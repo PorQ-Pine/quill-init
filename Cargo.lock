@@ -2388,6 +2388,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "env_logger",
+ "libquillcom 0.1.0 (git+https://github.com/PorQ-Pine/libquillcom)",
  "local-ip-address",
  "log",
  "openssl",
@@ -2401,6 +2402,15 @@ dependencies = [
  "sha256",
  "strum_macros",
  "sys-mount",
+]
+
+[[package]]
+name = "libquillcom"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "serde",
 ]
 
 [[package]]
@@ -3562,7 +3572,7 @@ dependencies = [
  "exec",
  "git-const",
  "libqinit",
- "libquillcom",
+ "libquillcom 0.1.0",
  "log",
  "network-interface",
  "nix",

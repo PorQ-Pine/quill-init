@@ -49,6 +49,7 @@ cfg_if::cfg_if! {
 
         use libqinit::signing::{read_public_key};
         use libqinit::system::{generate_version_string, generate_short_version_string, power_off, reboot, BootCommand};
+        use libqinit::rootfs_socket;
         use std::time::Duration;
         use std::thread;
         use std::sync::{Arc, Mutex};
@@ -308,6 +309,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     // Only runs on first boot or when boot configuration is cleared/corrupted
                     systemd::wait_and_count_targets(Some(&mut boot_config), Some(progress_sender), None)?;
                 }
+
+                thread::spawn(move || rootfs_socket::initialize());
 
                 // Wait until systemd startup has completed
                 boot_receiver.recv()?;
