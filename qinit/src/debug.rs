@@ -42,16 +42,37 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
     if usbnet_host_mac_address.is_empty() || usbnet_dev_mac_address.is_empty() {
         warn!("Generating new MAC addresses");
         let generate_command = "printf '%02x' $((0x$(od /dev/urandom -N1 -t x1 -An | tr -d ' ') & 0xFE | 0x02)); od /dev/urandom -N5 -t x1 -An | tr ' '  ':'";
-        usbnet_host_mac_address = String::from_utf8(Command::new("/bin/sh").args(&["-c", &generate_command]).output()?.stdout)?.trim().to_string();
-        usbnet_dev_mac_address = String::from_utf8(Command::new("/bin/sh").args(&["-c", &generate_command]).output()?.stdout)?.trim().to_string();
+        usbnet_host_mac_address = String::from_utf8(
+            Command::new("/bin/sh")
+                .args(&["-c", &generate_command])
+                .output()?
+                .stdout,
+        )?
+        .trim()
+        .to_string();
+        usbnet_dev_mac_address = String::from_utf8(
+            Command::new("/bin/sh")
+                .args(&["-c", &generate_command])
+                .output()?
+                .stdout,
+        )?
+        .trim()
+        .to_string();
         boot_config.debug.usbnet_host_mac_address = Some(usbnet_host_mac_address.to_string());
         boot_config.debug.usbnet_dev_mac_address = Some(usbnet_dev_mac_address.to_string());
     }
-    warn!("Using host MAC address {} and device MAC address {}", &usbnet_host_mac_address, &usbnet_dev_mac_address);
+    warn!(
+        "Using host MAC address {} and device MAC address {}",
+        &usbnet_host_mac_address, &usbnet_dev_mac_address
+    );
 
     // liblmod is not able to load g_ether properly, it seems
     modprobe(&["phy-rockchip-inno-usb2"])?;
-    modprobe(&["g_ether", &format!("host_addr={}", &usbnet_host_mac_address), &format!("dev_addr={}", &usbnet_dev_mac_address)])?;
+    modprobe(&[
+        "g_ether",
+        &format!("host_addr={}", &usbnet_host_mac_address),
+        &format!("dev_addr={}", &usbnet_dev_mac_address),
+    ])?;
 
     let network_interfaces =
         NetworkInterface::show().with_context(|| "Failed to retrieve network interfaces")?;
@@ -108,7 +129,10 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
         .with_context(|| "Failed to start DHCP server")?;
 
     // FTP server
-    Command::new("/usr/bin/tcpsvd").args(&["-vE", "0.0.0.0", "2221", "/usr/sbin/ftpd", "-A", "-w", "/"]).spawn().with_context(|| "Failed to start FTP server")?;
+    Command::new("/usr/bin/tcpsvd")
+        .args(&["-vE", "0.0.0.0", "2221", "/usr/sbin/ftpd", "-A", "-w", "/"])
+        .spawn()
+        .with_context(|| "Failed to start FTP server")?;
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use log::info;
 use libquillcom::socket;
+use log::info;
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 

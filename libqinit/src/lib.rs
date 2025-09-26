@@ -14,9 +14,9 @@ cfg_if::cfg_if! {
 }
 pub mod boot_config;
 pub mod eink;
+pub mod rootfs_socket;
 pub mod signing;
 pub mod system;
-pub mod rootfs_socket;
 
 pub const BOOT_PART: &str = "/dev/mmcblk0p7";
 pub const MAIN_PART: &str = "/dev/mmcblk0p9";
