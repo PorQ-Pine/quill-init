@@ -138,6 +138,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
             first_stage_info("Waiting for status message from second stage qinit binary");
             let status = from_bytes::<OverlayStatus>(socket::read(boot_unix_listener)?.deref())?;
+
             if status.ready {
                 first_stage_info("Ready for systemd initialization");
                 fs::remove_file(&BOOT_SOCKET_PATH).with_context(|| "Failed to remove qinit UNIX socket file")?;
