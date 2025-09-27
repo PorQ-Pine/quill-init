@@ -25,7 +25,7 @@ pub fn initialize(login_credentials_receiver: Receiver<LoginForm>) -> Result<()>
 
     thread::spawn({
         let login_form_mutex = login_form_mutex.clone();
-        move || listen_for_commands(login_form_mutex.clone())
+        move || listen_for_commands(login_form_mutex)
     });
 
     Ok(())
