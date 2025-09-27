@@ -54,9 +54,11 @@ fn main() -> Result<()> {
     }
 
     if args.exclusive_options.get_login_credentials {
-        let credentials = &from_bytes::<socket::LoginForm>(&reply)?;
-        info!("Username: '{}'", credentials.username);
-        info!("Password: '{}'", credentials.password);
+        let credentials = &from_bytes::<Option<socket::LoginForm>>(&reply)?;
+        if let Some(c) = credentials {
+            info!("Username: '{}'", c.username);
+            info!("Password: '{}'", c.password);
+        }
     }
 
     Ok(())
