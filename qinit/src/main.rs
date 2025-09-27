@@ -290,7 +290,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             std::thread::spawn(move || {
                 if let Ok(qinit_unix_listener) = socket::bind(&qinit_socket_path) {
                     // This is a one-time call: any more fatal errors are useless since we already block the UI until the next boot
-                    if let Ok(qinit_unix_listener_socket) = socket::read(qinit_unix_listener) {
+                    if let Ok(qinit_unix_listener_socket) = socket::read(&qinit_unix_listener) {
                         info!("Received request to show fatal error splash: proceeding");
                         if let Ok(error_details) = from_bytes::<socket::ErrorDetails>(&qinit_unix_listener_socket) {
                             let _ = interrupt_sender.send(error_details.error_reason);

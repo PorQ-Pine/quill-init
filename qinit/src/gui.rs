@@ -911,7 +911,6 @@ pub fn setup_gui(
                     if let Err(e) = login_credentials_sender.send(LoginForm {
                         username: username.to_string(),
                         password: password.to_string(),
-                        assumed_valid: true,
                     }) {
                         error_toast(&gui, "Failed to send login credentials", e.into());
                     } else {

@@ -2414,7 +2414,6 @@ dependencies = [
 [[package]]
 name = "libquillcom"
 version = "0.1.0"
-source = "git+https://github.com/PorQ-Pine/libquillcom#60e74c5b21cfe64b4f9c555d9e81423c64a90154"
 dependencies = [
  "anyhow",
  "log",
