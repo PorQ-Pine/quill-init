@@ -8,8 +8,8 @@ anyhow = "1.0.98"
 clap = { version = "4.5.41", features = ["derive"] }
 postcard = { version = "1.1.2", features = ["alloc"] }
 libquillcom = { git = "https://github.com/PorQ-Pine/libquillcom" }
-
-[workspace]
+env_logger = "0.11.8"
+log = "0.4.28"
 
 [features]
 debug = []

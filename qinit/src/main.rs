@@ -61,7 +61,7 @@ cfg_if::cfg_if! {
 
 use anyhow::{Context, Result};
 use libqinit::boot_config::BootConfig;
-use libquillcom::socket::{self, LoginForm};
+use libquillcom::socket;
 use log::{error, info};
 use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
@@ -219,7 +219,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
-            let (login_credentials_sender, login_credentials_receiver): (Sender<LoginForm>, Receiver<LoginForm>) = channel();
+            let (login_credentials_sender, login_credentials_receiver): (Sender<socket::LoginForm>, Receiver<socket::LoginForm>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
@@ -302,7 +302,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
             #[cfg(not(feature = "gui_only"))] {
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
-                socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
+                let _ = socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
 
                 thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver));
 

@@ -8,6 +8,7 @@ use core::ops::Deref;
 use libquillcom::socket::{self, Command, LoginForm};
 use log::info;
 use postcard::{from_bytes, to_allocvec};
+use std::io::Write;
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 
@@ -47,10 +48,11 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<LoginForm>>) -> Result<()
     info!("Listening for commands");
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
     loop {
-        let (unix_stream, _socket_address) = unix_listener.accept()?;
-        match from_bytes::<Command>(&socket::read_from_stream(unix_stream)?.deref())? {
+        let (mut unix_stream, _socket_address) = unix_listener.accept()?;
+        match from_bytes::<Command>(&socket::read_from_stream(&unix_stream)?.deref())? {
             Command::GetLoginCredentials => {
                 info!("Sending login credentials to root filesystem");
+
                 let mut login_form_guard = login_form_mutex.lock().unwrap();
                 login_form_guard.assumed_valid =
                     !login_form_guard.username.is_empty() && !login_form_guard.password.is_empty();
@@ -61,8 +63,8 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<LoginForm>>) -> Result<()
                     assumed_valid: login_form_guard.assumed_valid,
                 })
                 .with_context(|| "Failed to create vector with login credentials")?;
-                // Write to qoms socket somewhere?
-                // socket::write(&ROOTFS_SOCKET_PATH, &login_form_vec)?;
+
+                unix_stream.write_all(&login_form_vec)?;
             }
             Command::StopListening => {
                 break;

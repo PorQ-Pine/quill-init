@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use libquillcom::{socket, socket::Command, socket::ErrorDetails};
-use postcard::to_allocvec;
+use libquillcom::socket;
+use postcard::{from_bytes, to_allocvec};
+use log::info;
 
 // Should be run from the chroot
 const QINIT_SOCKET_PATH: &str = "/run/qinit.sock";
@@ -35,6 +36,7 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
     let args = Args::parse();
     let vector;
     if args.exclusive_options.trigger_fatal_error {
@@ -46,7 +48,16 @@ fn main() -> Result<()> {
         vector = to_allocvec(&socket::Command::GetLoginCredentials)?;
     }
 
-    socket::write(&args.socket_path, &vector)?;
+    let mut reply = Vec::new();
+    if args.exclusive_options.get_login_credentials {
+        reply = socket::write_and_read(&args.socket_path, &vector)?;
+    }
+
+    if args.exclusive_options.get_login_credentials {
+        let credentials = &from_bytes::<socket::LoginForm>(&reply)?;
+        info!("Username: '{}'", credentials.username);
+        info!("Password: '{}'", credentials.password);
+    }
 
     Ok(())
 }
