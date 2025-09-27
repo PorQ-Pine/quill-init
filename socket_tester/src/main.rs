@@ -45,7 +45,7 @@ fn main() -> Result<()> {
         })
         .with_context(|| "Failed to create vector with boot command")?;
     } else {
-        vector = to_allocvec(&socket::Command::GetLoginCredentials)?;
+        vector = to_allocvec(&socket::CommandToQinit::GetLoginCredentials)?;
     }
 
     let mut reply = Vec::new();
