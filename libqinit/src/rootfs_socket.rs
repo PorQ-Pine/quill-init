@@ -1,5 +1,4 @@
 use std::{
-    os::unix::net::UnixListener,
     sync::{Arc, Mutex, mpsc::Receiver},
     thread,
 };
@@ -23,10 +22,9 @@ pub fn initialize(login_credentials_receiver: Receiver<LoginForm>) -> Result<()>
         move || listen_for_login_credentials(login_credentials_receiver, login_form_mutex)
     });
 
-    let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
     thread::spawn({
         let login_form_mutex = login_form_mutex.clone();
-        move || listen_for_commands(unix_listener, login_form_mutex.clone())
+        move || listen_for_commands(login_form_mutex.clone())
     });
 
     Ok(())
@@ -45,13 +43,12 @@ pub fn listen_for_login_credentials(
     }
 }
 
-pub fn listen_for_commands(
-    unix_listener: UnixListener,
-    login_form_mutex: Arc<Mutex<LoginForm>>,
-) -> Result<()> {
+pub fn listen_for_commands(login_form_mutex: Arc<Mutex<LoginForm>>) -> Result<()> {
     info!("Listening for commands");
+    let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
     loop {
-        match from_bytes::<Command>(socket::read(unix_listener.try_clone()?)?.deref())? {
+        let (unix_stream, _socket_address) = unix_listener.accept()?;
+        match from_bytes::<Command>(&socket::read_from_stream(unix_stream)?.deref())? {
             Command::GetLoginCredentials => {
                 info!("Sending login credentials to root filesystem");
                 let mut login_form_guard = login_form_mutex.lock().unwrap();
@@ -65,7 +62,7 @@ pub fn listen_for_commands(
                 })
                 .with_context(|| "Failed to create vector with login credentials")?;
                 // Write to qoms socket somewhere?
-                // socket::write(&QOMS_SOCKET_PATH, &login_form_vec)?;
+                // socket::write(&ROOTFS_SOCKET_PATH, &login_form_vec)?;
             }
             Command::StopListening => {
                 break;

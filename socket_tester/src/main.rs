@@ -6,7 +6,7 @@ use postcard::to_allocvec;
 // Should be run from the chroot
 const QINIT_SOCKET_PATH: &str = "/run/qinit.sock";
 
-// ChatGPT helped for this ;p
+// Gemini helped for this ;p
 #[derive(Parser)]
 #[clap(group(clap::ArgGroup::new("exclusive").required(true).multiple(false)))]
 struct ExclusiveOptions {
