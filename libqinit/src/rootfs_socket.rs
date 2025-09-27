@@ -1,26 +1,71 @@
-use std::os::unix::net::UnixListener;
+use std::{
+    os::unix::net::UnixListener,
+    sync::{Arc, Mutex, mpsc::Receiver},
+    thread,
+};
 
 use anyhow::{Context, Result};
-use libquillcom::socket::{self, Command};
-use postcard::{from_bytes, to_allocvec};
-use log::info;
 use core::ops::Deref;
+use libquillcom::socket::{self, Command, LoginForm};
+use log::info;
+use postcard::{from_bytes, to_allocvec};
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 
-pub fn initialize() -> Result<()> {
+pub fn initialize(login_credentials_receiver: Receiver<LoginForm>) -> Result<()> {
+    let login_form_mutex = Arc::new(Mutex::new(LoginForm {
+        username: String::new(),
+        password: String::new(),
+        assumed_valid: false,
+    }));
+    thread::spawn({
+        let login_form_mutex = login_form_mutex.clone();
+        move || listen_for_login_credentials(login_credentials_receiver, login_form_mutex)
+    });
+
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
-    listen_for_commands(unix_listener)?;
+    thread::spawn({
+        let login_form_mutex = login_form_mutex.clone();
+        move || listen_for_commands(unix_listener, login_form_mutex.clone())
+    });
 
     Ok(())
 }
 
-pub fn listen_for_commands(unix_listener: UnixListener) -> Result<()> {
+pub fn listen_for_login_credentials(
+    login_credentials_receiver: Receiver<LoginForm>,
+    login_form_mutex: Arc<Mutex<LoginForm>>,
+) -> Result<()> {
+    loop {
+        if let Ok(login_form) = login_credentials_receiver.recv() {
+            let mut login_form_guard = login_form_mutex.lock().unwrap();
+            login_form_guard.username = login_form.username;
+            login_form_guard.password = login_form.password;
+        }
+    }
+}
+
+pub fn listen_for_commands(
+    unix_listener: UnixListener,
+    login_form_mutex: Arc<Mutex<LoginForm>>,
+) -> Result<()> {
     info!("Listening for commands");
     loop {
         match from_bytes::<Command>(socket::read(unix_listener.try_clone()?)?.deref())? {
             Command::GetLoginCredentials => {
                 info!("Sending login credentials to root filesystem");
+                let mut login_form_guard = login_form_mutex.lock().unwrap();
+                login_form_guard.assumed_valid =
+                    !login_form_guard.username.is_empty() && !login_form_guard.password.is_empty();
+
+                let login_form_vec = to_allocvec(&LoginForm {
+                    username: login_form_guard.username.clone(),
+                    password: login_form_guard.password.clone(),
+                    assumed_valid: login_form_guard.assumed_valid,
+                })
+                .with_context(|| "Failed to create vector with login credentials")?;
+                // Write to qoms socket somewhere?
+                // socket::write(&QOMS_SOCKET_PATH, &login_form_vec)?;
             }
             Command::StopListening => {
                 break;

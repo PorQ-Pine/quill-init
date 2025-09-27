@@ -17,6 +17,7 @@ use libqinit::system::{
     read_kernel_buffer_singleshot, reboot,
 };
 use libqinit::wifi;
+use libquillcom::socket::LoginForm;
 use log::{debug, error, info};
 use openssl::pkey::{PKey, Public};
 use qrcode_generator::QrCodeEcc;
@@ -34,6 +35,7 @@ const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
 pub fn setup_gui(
     progress_receiver: Receiver<f32>,
     boot_sender: Sender<BootCommand>,
+    login_credentials_sender: Sender<LoginForm>,
     interrupt_receiver: Receiver<String>,
     toast_receiver: Receiver<String>,
     version_string: String,
@@ -906,7 +908,15 @@ pub fn setup_gui(
                 if let Err(e) = storage_encryption::mount_storage(&username, &password) {
                     error_toast(&gui, "Login failed: please try again", e.into());
                 } else {
-                    let _ = set_page_sender.send(Page::BootSplash);
+                    if let Err(e) = login_credentials_sender.send(LoginForm {
+                        username: username.to_string(),
+                        password: password.to_string(),
+                        assumed_valid: true,
+                    }) {
+                        error_toast(&gui, "Failed to send login credentials", e.into());
+                    } else {
+                        let _ = set_page_sender.send(Page::BootSplash);
+                    }
                 }
             }
         }

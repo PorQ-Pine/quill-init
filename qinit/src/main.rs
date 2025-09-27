@@ -61,7 +61,7 @@ cfg_if::cfg_if! {
 
 use anyhow::{Context, Result};
 use libqinit::boot_config::BootConfig;
-use libquillcom::socket;
+use libquillcom::socket::{self, LoginForm};
 use log::{error, info};
 use postcard::{from_bytes, to_allocvec};
 use serde::{Deserialize, Serialize};
@@ -219,13 +219,14 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
             let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
+            let (login_credentials_sender, login_credentials_receiver): (Sender<LoginForm>, Receiver<LoginForm>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
                 let boot_config_mutex = boot_config_mutex.clone();
                 let pubkey = pubkey.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey, boot_config_valid)
+                    gui::setup_gui(progress_receiver, boot_sender, login_credentials_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey, boot_config_valid)
                 }
             });
 
@@ -303,7 +304,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
                 socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
 
-                thread::spawn(move || rootfs_socket::initialize());
+                thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver));
 
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
