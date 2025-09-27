@@ -137,7 +137,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             Command::new("/bin/sh").args(&["-c", &format!("env {} {} 2>&1 | tee -a {}", &rotation_env_var, &QINIT_PATH, &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE))]).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
 
             first_stage_info("Waiting for status message from second stage qinit binary");
-            let status = from_bytes::<OverlayStatus>(socket::read(boot_unix_listener)?.deref())?;
+            let status = from_bytes::<OverlayStatus>(socket::read(&boot_unix_listener)?.deref())?;
 
             if status.ready {
                 first_stage_info("Ready for systemd initialization");
