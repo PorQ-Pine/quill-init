@@ -757,16 +757,16 @@ pub fn setup_gui(
                             change_user_password(&pubkey, &user, &old_password, &new_password)
                         {
                             error_toast(&gui, "Failed to change user password", e.into());
-                        }
-
-                        if let Err(e) = storage_encryption::change_password(
-                            &user.to_string(),
-                            &old_password.to_string(),
-                            &new_password.to_string(),
-                        ) {
-                            error_toast(&gui, "Failed to change encryption password", e.into());
                         } else {
-                            toast(&gui, "Password set successfully");
+                            if let Err(e) = storage_encryption::change_password(
+                                &user.to_string(),
+                                &old_password.to_string(),
+                                &new_password.to_string(),
+                            ) {
+                                error_toast(&gui, "Failed to change encryption password", e.into());
+                            } else {
+                                toast(&gui, "Password set successfully");
+                            }
                         }
                         refresh_storage_encryption_ui(&gui);
                     }

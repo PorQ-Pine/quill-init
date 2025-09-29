@@ -34,7 +34,6 @@ pub fn listen_for_login_credentials(
     loop {
         if let Ok(login_form) = login_credentials_receiver.recv() {
             let mut login_form_guard = login_form_mutex.lock().unwrap();
-            // Or, as we force password?
             if login_form.username.is_empty() || login_form.password.is_empty() {
                 *login_form_guard = None;
             } else {
@@ -49,7 +48,6 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<Option<LoginForm>>>) -> R
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
     loop {
         let (mut unix_stream, _socket_address) = unix_listener.accept()?;
-        // If a function has a general name, like from_bytes, don't import it, use it via library name
         match postcard::from_bytes::<CommandToQinit>(&socket::read_from_stream(&unix_stream)?.deref())? {
             CommandToQinit::GetLoginCredentials => {
                 info!("Sending login credentials to root filesystem");
