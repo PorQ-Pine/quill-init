@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use core::ops::Deref;
-use libquillcom::socket::{self, CommandToQinit, LoginForm};
+use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
 use log::info;
 use postcard::to_allocvec;
 use std::io::Write;
@@ -53,7 +53,7 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<Option<LoginForm>>>) -> R
                 info!("Sending login credentials to root filesystem");
 
                 let login_form_guard = login_form_mutex.lock().unwrap().clone();
-                let login_form_vec = to_allocvec(&login_form_guard)
+                let login_form_vec = to_allocvec(&AnswerFromQinit::Login(login_form_guard))
                 .with_context(|| "Failed to create vector with login credentials")?;
 
                 unix_stream.write_all(&login_form_vec)?;
