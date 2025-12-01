@@ -183,7 +183,9 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             #[cfg(not(feature = "gui_only"))]
             {
                 #[cfg(feature = "debug")]
-                debug::start_debug_framework(&pubkey, &mut boot_config).with_context(|| "Failed to start debug framework")?;
+                if let Err(e) = debug::start_debug_framework(&pubkey, &mut boot_config).with_context(|| "Failed to start debug framework") {
+                    error!("Failed to initialize debug framework: {}", &e);
+                }
 
                 eink::load_waveform()?;
                 eink::load_modules()?;
