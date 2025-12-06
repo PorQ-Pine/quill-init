@@ -27,6 +27,9 @@ pub fn get_users_using_storage_encryption() -> Result<Vec<String>> {
     let mut users_using_storage_encryption: Vec<String> = Vec::new();
     for user in users {
         let user = user?;
+        if !user.metadata()?.is_dir() {
+            continue;
+        }
         let user_path = user.path().to_string_lossy().to_string();
         if fs::exists(&format!("{}/gocryptfs.conf", &user_path))? {
             users_using_storage_encryption
