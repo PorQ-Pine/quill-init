@@ -562,12 +562,22 @@ pub fn setup_gui(
         }
     });
 
-    // System command
+    // System commands
     gui.on_boot_default({
         let boot_sender = boot_sender.clone();
         let set_page_sender = set_page_sender.clone();
         let gui_weak = gui_weak.clone();
+        let wifi_command_sender = wifi_command_sender.clone();
         move || {
+            // Turn off Wi-Fi
+            if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                command_type: wifi::CommandType::Disable,
+                arguments: None,
+            }) {
+                if let Some(gui) = gui_weak.upgrade() {
+                    error_toast(&gui, "Failed to disable Wi-Fi", e.into());
+                }
+            }
             if let Err(e) = boot_normal(
                 &boot_sender,
                 &set_page_sender,
