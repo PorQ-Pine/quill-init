@@ -10,7 +10,7 @@ crossterm = "0.29.0"
 env_logger = "0.11.8"
 log = "0.4.27"
 network-interface = "2.0.1"
-slint = { git = "https://github.com/PorQ-Pine/slint.git", default-features = false, features = ["compat-1-2", "backend-linuxkms-noseat", "libm", "log", "renderer-software"] }
+slint = { version = "1.14.1", default-features = false, features = ["compat-1-2", "backend-linuxkms-noseat", "libm", "log", "renderer-software"] }
 sys-mount = { version = "3.0.1", default-features = false }
 libqinit = { path = "../libqinit" }
 openssl = "0.10.73"
@@ -27,7 +27,7 @@ git-const = "1.1.0"
 libquillcom = { path = "../../../common/libquillcom" }
 
 [build-dependencies]
-slint-build = { git = "https://github.com/PorQ-Pine/slint.git" }
+slint-build = { version = "1.14.1" }
 
 [features]
 debug = ["libqinit/debug"]
