@@ -1820,6 +1820,7 @@ export component AppWindow inherits Window {
                 border-radius: radius;
                 text: "Power off";
                 clicked => {
+                    TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
                     if page == Page.UserLogin {
                         shutdown_command = RootFsShutDownCommand.PowerOff;
@@ -1842,6 +1843,7 @@ export component AppWindow inherits Window {
                 border-radius: radius;
                 text: "Reboot";
                 clicked => {
+                    TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
