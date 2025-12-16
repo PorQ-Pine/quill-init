@@ -453,6 +453,7 @@ export component AppWindow inherits Window {
                         Text {
                             text: "Nicolas Mailloux\n<nicolecrivain@gmail.com>\nSzybet\n<https://github.com/Szybet>";
                             font-family: regular_font_family;
+                            font-size: root.default-font-size * 0.9;
                             horizontal-alignment: center;
                         }
 
@@ -469,6 +470,7 @@ export component AppWindow inherits Window {
 
                         Text {
                             text: root.version_string;
+                            font-size: root.default-font-size * 0.9;
                             horizontal-alignment: center;
                             wrap: word-wrap;
                         }
@@ -934,40 +936,6 @@ export component AppWindow inherits Window {
 
                 Rectangle {
                     height: root.height * 0.02;
-                }
-
-                HorizontalLayout {
-                    alignment: center;
-                    HorizontalLayout {
-                        width: scaling_factor > 1 ? root.width * 0.6 : root.width * 0.35;
-                        Text {
-                            font-family: regular_font_family;
-                            text: "Show password";
-                            font-size: root.default-font-size * dialog_sizes_multiplier;
-                            vertical-alignment: center;
-                        }
-
-                        Rectangle { }
-
-                        Switch {
-                            y: (parent.height - self.height) / 2;
-                            width: switch_width * dialog_sizes_multiplier;
-                            height: switch_height * dialog_sizes_multiplier;
-                            border-radius: radius;
-                            activated: login-password-edit.input-type == InputType.text ? true : false;
-                            toggled => {
-                                if (login-password-edit.input-type == InputType.password) {
-                                    login-password-edit.input-type = InputType.text;
-                                } else {
-                                    login-password-edit.input-type = InputType.password;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: root.height * 0.01;
                 }
 
                 HorizontalLayout {
@@ -1547,36 +1515,6 @@ export component AppWindow inherits Window {
                 input-type: password;
             }
 
-            Rectangle {
-                vertical-stretch: 0.05;
-            }
-
-            HorizontalLayout {
-                Text {
-                    font-family: regular_font_family;
-                    text: "Show passphrase";
-                    font-size: root.default-font-size * dialog_sizes_multiplier;
-                    vertical-alignment: center;
-                }
-
-                Rectangle { }
-
-                Switch {
-                    y: (parent.height - self.height) / 2;
-                    width: switch_width * dialog_sizes_multiplier;
-                    height: switch_height * dialog_sizes_multiplier;
-                    border-radius: radius;
-                    activated: wifi-passphrase-edit.input-type == InputType.text ? true : false;
-                    toggled => {
-                        if (wifi-passphrase-edit.input-type == InputType.password) {
-                            wifi-passphrase-edit.input-type = InputType.text;
-                        } else {
-                            wifi-passphrase-edit.input-type = InputType.password;
-                        }
-                    }
-                }
-            }
-
             Rectangle { }
 
             Button {
@@ -1645,41 +1583,6 @@ export component AppWindow inherits Window {
             HLine {
                 top-padding-multiplier: 4.0;
                 bottom-padding-multiplier: self.top-padding-multiplier;
-            }
-
-            HorizontalLayout {
-                Text {
-                    font-family: regular_font_family;
-                    text: dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword ? "Show passwords" : "Show password";
-                    font-size: root.default-font-size * dialog_sizes_multiplier;
-                    vertical-alignment: center;
-                }
-
-                Rectangle { }
-
-                Switch {
-                    y: (parent.height - self.height) / 2;
-                    width: switch_width * dialog_sizes_multiplier;
-                    height: switch_height * dialog_sizes_multiplier;
-                    border-radius: radius;
-                    activated: encryption-current-password-edit.input-type == InputType.text ? true : false;
-                    toggled => {
-                        if (encryption-current-password-edit.input-type == InputType.password) {
-                            encryption-current-password-edit.input-type = InputType.text;
-                            encryption-new-password-edit.input-type = InputType.text;
-                            encryption-confirm-password-edit.input-type = InputType.text;
-                        } else {
-                            encryption-current-password-edit.input-type = InputType.password;
-                            encryption-new-password-edit.input-type = InputType.password;
-                            encryption-confirm-password-edit.input-type = InputType.password;
-                        }
-                    }
-                }
-            }
-
-            Rectangle {
-                height: 20px;
-                visible: dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword;
             }
 
             encryption-current-password-edit := LineEdit {
