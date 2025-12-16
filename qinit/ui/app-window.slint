@@ -10,13 +10,18 @@ import { Dialog } from "../../ui-common/dialog.slint";
 import { SectionButton } from "../../ui-common/sectionbutton.slint";
 import { LineEdit } from "../../ui-common/lineedit.slint";
 import { Slider } from "../../ui-common/slider.slint";
-import { VirtualKeyboard, VirtualKeyboardHandler, KeyModel } from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
+import {
+    VirtualKeyboard,
+    VirtualKeyboardHandler,
+    KeyModel,
+} from "../../ui-common/virtual_keyboard/virtual_keyboard.slint";
 import { HList } from "../../ui-common/hlist.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, InvalidBootConfig, Error }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, InvalidBootConfig, Error, ShutDownSplash }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword, EncryptionNewPassword, Brightness, BatteryStatus }
+export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword, EncryptionNewPassword, Brightness, BatteryStatus, PowerOptions }
+export enum RootFsShutDownCommand { None, PowerOff, Reboot }
 export { VirtualKeyboardHandler, KeyModel }
 
 export struct SystemUser {
@@ -37,6 +42,7 @@ export component AppWindow inherits Window {
     callback power_off();
     callback direct_power_off();
     callback reboot();
+    callback direct_reboot();
     callback toggle_ui_scale();
     callback toggle_persistent_rootfs();
     callback toggle_wifi();
@@ -102,6 +108,7 @@ export component AppWindow inherits Window {
     in property <string> default_user: "";
     in property <bool> login_captive_portal: false;
     in property <bool> quill_recovery;
+    out property <RootFsShutDownCommand> shutdown_command: RootFsShutDownCommand.None;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -147,7 +154,7 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: layout_padding;
             spacing: layout_spacing;
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HorizontalLayout {
+            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.ShutDownSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HorizontalLayout {
                 IconButton {
                     icon: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -263,15 +270,11 @@ export component AppWindow inherits Window {
                     padding-value: bar_icon_button_padding;
                     y: (parent.height - self.height) / 2;
                     clicked => {
-                        if page == Page.UserLogin {
-                            direct_power_off();
-                        } else {
-                            power_off();
-                        }
+                        dialog = DialogType.PowerOptions;
                     }
                 }
             }
-            if (page != Page.BootSplash) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
+            if (page != Page.BootSplash) && (page != Page.ShutDownSplash) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
                 top-padding-multiplier: page == Page.QuillBoot ? 0.5 : 1;
             }
 
@@ -980,6 +983,7 @@ export component AppWindow inherits Window {
                         height: self.width;
                     }
                 }
+
                 HorizontalLayout {
                     alignment: center;
                     Text {
@@ -990,9 +994,11 @@ export component AppWindow inherits Window {
                         font-weight: 800;
                     }
                 }
+
                 Rectangle {
                     height: root.height * 0.025;
                 }
+
                 HorizontalLayout {
                     alignment: center;
                     Text {
@@ -1002,9 +1008,11 @@ export component AppWindow inherits Window {
                         horizontal-alignment: center;
                     }
                 }
+
                 Rectangle {
                     height: root.height * 0.05;
                 }
+
                 HorizontalLayout {
                     alignment: center;
                     spacing: layout_spacing * 4;
@@ -1035,7 +1043,6 @@ export component AppWindow inherits Window {
                         }
                     }
                 }
-
             }
 
             if (page == Page.Error): VerticalLayout {
@@ -1251,7 +1258,7 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword && dialog != DialogType.EncryptionNewPassword && dialog != DialogType.Brightness && dialog != DialogType.BatteryStatus): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword && dialog != DialogType.EncryptionNewPassword && dialog != DialogType.Brightness && dialog != DialogType.BatteryStatus && dialog != DialogType.PowerOptions): Dialog {
         border-radius: radius;
         width: 0.45 * scaling_factor * root.width;
         height: 0.3 * scaling_factor * root.height;
@@ -1782,6 +1789,70 @@ export component AppWindow inherits Window {
                     font-family: regular_font_family;
                     font-size: root.default-font-size * dialog_sizes_multiplier;
                     vertical-alignment: center;
+                }
+            }
+        }
+    }
+    // Power options dialog
+    if (dialog == DialogType.PowerOptions): Rectangle {
+        border-width: dialog_rectangle_thickness;
+        border-color: black;
+        border-radius: radius;
+        background: white;
+        width: scaling_factor > 1 ? root.width * 0.65 : root.width * 0.35;
+        height: button_height * dialog_sizes_multiplier * 2 + layout_padding * 2 + layout_spacing * 2;
+        x: scaling_factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - layout_padding;
+        y: scaling_factor > 1 ? (root.height - self.height) / 2 : approx_bar_height;
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: true;
+        }
+
+        VerticalLayout {
+            padding: layout_padding;
+            spacing: layout_spacing * 2;
+            Button {
+                width: 100%;
+                height: button_height * dialog_sizes_multiplier;
+                font-family: header_font_family;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                border-radius: radius;
+                text: "Power off";
+                clicked => {
+                    dialog = DialogType.None;
+                    if page == Page.UserLogin {
+                        shutdown_command = RootFsShutDownCommand.PowerOff;
+                        page = Page.ShutDownSplash;
+                        if startup_finished {
+                            direct_power_off();
+                        }
+                    } else {
+                        page = Page.ShutDownSplash;
+                        power_off();
+                    }
+                }
+            }
+
+            Button {
+                width: 100%;
+                height: button_height * dialog_sizes_multiplier;
+                font-family: header_font_family;
+                font-size: root.default-font-size * dialog_sizes_multiplier;
+                border-radius: radius;
+                text: "Reboot";
+                clicked => {
+                    dialog = DialogType.None;
+                    if page == Page.UserLogin {
+                        page = Page.ShutDownSplash;
+                        shutdown_command = RootFsShutDownCommand.Reboot;
+                        if startup_finished {
+                            direct_reboot();
+                        }
+                    } else {
+                        page = Page.ShutDownSplash;
+                        reboot();
+                    }
                 }
             }
         }

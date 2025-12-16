@@ -252,7 +252,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     toast_sender.send("Applying changes".to_string())?;
                     BootConfig::write(&mut boot_config, false)?;
                     std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
-                    reboot()?;
+                    reboot(libqinit::system::PowerDownMode::Normal)?;
                 }
             } else {
                 // Trigger switch to boot splash page
@@ -268,13 +268,17 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     info!("Boot configuration did not change: not writing it back");
                 }
 
-                if boot_command == BootCommand::PowerOff {
-                    power_off()?;
-                    return Ok(());
-                } else if boot_command == BootCommand::Reboot {
-                    reboot()?;
-                    return Ok(());
-                }
+                match boot_command {
+                    BootCommand::PowerOff => {
+                        power_off(libqinit::system::PowerDownMode::Normal)?;
+                        return Ok(());
+                    },
+                    BootCommand::Reboot => {
+                        reboot(libqinit::system::PowerDownMode::Normal)?;
+                        return Ok(());
+                    },
+                    _ => {},
+                };
             }
 
             // Function that will always fail: can be used for debugging error splash GUI
@@ -317,10 +321,22 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 }
 
                 // Wait until systemd startup has completed
-                boot_receiver.recv()?;
+                let boot_command = boot_receiver.recv()?;
                 info!("systemd startup complete");
                 if !boot_config_valid || boot_config != original_boot_config {
                     BootConfig::write(&mut boot_config, false)?;
+                }
+
+                match boot_command {
+                    BootCommand::PowerOffRootFS => {
+                        power_off(libqinit::system::PowerDownMode::RootFS)?;
+                        return Ok(());
+                    },
+                    BootCommand::RebootRootFS => {
+                        reboot(libqinit::system::PowerDownMode::RootFS)?;
+                        return Ok(());
+                    }
+                    BootCommand::BootFinished | _ => {}
                 }
             }
         }

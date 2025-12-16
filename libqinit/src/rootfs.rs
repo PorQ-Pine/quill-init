@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::{error, info};
+use log::{debug, error, info};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use std::fs;
@@ -162,6 +162,8 @@ pub fn setup_misc(boot_config: &mut BootConfig) -> Result<()> {
 }
 
 pub fn run_chroot_command(command: &[&str]) -> Result<()> {
+    debug!("Running command in chroot: {:?}", &command);
+
     let mut args: Vec<&str> = Vec::with_capacity(1 + command.len());
     args.push(&crate::OVERLAY_MOUNTPOINT);
     args.extend_from_slice(&command);

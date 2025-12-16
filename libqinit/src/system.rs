@@ -15,6 +15,7 @@ use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
 
 use crate::boot_config::BootConfig;
+use crate::rootfs::run_chroot_command;
 use crate::signing::check_signature;
 
 pub const MODULES_DIR_PATH: &str = "/lib/modules";
@@ -22,12 +23,23 @@ pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";
 pub const FIRMWARE_ARCHIVE: &str = "firmware.squashfs";
 pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
 
+const REBOOT_BINARY_PATH: &str = "/sbin/reboot";
+const POWER_OFF_BINARY_PATH: &str = "/sbin/poweroff";
+
 #[derive(PartialEq)]
 pub enum BootCommand {
     PowerOff,
+    PowerOffRootFS,
     Reboot,
+    RebootRootFS,
     NormalBoot,
     BootFinished,
+}
+
+#[derive(PartialEq)]
+pub enum PowerDownMode {
+    Normal,
+    RootFS,
 }
 
 pub fn mount_base_filesystems() -> Result<()> {
@@ -227,24 +239,38 @@ pub fn restart_service(service: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn power_off() -> Result<()> {
+pub fn power_off(mode: PowerDownMode) -> Result<()> {
     warn!("Powering off");
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "gui_only"))] {
-            unmount_base_partitions()?;
-            run_command("/sbin/poweroff", &["-f"])?;
+            match mode {
+                PowerDownMode::Normal => {
+                    unmount_base_partitions()?;
+                    run_command(&POWER_OFF_BINARY_PATH, &["-f"])?;
+                },
+                PowerDownMode::RootFS => {
+                    run_chroot_command(&[&POWER_OFF_BINARY_PATH])?;
+                }
+            }
         }
     }
 
     Ok(())
 }
 
-pub fn reboot() -> Result<()> {
+pub fn reboot(mode: PowerDownMode) -> Result<()> {
     warn!("Rebooting");
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "gui_only"))] {
-            unmount_base_partitions()?;
-            run_command("/sbin/reboot", &["-f"])?;
+            match mode {
+                PowerDownMode::Normal => {
+                    unmount_base_partitions()?;
+                    run_command(&REBOOT_BINARY_PATH, &["-f"])?;
+                },
+                PowerDownMode::RootFS => {
+                    run_chroot_command(&[&REBOOT_BINARY_PATH])?;
+                }
+            }
         }
     }
 

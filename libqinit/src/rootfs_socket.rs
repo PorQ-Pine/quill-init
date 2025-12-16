@@ -37,7 +37,10 @@ pub fn listen_for_login_credentials(
             if login_form.username.is_empty() || login_form.password.is_empty() {
                 *login_form_guard = None;
             } else {
-                *login_form_guard = Some(LoginForm { username: login_form.username, password: login_form.password });
+                *login_form_guard = Some(LoginForm {
+                    username: login_form.username,
+                    password: login_form.password,
+                });
             }
         }
     }
@@ -48,13 +51,15 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<Option<LoginForm>>>) -> R
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
     loop {
         let (mut unix_stream, _socket_address) = unix_listener.accept()?;
-        match postcard::from_bytes::<CommandToQinit>(&socket::read_from_stream(&unix_stream)?.deref())? {
+        match postcard::from_bytes::<CommandToQinit>(
+            &socket::read_from_stream(&unix_stream)?.deref(),
+        )? {
             CommandToQinit::GetLoginCredentials => {
                 // info!("Sending login credentials to root filesystem");
 
                 let login_form_guard = login_form_mutex.lock().unwrap().clone();
                 let login_form_vec = to_allocvec(&AnswerFromQinit::Login(login_form_guard))
-                .with_context(|| "Failed to create vector with login credentials")?;
+                    .with_context(|| "Failed to create vector with login credentials")?;
 
                 unix_stream.write_all(&login_form_vec)?;
             }

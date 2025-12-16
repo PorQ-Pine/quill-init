@@ -13,8 +13,8 @@ use libqinit::recovery::soft_reset;
 use libqinit::rootfs::change_user_password;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, compress_string_to_xz, get_cmdline_bool, keep_last_lines, power_off,
-    read_kernel_buffer_singleshot, reboot,
+    BootCommand, PowerDownMode, compress_string_to_xz, get_cmdline_bool, keep_last_lines,
+    power_off, read_kernel_buffer_singleshot, reboot,
 };
 use libqinit::wifi;
 use libquillcom::socket::LoginForm;
@@ -166,7 +166,17 @@ pub fn setup_gui(
                         }
                         if progress == libqinit::READY_PROGRESS_VALUE {
                             gui.set_startup_finished(true);
-                            let _ = boot_sender.send(BootCommand::BootFinished);
+                            let command: BootCommand;
+                            match gui.get_shutdown_command() {
+                                RootFsShutDownCommand::PowerOff => {
+                                    command = BootCommand::PowerOffRootFS
+                                }
+                                RootFsShutDownCommand::Reboot => {
+                                    command = BootCommand::RebootRootFS
+                                }
+                                RootFsShutDownCommand::None => command = BootCommand::BootFinished,
+                            };
+                            let _ = boot_sender.send(command);
                         }
                     }
                 }
@@ -485,7 +495,7 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = power_off() {
+                        if let Err(_e) = power_off(PowerDownMode::Normal) {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -500,19 +510,30 @@ pub fn setup_gui(
         }
     });
 
-    // System
     gui.on_direct_power_off({
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
-                if let Err(e) = power_off() {
+                let power_down_mode = determine_power_down_mode(&gui);
+                if let Err(e) = power_off(power_down_mode) {
                     error_toast(&gui, "Failed to power off", e.into());
                 }
             }
         }
     });
 
-    // System
+    gui.on_direct_reboot({
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                let power_down_mode = determine_power_down_mode(&gui);
+                if let Err(e) = reboot(power_down_mode) {
+                    error_toast(&gui, "Failed to reboot", e.into());
+                }
+            }
+        }
+    });
+
     gui.on_reboot({
         let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
@@ -521,7 +542,7 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = reboot() {
+                        if let Err(_e) = reboot(PowerDownMode::Normal) {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -996,4 +1017,15 @@ fn boot_normal(
     boot_sender.send(BootCommand::NormalBoot)?;
 
     Ok(())
+}
+
+fn determine_power_down_mode(gui: &AppWindow) -> PowerDownMode {
+    let power_down_mode: PowerDownMode;
+    if gui.get_shutdown_command() == RootFsShutDownCommand::None {
+        power_down_mode = PowerDownMode::Normal;
+    } else {
+        power_down_mode = PowerDownMode::RootFS;
+    }
+
+    return power_down_mode;
 }

@@ -3,7 +3,6 @@ use cfg_if;
 cfg_if::cfg_if! {
     if #[cfg(not(feature = "init_wrapper"))] {
         pub mod recovery;
-        pub mod rootfs;
         pub mod systemd;
         pub mod wifi;
         pub mod storage_encryption;
@@ -14,6 +13,7 @@ cfg_if::cfg_if! {
 }
 pub mod boot_config;
 pub mod eink;
+pub mod rootfs;
 pub mod rootfs_socket;
 pub mod signing;
 pub mod system;
