@@ -48,7 +48,7 @@ cfg_if::cfg_if! {
         mod gui;
 
         use libqinit::signing::{read_public_key};
-        use libqinit::system::{generate_version_string, generate_short_version_string, power_off, reboot, BootCommand};
+        use libqinit::system::{generate_version_string, generate_short_version_string, shut_down, BootCommand};
         use libqinit::rootfs_socket;
         use std::time::Duration;
         use std::thread;
@@ -252,7 +252,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     toast_sender.send("Applying changes".to_string())?;
                     BootConfig::write(&mut boot_config, false)?;
                     std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
-                    reboot(libqinit::system::PowerDownMode::Normal)?;
+                    shut_down(libqinit::system::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
                 }
             } else {
                 // Trigger switch to boot splash page
@@ -270,11 +270,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOff => {
-                        power_off(libqinit::system::PowerDownMode::Normal)?;
+                        shut_down(libqinit::system::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::Normal)?;
                         return Ok(());
                     },
                     BootCommand::Reboot => {
-                        reboot(libqinit::system::PowerDownMode::Normal)?;
+                        shut_down(libqinit::system::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
                         return Ok(());
                     },
                     _ => {},
@@ -329,11 +329,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOffRootFS => {
-                        power_off(libqinit::system::PowerDownMode::RootFS)?;
+                        shut_down(libqinit::system::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::RootFS)?;
                         return Ok(());
                     },
                     BootCommand::RebootRootFS => {
-                        reboot(libqinit::system::PowerDownMode::RootFS)?;
+                        shut_down(libqinit::system::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::RootFS)?;
                         return Ok(());
                     }
                     BootCommand::BootFinished | _ => {}

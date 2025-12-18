@@ -59,6 +59,7 @@ export component AppWindow inherits Window {
     callback change_warm_brightness(int);
     callback login(string, string);
     callback change_initial_screen_rotation(int);
+    callback generate_wallpaper();
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -76,6 +77,7 @@ export component AppWindow inherits Window {
     in-out property <string> kernel_buffer;
     in-out property <image> debug_qr_code;
     in-out property <image> help_uri_qr_code;
+    in-out property <image> splash_wallpaper;
     in-out property <int> debug_tab_index: 0;
     in-out property <string> section_header_title;
     in-out property <image> wifi_icon: @image-url("../../icons/wifi-init.svg");
@@ -147,6 +149,7 @@ export component AppWindow inherits Window {
     property <length> space_between_keyboard_and_widget: 100px;
     property <color> item_border_color: #a5a5a5;
     property <color> item_selected_color: #dbdada;
+    property <string> version_info_header: "About";
 
     // Main UI
     // Don't ask me why a ScrollView is needed here to prevent binding loops...
@@ -352,7 +355,7 @@ export component AppWindow inherits Window {
                             width: self.height;
                             border-radius: radius;
                             clicked => {
-                                section_header_title = "About";
+                                section_header_title = version_info_header;
                                 root.page = Page.VersionInfo;
                             }
                         }
@@ -880,6 +883,7 @@ export component AppWindow inherits Window {
                         padding-value: bar_icon_button_padding * 0.2;
                         clicked => {
                             TextInputInterface.text-input-focused = false;
+                            section_header_title = version_info_header;
                             page = Page.VersionInfo;
                         }
                     }
@@ -1042,6 +1046,14 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
+                }
+            }
+
+            if (page == Page.ShutDownSplash): VerticalLayout {
+                Image {
+                    source: splash_wallpaper;
+                    width: root.width;
+                    height: root.height;
                 }
             }
 
@@ -1822,6 +1834,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
+                    generate_wallpaper();
                     if page == Page.UserLogin {
                         shutdown_command = RootFsShutDownCommand.PowerOff;
                         page = Page.ShutDownSplash;
@@ -1845,6 +1858,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
+                    generate_wallpaper();
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
                         shutdown_command = RootFsShutDownCommand.Reboot;

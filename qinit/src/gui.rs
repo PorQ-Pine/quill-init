@@ -11,10 +11,11 @@ use libqinit::eink::ScreenRotation;
 use libqinit::networking;
 use libqinit::recovery::soft_reset;
 use libqinit::rootfs::change_user_password;
+use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, PowerDownMode, compress_string_to_xz, get_cmdline_bool, keep_last_lines,
-    power_off, read_kernel_buffer_singleshot, reboot,
+    BootCommand, PowerDownMode, PrimitiveShutDownType, compress_string_to_xz, get_cmdline_bool,
+    keep_last_lines, read_kernel_buffer_singleshot, shut_down,
 };
 use libqinit::wifi;
 use libquillcom::socket::LoginForm;
@@ -22,7 +23,7 @@ use log::{debug, error, info};
 use openssl::pkey::{PKey, Public};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
-use std::{fs, thread};
+use std::{fs, path::Path, thread};
 slint::include_modules!();
 
 pub const TOAST_DURATION_MILLIS: i32 = 5000;
@@ -495,7 +496,9 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = power_off(PowerDownMode::Normal) {
+                        if let Err(_e) =
+                            shut_down(PrimitiveShutDownType::PowerOff, PowerDownMode::Normal)
+                        {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -515,7 +518,7 @@ pub fn setup_gui(
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 let power_down_mode = determine_power_down_mode(&gui);
-                if let Err(e) = power_off(power_down_mode) {
+                if let Err(e) = shut_down(PrimitiveShutDownType::PowerOff, power_down_mode) {
                     error_toast(&gui, "Failed to power off", e.into());
                 }
             }
@@ -527,7 +530,7 @@ pub fn setup_gui(
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 let power_down_mode = determine_power_down_mode(&gui);
-                if let Err(e) = reboot(power_down_mode) {
+                if let Err(e) = shut_down(PrimitiveShutDownType::Reboot, power_down_mode) {
                     error_toast(&gui, "Failed to reboot", e.into());
                 }
             }
@@ -542,7 +545,9 @@ pub fn setup_gui(
                 if let Some(gui) = gui_weak.upgrade() {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = reboot(PowerDownMode::Normal) {
+                        if let Err(_e) =
+                            shut_down(PrimitiveShutDownType::Reboot, PowerDownMode::Normal)
+                        {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -961,6 +966,25 @@ pub fn setup_gui(
                 1 => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw90,
                 2 => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw180,
                 3 | _ => locked_boot_config.system.initial_screen_rotation = ScreenRotation::Cw270,
+            }
+        }
+    });
+
+    gui.on_generate_wallpaper({
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                if let Err(e) = splash::generate_wallpaper() {
+                    error_toast(&gui, "Failed to generate wallpaper", e.into());
+                } else {
+                    if let Ok(wallpaper) =
+                        Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH))
+                    {
+                        gui.set_splash_wallpaper(wallpaper);
+                    } else {
+                        // TODO: Handle error
+                    }
+                }
             }
         }
     });

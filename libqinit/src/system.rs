@@ -22,6 +22,8 @@ pub const MODULES_DIR_PATH: &str = "/lib/modules";
 pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";
 pub const FIRMWARE_ARCHIVE: &str = "firmware.squashfs";
 pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
+pub const QINIT_BINARIES_ARCHIVE: &str = "qinit_binaries.squashfs";
+pub const QINIT_BINARIES_DIR_PATH: &str = "/qinit_binaries/";
 
 const REBOOT_BINARY_PATH: &str = "/sbin/reboot";
 const POWER_OFF_BINARY_PATH: &str = "/sbin/poweroff";
@@ -40,6 +42,11 @@ pub enum BootCommand {
 pub enum PowerDownMode {
     Normal,
     RootFS,
+}
+
+pub enum PrimitiveShutDownType {
+    PowerOff,
+    Reboot,
 }
 
 pub fn mount_base_filesystems() -> Result<()> {
@@ -239,36 +246,27 @@ pub fn restart_service(service: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn power_off(mode: PowerDownMode) -> Result<()> {
-    warn!("Powering off");
+pub fn shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode) -> Result<()> {
+    match shut_down_type {
+        PrimitiveShutDownType::PowerOff => warn!("Powering off"),
+        PrimitiveShutDownType::Reboot => warn!("Rebooting"),
+    };
+
     cfg_if::cfg_if! {
         if #[cfg(not(feature = "gui_only"))] {
             match mode {
                 PowerDownMode::Normal => {
                     unmount_base_partitions()?;
-                    run_command(&POWER_OFF_BINARY_PATH, &["-f"])?;
+                    match shut_down_type {
+                        PrimitiveShutDownType::PowerOff => run_command(&POWER_OFF_BINARY_PATH, &["-f"])?,
+                        PrimitiveShutDownType::Reboot => run_command(&REBOOT_BINARY_PATH, &["-f"])?,
+                    }
                 },
                 PowerDownMode::RootFS => {
-                    run_chroot_command(&[&POWER_OFF_BINARY_PATH])?;
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-pub fn reboot(mode: PowerDownMode) -> Result<()> {
-    warn!("Rebooting");
-    cfg_if::cfg_if! {
-        if #[cfg(not(feature = "gui_only"))] {
-            match mode {
-                PowerDownMode::Normal => {
-                    unmount_base_partitions()?;
-                    run_command(&REBOOT_BINARY_PATH, &["-f"])?;
-                },
-                PowerDownMode::RootFS => {
-                    run_chroot_command(&[&REBOOT_BINARY_PATH])?;
+                    match shut_down_type {
+                        PrimitiveShutDownType::PowerOff => run_chroot_command(&[&POWER_OFF_BINARY_PATH])?,
+                        PrimitiveShutDownType::Reboot => run_chroot_command(&[&REBOOT_BINARY_PATH])?,
+                    }
                 }
             }
         }
@@ -460,4 +458,23 @@ pub fn is_mountpoint(path: &str) -> Result<bool> {
         info!("Path '{}' is a mountpoint", &path);
         return Ok(true);
     }
+}
+
+pub fn mount_qinit_binaries() -> Result<()> {
+    let qinit_binaries_archive_path = format!(
+        "{}{}",
+        &crate::BOOT_PART_MOUNTPOINT,
+        &QINIT_BINARIES_ARCHIVE
+    );
+
+    if !is_mountpoint(&QINIT_BINARIES_DIR_PATH)? {
+        fs::create_dir_all(&QINIT_BINARIES_DIR_PATH)?;
+        run_command(
+            "/bin/mount",
+            &[&qinit_binaries_archive_path, &QINIT_BINARIES_DIR_PATH],
+        )
+        .with_context(|| "Failed to mount qinit binaries")?;
+    }
+
+    Ok(())
 }

@@ -9,6 +9,7 @@ cfg_if::cfg_if! {
         pub mod brightness;
         pub mod battery;
         pub mod networking;
+        pub mod splash;
     }
 }
 pub mod boot_config;
@@ -34,3 +35,5 @@ pub const OVERLAY_WORKDIR: &str = "/.overlay/";
 pub const OVERLAY_MOUNTPOINT: &str = "/overlay/";
 pub const READY_PROGRESS_VALUE: f32 = 1.0;
 pub const OPENRC_WORKDIR: &str = "/run/openrc";
+pub const SCREEN_H: u16 = 1404;
+pub const SCREEN_W: u16 = 1872;
