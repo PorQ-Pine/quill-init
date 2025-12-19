@@ -476,7 +476,12 @@ pub fn mount_qinit_binaries() -> Result<()> {
     );
 
     if !is_mountpoint(&QINIT_BINARIES_DIR_PATH)? {
-        fs::create_dir_all(&QINIT_BINARIES_DIR_PATH)?;
+        fs::create_dir_all(&QINIT_BINARIES_DIR_PATH).with_context(|| {
+            format!(
+                "Failed to create qinit binaries directory at '{}'",
+                &QINIT_BINARIES_DIR_PATH
+            )
+        })?;
         run_command(
             "/bin/mount",
             &[&qinit_binaries_archive_path, &QINIT_BINARIES_DIR_PATH],

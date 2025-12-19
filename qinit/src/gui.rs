@@ -492,12 +492,13 @@ pub fn setup_gui(
         let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Err(e) = boot_sender.send(BootCommand::PowerOff) {
-                if let Some(gui) = gui_weak.upgrade() {
+            let shut_down_type = PrimitiveShutDownType::PowerOff;
+            if let Some(gui) = gui_weak.upgrade() {
+                set_wallpaper_splash_text(&gui, &shut_down_type);
+                if let Err(e) = boot_sender.send(BootCommand::PowerOff) {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) =
-                            shut_down(PrimitiveShutDownType::PowerOff, PowerDownMode::Normal)
+                        if let Err(_e) = shut_down( shut_down_type, PowerDownMode::Normal)
                         {
                             display_error = true;
                         } else {
@@ -518,8 +519,38 @@ pub fn setup_gui(
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 let power_down_mode = determine_power_down_mode(&gui);
-                if let Err(e) = shut_down(PrimitiveShutDownType::PowerOff, power_down_mode) {
+                if let Err(e) =
+                    gui_shut_down(&gui, PrimitiveShutDownType::PowerOff, power_down_mode)
+                {
                     error_toast(&gui, "Failed to power off", e.into());
+                }
+            }
+        }
+    });
+
+    gui.on_reboot({
+        let boot_sender = boot_sender.clone();
+        let gui_weak = gui_weak.clone();
+        move || {
+            let shut_down_type = PrimitiveShutDownType::Reboot;
+            if let Some(gui) = gui_weak.upgrade() {
+                set_wallpaper_splash_text(&gui, &shut_down_type);
+                if let Err(e) = boot_sender.send(BootCommand::Reboot) {
+                    let mut display_error = true;
+                    if gui.get_page() == Page::Error {
+                        if let Err(_e) = shut_down(
+                            shut_down_type,
+                            PowerDownMode::Normal,
+                        ) {
+                            display_error = true;
+                        } else {
+                            display_error = false;
+                        }
+                    }
+
+                    if display_error {
+                        error_toast(&gui, "Failed to reboot", e.into());
+                    }
                 }
             }
         }
@@ -530,33 +561,9 @@ pub fn setup_gui(
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 let power_down_mode = determine_power_down_mode(&gui);
-                if let Err(e) = shut_down(PrimitiveShutDownType::Reboot, power_down_mode) {
+                if let Err(e) = gui_shut_down(&gui, PrimitiveShutDownType::Reboot, power_down_mode)
+                {
                     error_toast(&gui, "Failed to reboot", e.into());
-                }
-            }
-        }
-    });
-
-    gui.on_reboot({
-        let boot_sender = boot_sender.clone();
-        let gui_weak = gui_weak.clone();
-        move || {
-            if let Err(e) = boot_sender.send(BootCommand::Reboot) {
-                if let Some(gui) = gui_weak.upgrade() {
-                    let mut display_error = true;
-                    if gui.get_page() == Page::Error {
-                        if let Err(_e) =
-                            shut_down(PrimitiveShutDownType::Reboot, PowerDownMode::Normal)
-                        {
-                            display_error = true;
-                        } else {
-                            display_error = false;
-                        }
-                    }
-
-                    if display_error {
-                        error_toast(&gui, "Failed to reboot", e.into());
-                    }
                 }
             }
         }
@@ -974,11 +981,14 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
-                if let Err(e) = splash::generate_wallpaper() {
+                if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
                     error_toast(&gui, "Failed to generate wallpaper", e.into());
                 } else {
                     match Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH)) {
-                        Ok(wallpaper) => gui.set_splash_wallpaper(wallpaper),
+                        Ok(wallpaper) => {
+                            gui.set_splash_wallpaper(wallpaper);
+                            let _ = fs::remove_file(&splash::WALLPAPER_OUT_FILE_PATH);
+                        }
                         Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
                     }
                 }
@@ -1049,4 +1059,26 @@ fn determine_power_down_mode(gui: &AppWindow) -> PowerDownMode {
     }
 
     return power_down_mode;
+}
+
+fn gui_shut_down(
+    gui: &AppWindow,
+    shut_down_type: PrimitiveShutDownType,
+    mode: PowerDownMode,
+) -> Result<()> {
+    set_wallpaper_splash_text(&gui, &shut_down_type);
+    shut_down(shut_down_type, mode)?;
+
+    Ok(())
+}
+
+fn set_wallpaper_splash_text(gui: &AppWindow, shut_down_type: &PrimitiveShutDownType) {
+    match shut_down_type {
+        PrimitiveShutDownType::PowerOff => {
+            gui.set_wallpaper_splash_text(SharedString::from("Powered off"))
+        }
+        PrimitiveShutDownType::Reboot => {
+            gui.set_wallpaper_splash_text(SharedString::from("Rebooting"))
+        }
+    }
 }

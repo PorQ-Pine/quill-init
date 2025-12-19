@@ -26,6 +26,7 @@ pub struct System {
     // The following option is always enabled by default. If a user chooses to disable it, the "Recovery options" submenu in the GUI will be hidden
     pub recovery_features: bool,
     pub initial_screen_rotation: eink::ScreenRotation,
+    pub splash_wallpaper: String,
 }
 
 #[cfg(feature = "debug")]
@@ -55,6 +56,7 @@ impl BootConfig {
         // System
         boot_config.system.timezone = "UTC".to_string();
         boot_config.system.recovery_features = true;
+        boot_config.system.splash_wallpaper = "flow".to_string();
 
         return boot_config;
     }
