@@ -91,10 +91,10 @@ pub fn listen_for_commands(
                 // Conservative wait time to allow display to complete refresh after wallpaper generation is done
                 thread::sleep(std::time::Duration::from_millis(2000));
 
-                let reply = to_allocvec(&())?;
+                let reply = to_allocvec(&AnswerFromQinit::SplashReady)?;
                 unix_stream
                     .write_all(&reply)
-                    .with_context(|| "Failed to send UI readiness boolean")?;
+                    .with_context(|| "Failed to send splash readiness status")?;
             }
             CommandToQinit::StopListening => {
                 break;
