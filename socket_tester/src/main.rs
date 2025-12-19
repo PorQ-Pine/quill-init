@@ -66,9 +66,6 @@ fn main() -> Result<()> {
             info!("Username: '{}'", c.username);
             info!("Password: '{}'", c.password);
         }
-    } else if args.exclusive_options.trigger_poweroff_splash {
-        let ready = &from_bytes::<bool>(&reply)?;
-        info!("Splash ready: {}", ready);
     }
 
     Ok(())
