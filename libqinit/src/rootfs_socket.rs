@@ -9,6 +9,7 @@ use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
 use log::info;
 use postcard::to_allocvec;
 use std::io::Write;
+use socket::Splash;
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 
@@ -62,6 +63,13 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<Option<LoginForm>>>) -> R
                     .with_context(|| "Failed to create vector with login credentials")?;
 
                 unix_stream.write_all(&login_form_vec)?;
+            }
+            CommandToQinit::TriggerSplash(splash_type) => {
+                match splash_type {
+                    Splash::PowerOff => {},
+                    Splash::Reboot => {},
+                    Splash::Sleep => {},
+                }
             }
             CommandToQinit::StopListening => {
                 break;
