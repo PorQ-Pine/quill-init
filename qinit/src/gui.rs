@@ -977,12 +977,9 @@ pub fn setup_gui(
                 if let Err(e) = splash::generate_wallpaper() {
                     error_toast(&gui, "Failed to generate wallpaper", e.into());
                 } else {
-                    if let Ok(wallpaper) =
-                        Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH))
-                    {
-                        gui.set_splash_wallpaper(wallpaper);
-                    } else {
-                        // TODO: Handle error
+                    match Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH)) {
+                        Ok(wallpaper) => gui.set_splash_wallpaper(wallpaper),
+                        Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
                     }
                 }
             }
