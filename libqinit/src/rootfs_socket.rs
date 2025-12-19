@@ -19,7 +19,7 @@ pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 pub fn initialize(
     login_credentials_receiver: Receiver<LoginForm>,
     splash_sender: Sender<PrimitiveShutDownType>,
-    splash_ready_receiver: Receiver<bool>,
+    splash_ready_receiver: Receiver<()>,
 ) -> Result<()> {
     let login_form_mutex = Arc::new(Mutex::new(None));
     thread::spawn({
@@ -57,7 +57,7 @@ pub fn listen_for_login_credentials(
 pub fn listen_for_commands(
     login_form_mutex: Arc<Mutex<Option<LoginForm>>>,
     splash_sender: Sender<PrimitiveShutDownType>,
-    splash_ready_receiver: Receiver<bool>,
+    splash_ready_receiver: Receiver<()>,
 ) -> Result<()> {
     info!("Listening for commands");
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;

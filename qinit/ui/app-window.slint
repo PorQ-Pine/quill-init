@@ -112,6 +112,7 @@ export component AppWindow inherits Window {
     in property <bool> quill_recovery;
     out property <RootFsShutDownCommand> shutdown_command: RootFsShutDownCommand.None;
     in property <string> wallpaper_splash_text;
+    in property <string> wallpaper_date_time_information;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -215,7 +216,7 @@ export component AppWindow inherits Window {
                                 width: layout_spacing * 0.8;
                             }
                             Text {
-                                text: current_time;
+                                text: wallpaper_date_time_information;
                                 font-size: header_font_size * 0.46;
                                 vertical-alignment: center;
                             }

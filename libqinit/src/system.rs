@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use base64::prelude::*;
+use libquillcom::socket::PrimitiveShutDownType;
 use log::{debug, info, warn};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
@@ -13,7 +14,6 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
-use libquillcom::socket::PrimitiveShutDownType;
 
 use crate::boot_config::BootConfig;
 use crate::rootfs::run_chroot_command;
@@ -248,7 +248,7 @@ pub fn real_shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode
     match shut_down_type {
         PrimitiveShutDownType::PowerOff => warn!("Powering off"),
         PrimitiveShutDownType::Reboot => warn!("Rebooting"),
-        _ => {},
+        _ => {}
     };
 
     cfg_if::cfg_if! {

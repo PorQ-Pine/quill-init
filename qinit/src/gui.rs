@@ -14,8 +14,8 @@ use libqinit::rootfs::change_user_password;
 use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
-    keep_last_lines, read_kernel_buffer_singleshot, shut_down,
+    BootCommand, PowerDownMode, compress_string_to_xz, get_cmdline_bool, keep_last_lines,
+    read_kernel_buffer_singleshot, shut_down,
 };
 use libqinit::wifi;
 use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
@@ -38,7 +38,7 @@ pub fn setup_gui(
     boot_sender: Sender<BootCommand>,
     login_credentials_sender: Sender<LoginForm>,
     splash_receiver: Receiver<PrimitiveShutDownType>,
-    splash_ready_sender: Sender<bool>,
+    splash_ready_sender: Sender<()>,
     interrupt_receiver: Receiver<String>,
     toast_receiver: Receiver<String>,
     version_string: String,
@@ -233,17 +233,21 @@ pub fn setup_gui(
     );
 
     let splash_timer = Timer::default();
-    splash_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(100), {
-        let gui_weak = gui_weak.clone();
-        move || {
-            if let Ok(shut_down_type) = splash_receiver.try_recv() {
-                if let Some(gui) = gui_weak.upgrade() {
-                    set_wallpaper_splash_text(&gui, &shut_down_type);
-                    gui.invoke_generate_wallpaper(true);
+    splash_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(100),
+        {
+            let gui_weak = gui_weak.clone();
+            move || {
+                if let Ok(shut_down_type) = splash_receiver.try_recv() {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        set_wallpaper_splash_text(&gui, &shut_down_type);
+                        gui.invoke_generate_wallpaper(true);
+                    }
                 }
             }
-        }
-    });
+        },
+    );
 
     // Time display timer
     let time_display_timer = Timer::default();
@@ -513,8 +517,7 @@ pub fn setup_gui(
                 if let Err(e) = boot_sender.send(BootCommand::PowerOff) {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = shut_down( shut_down_type, PowerDownMode::Normal)
-                        {
+                        if let Err(_e) = shut_down(shut_down_type, PowerDownMode::Normal) {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -553,10 +556,7 @@ pub fn setup_gui(
                 if let Err(e) = boot_sender.send(BootCommand::Reboot) {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = shut_down(
-                            shut_down_type,
-                            PowerDownMode::Normal,
-                        ) {
+                        if let Err(_e) = shut_down(shut_down_type, PowerDownMode::Normal) {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -1012,7 +1012,7 @@ pub fn setup_gui(
 
                 if from_socket {
                     let _ = set_page_sender.send(Page::ShutDownSplash);
-                    let _ = splash_ready_sender.send(true);
+                    let _ = splash_ready_sender.send(());
                 }
             }
         }
@@ -1097,13 +1097,19 @@ fn gui_shut_down(
 fn set_wallpaper_splash_text(gui: &AppWindow, shut_down_type: &PrimitiveShutDownType) {
     match shut_down_type {
         PrimitiveShutDownType::PowerOff => {
-            gui.set_wallpaper_splash_text(SharedString::from("Powered off"))
+            let current_time: DateTime<Local> = Local::now();
+            gui.set_wallpaper_splash_text(SharedString::from("Powered off"));
+            gui.set_wallpaper_date_time_information(SharedString::from(
+                current_time.format("%d/%m").to_string(),
+            ));
         }
         PrimitiveShutDownType::Reboot => {
-            gui.set_wallpaper_splash_text(SharedString::from("Rebooting"))
+            gui.set_wallpaper_splash_text(SharedString::from("Rebooting"));
+            gui.set_wallpaper_date_time_information(gui.get_current_time());
         }
         PrimitiveShutDownType::Sleep => {
             gui.set_wallpaper_splash_text(SharedString::from("Sleeping"));
+            gui.set_wallpaper_date_time_information(gui.get_current_time());
         }
     }
 }

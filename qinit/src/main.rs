@@ -223,7 +223,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
             let (login_credentials_sender, login_credentials_receiver): (Sender<socket::LoginForm>, Receiver<socket::LoginForm>) = channel();
             let (splash_sender, splash_receiver): (Sender<socket::PrimitiveShutDownType>, Receiver<socket::PrimitiveShutDownType>) = channel();
-            let (splash_ready_sender, splash_ready_receiver): (Sender<bool>, Receiver<bool>) = channel();
+            let (splash_ready_sender, splash_ready_receiver): (Sender<()>, Receiver<()>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
