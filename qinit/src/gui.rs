@@ -14,11 +14,11 @@ use libqinit::rootfs::change_user_password;
 use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, PowerDownMode, PrimitiveShutDownType, compress_string_to_xz, get_cmdline_bool,
+    BootCommand, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
     keep_last_lines, read_kernel_buffer_singleshot, shut_down,
 };
 use libqinit::wifi;
-use libquillcom::socket::LoginForm;
+use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
 use log::{debug, error, info};
 use openssl::pkey::{PKey, Public};
 use qrcode_generator::QrCodeEcc;
@@ -37,6 +37,8 @@ pub fn setup_gui(
     progress_receiver: Receiver<f32>,
     boot_sender: Sender<BootCommand>,
     login_credentials_sender: Sender<LoginForm>,
+    splash_receiver: Receiver<PrimitiveShutDownType>,
+    splash_ready_sender: Sender<bool>,
     interrupt_receiver: Receiver<String>,
     toast_receiver: Receiver<String>,
     version_string: String,
@@ -229,6 +231,19 @@ pub fn setup_gui(
             }
         },
     );
+
+    let splash_timer = Timer::default();
+    splash_timer.start(TimerMode::Repeated, std::time::Duration::from_millis(100), {
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Ok(shut_down_type) = splash_receiver.try_recv() {
+                if let Some(gui) = gui_weak.upgrade() {
+                    set_wallpaper_splash_text(&gui, &shut_down_type);
+                    gui.invoke_generate_wallpaper(true);
+                }
+            }
+        }
+    });
 
     // Time display timer
     let time_display_timer = Timer::default();
@@ -979,7 +994,9 @@ pub fn setup_gui(
 
     gui.on_generate_wallpaper({
         let gui_weak = gui_weak.clone();
-        move || {
+        let set_page_sender = set_page_sender.clone();
+        let splash_ready_sender = splash_ready_sender.clone();
+        move |from_socket| {
             if let Some(gui) = gui_weak.upgrade() {
                 if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
                     error_toast(&gui, "Failed to generate wallpaper", e.into());
@@ -991,6 +1008,11 @@ pub fn setup_gui(
                         }
                         Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
                     }
+                }
+
+                if from_socket {
+                    let _ = set_page_sender.send(Page::ShutDownSplash);
+                    let _ = splash_ready_sender.send(true);
                 }
             }
         }
@@ -1079,6 +1101,9 @@ fn set_wallpaper_splash_text(gui: &AppWindow, shut_down_type: &PrimitiveShutDown
         }
         PrimitiveShutDownType::Reboot => {
             gui.set_wallpaper_splash_text(SharedString::from("Rebooting"))
+        }
+        PrimitiveShutDownType::Sleep => {
+            gui.set_wallpaper_splash_text(SharedString::from("Sleeping"));
         }
     }
 }

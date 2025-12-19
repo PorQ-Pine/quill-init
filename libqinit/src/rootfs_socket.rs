@@ -1,19 +1,26 @@
 use std::{
-    sync::{Arc, Mutex, mpsc::Receiver},
+    sync::{
+        Arc, Mutex,
+        mpsc::{Receiver, Sender},
+    },
     thread,
 };
 
 use anyhow::{Context, Result};
 use core::ops::Deref;
 use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
-use log::info;
+use log::{debug, info};
 use postcard::to_allocvec;
+use socket::PrimitiveShutDownType;
 use std::io::Write;
-use socket::Splash;
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 
-pub fn initialize(login_credentials_receiver: Receiver<LoginForm>) -> Result<()> {
+pub fn initialize(
+    login_credentials_receiver: Receiver<LoginForm>,
+    splash_sender: Sender<PrimitiveShutDownType>,
+    splash_ready_receiver: Receiver<bool>,
+) -> Result<()> {
     let login_form_mutex = Arc::new(Mutex::new(None));
     thread::spawn({
         let login_form_mutex = login_form_mutex.clone();
@@ -22,7 +29,7 @@ pub fn initialize(login_credentials_receiver: Receiver<LoginForm>) -> Result<()>
 
     thread::spawn({
         let login_form_mutex = login_form_mutex.clone();
-        move || listen_for_commands(login_form_mutex)
+        move || listen_for_commands(login_form_mutex, splash_sender, splash_ready_receiver)
     });
 
     Ok(())
@@ -47,7 +54,11 @@ pub fn listen_for_login_credentials(
     }
 }
 
-pub fn listen_for_commands(login_form_mutex: Arc<Mutex<Option<LoginForm>>>) -> Result<()> {
+pub fn listen_for_commands(
+    login_form_mutex: Arc<Mutex<Option<LoginForm>>>,
+    splash_sender: Sender<PrimitiveShutDownType>,
+    splash_ready_receiver: Receiver<bool>,
+) -> Result<()> {
     info!("Listening for commands");
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
     loop {
@@ -56,20 +67,34 @@ pub fn listen_for_commands(login_form_mutex: Arc<Mutex<Option<LoginForm>>>) -> R
             &socket::read_from_stream(&unix_stream)?.deref(),
         )? {
             CommandToQinit::GetLoginCredentials => {
-                // info!("Sending login credentials to root filesystem");
+                debug!("Sending login credentials to root filesystem");
 
                 let login_form_guard = login_form_mutex.lock().unwrap().clone();
                 let login_form_vec = to_allocvec(&AnswerFromQinit::Login(login_form_guard))
                     .with_context(|| "Failed to create vector with login credentials")?;
 
-                unix_stream.write_all(&login_form_vec)?;
+                unix_stream
+                    .write_all(&login_form_vec)
+                    .with_context(|| "Failed to send login credentials")?;
             }
-            CommandToQinit::TriggerSplash(splash_type) => {
-                match splash_type {
-                    Splash::PowerOff => {},
-                    Splash::Reboot => {},
-                    Splash::Sleep => {},
-                }
+            CommandToQinit::TriggerSplash(shut_down_type) => {
+                info!(
+                    "Displaying splash screen for shut down type '{:?}'",
+                    shut_down_type
+                );
+                splash_sender
+                    .send(shut_down_type)
+                    .with_context(|| "Failed to send splash type from socket call")?;
+                splash_ready_receiver
+                    .recv()
+                    .with_context(|| "Failed to receive message from splash readiness sender")?;
+                // Conservative wait time to allow display to complete refresh after wallpaper generation is done
+                thread::sleep(std::time::Duration::from_millis(2000));
+
+                let reply = to_allocvec(&true)?;
+                unix_stream
+                    .write_all(&reply)
+                    .with_context(|| "Failed to send UI readiness boolean")?;
             }
             CommandToQinit::StopListening => {
                 break;

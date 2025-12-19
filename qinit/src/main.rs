@@ -222,13 +222,15 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
             let (login_credentials_sender, login_credentials_receiver): (Sender<socket::LoginForm>, Receiver<socket::LoginForm>) = channel();
+            let (splash_sender, splash_receiver): (Sender<socket::PrimitiveShutDownType>, Receiver<socket::PrimitiveShutDownType>) = channel();
+            let (splash_ready_sender, splash_ready_receiver): (Sender<bool>, Receiver<bool>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
                 let boot_config_mutex = boot_config_mutex.clone();
                 let pubkey = pubkey.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, login_credentials_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey, boot_config_valid)
+                    gui::setup_gui(progress_receiver, boot_sender, login_credentials_sender, splash_receiver, splash_ready_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey, boot_config_valid)
                 }
             });
 
@@ -252,7 +254,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     toast_sender.send("Applying changes".to_string())?;
                     BootConfig::write(&mut boot_config, false)?;
                     std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
-                    shut_down(libqinit::system::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
+                    shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
                 }
             } else {
                 // Trigger switch to boot splash page
@@ -270,11 +272,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOff => {
-                        shut_down(libqinit::system::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::Normal)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::Normal)?;
                         return Ok(());
                     },
                     BootCommand::Reboot => {
-                        shut_down(libqinit::system::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
                         return Ok(());
                     },
                     _ => {},
@@ -310,7 +312,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
                 let _ = socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
 
-                thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver));
+                thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver, splash_sender, splash_ready_receiver));
 
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
@@ -329,11 +331,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOffRootFS => {
-                        shut_down(libqinit::system::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::RootFS)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::RootFS)?;
                         return Ok(());
                     },
                     BootCommand::RebootRootFS => {
-                        shut_down(libqinit::system::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::RootFS)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::RootFS)?;
                         return Ok(());
                     }
                     BootCommand::BootFinished | _ => {}

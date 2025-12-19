@@ -14,8 +14,11 @@ struct ExclusiveOptions {
     #[arg(long, short, group = "exclusive")]
     get_login_credentials: bool,
 
-    #[arg(long, short, group = "exclusive")]
+    #[arg(long, short = 'f', group = "exclusive")]
     trigger_fatal_error: bool,
+
+    #[arg(long, short = 'p', group = "exclusive")]
+    trigger_poweroff_splash: bool,
 }
 
 #[derive(Parser)]
@@ -44,13 +47,17 @@ fn main() -> Result<()> {
             error_reason: args.error_reason,
         })
         .with_context(|| "Failed to create vector with boot command")?;
-    } else {
+    } else if args.exclusive_options.get_login_credentials {
         vector = to_allocvec(&socket::CommandToQinit::GetLoginCredentials)?;
+    } else {
+        vector = to_allocvec(&socket::CommandToQinit::TriggerSplash(socket::PrimitiveShutDownType::PowerOff))?;
     }
 
     let mut reply = Vec::new();
-    if args.exclusive_options.get_login_credentials {
+    if args.exclusive_options.get_login_credentials || args.exclusive_options.trigger_poweroff_splash {
         reply = socket::write_and_read(&args.socket_path, &vector)?;
+    } else {
+        socket::write(&args.socket_path, &vector)?;
     }
 
     if args.exclusive_options.get_login_credentials {
@@ -59,6 +66,9 @@ fn main() -> Result<()> {
             info!("Username: '{}'", c.username);
             info!("Password: '{}'", c.password);
         }
+    } else if args.exclusive_options.trigger_poweroff_splash {
+        let ready = &from_bytes::<bool>(&reply)?;
+        info!("Splash ready: {}", ready);
     }
 
     Ok(())

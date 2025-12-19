@@ -59,7 +59,7 @@ export component AppWindow inherits Window {
     callback change_warm_brightness(int);
     callback login(string, string);
     callback change_initial_screen_rotation(int);
-    callback generate_wallpaper();
+    callback generate_wallpaper(bool);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -1124,7 +1124,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_wallpaper();
+                            generate_wallpaper(false);
                             page = Page.ShutDownSplash;
                             direct_power_off();
                         }
@@ -1286,7 +1286,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_wallpaper();
+                            generate_wallpaper(false);
                             page = Page.ShutDownSplash;
                             root.power_off();
                         }
@@ -1299,7 +1299,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_wallpaper();
+                            generate_wallpaper(false);
                             page = Page.ShutDownSplash;
                             root.reboot();
                         }
@@ -1929,7 +1929,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
-                    generate_wallpaper();
+                    generate_wallpaper(false);
                     if page == Page.UserLogin {
                         shutdown_command = RootFsShutDownCommand.PowerOff;
                         page = Page.ShutDownSplash;
@@ -1953,7 +1953,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
-                    generate_wallpaper();
+                    generate_wallpaper(false);
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
                         shutdown_command = RootFsShutDownCommand.Reboot;

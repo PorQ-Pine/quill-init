@@ -13,6 +13,7 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
+use libquillcom::socket::PrimitiveShutDownType;
 
 use crate::boot_config::BootConfig;
 use crate::rootfs::run_chroot_command;
@@ -42,11 +43,6 @@ pub enum BootCommand {
 pub enum PowerDownMode {
     Normal,
     RootFS,
-}
-
-pub enum PrimitiveShutDownType {
-    PowerOff,
-    Reboot,
 }
 
 pub fn mount_base_filesystems() -> Result<()> {
@@ -252,6 +248,7 @@ pub fn real_shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode
     match shut_down_type {
         PrimitiveShutDownType::PowerOff => warn!("Powering off"),
         PrimitiveShutDownType::Reboot => warn!("Rebooting"),
+        _ => {},
     };
 
     cfg_if::cfg_if! {
@@ -262,12 +259,14 @@ pub fn real_shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode
                     match shut_down_type {
                         PrimitiveShutDownType::PowerOff => run_command(&POWER_OFF_BINARY_PATH, &["-f"])?,
                         PrimitiveShutDownType::Reboot => run_command(&REBOOT_BINARY_PATH, &["-f"])?,
+                        _ => {},
                     }
                 },
                 PowerDownMode::RootFS => {
                     match shut_down_type {
                         PrimitiveShutDownType::PowerOff => run_chroot_command(&[&POWER_OFF_BINARY_PATH])?,
                         PrimitiveShutDownType::Reboot => run_chroot_command(&[&REBOOT_BINARY_PATH])?,
+                        _ => {},
                     }
                 }
             }
