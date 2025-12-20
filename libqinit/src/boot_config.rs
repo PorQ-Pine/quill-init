@@ -26,7 +26,13 @@ pub struct System {
     // The following option is always enabled by default. If a user chooses to disable it, the "Recovery options" submenu in the GUI will be hidden
     pub recovery_features: bool,
     pub initial_screen_rotation: eink::ScreenRotation,
-    pub splash_wallpaper: String,
+    pub splash_wallpaper_options: SplashWallpaperOptions,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
+pub struct SplashWallpaperOptions {
+    pub splash_wallpaper: Option<String>,
+    pub flow_particles_amount: Option<u64>,
 }
 
 #[cfg(feature = "debug")]
@@ -56,7 +62,12 @@ impl BootConfig {
         // System
         boot_config.system.timezone = "UTC".to_string();
         boot_config.system.recovery_features = true;
-        boot_config.system.splash_wallpaper = "flow".to_string();
+        boot_config.system.splash_wallpaper_options.splash_wallpaper =
+            Some(crate::splash::DEFAULT_WALLPAPER_MODEL.to_string());
+        boot_config
+            .system
+            .splash_wallpaper_options
+            .flow_particles_amount = Some(crate::splash::DEFAULT_FLOW_PARTICLES_AMOUNT);
 
         return boot_config;
     }

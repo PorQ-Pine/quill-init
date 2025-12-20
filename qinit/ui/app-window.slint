@@ -59,7 +59,8 @@ export component AppWindow inherits Window {
     callback change_warm_brightness(int);
     callback login(string, string);
     callback change_initial_screen_rotation(int);
-    callback generate_wallpaper(bool);
+    callback change_splash_wallpaper_model(string);
+    callback generate_splash_wallpaper(bool);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -84,7 +85,9 @@ export component AppWindow inherits Window {
     in-out property <image> battery_icon;
     in-out property <bool> sticky_toast: false;
     property <[string]> orientations_list: ["0", "90", "180", "270"];
+    in property <[string]> splash_wallpaper_models_list;
     in-out property <int> orientations_list_index: 3;
+    in-out property <int> splash_wallpaper_models_list_index;
     // Configuration properties
     in-out property <bool> persistent_rootfs;
     in property <bool> recovery_features;
@@ -111,8 +114,8 @@ export component AppWindow inherits Window {
     in property <bool> login_captive_portal: false;
     in property <bool> quill_recovery;
     out property <RootFsShutDownCommand> shutdown_command: RootFsShutDownCommand.None;
-    in property <string> wallpaper_splash_text;
-    in property <string> wallpaper_date_time_information;
+    in property <string> splash_wallpaper_text;
+    in property <string> splash_wallpaper_date_time_information;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier: 0.25;
     property <float> hmultiplier: 0.05;
@@ -191,7 +194,7 @@ export component AppWindow inherits Window {
                     VerticalLayout {
                         alignment: center;
                         Text {
-                            text: wallpaper_splash_text;
+                            text: splash_wallpaper_text;
                             font-family: header_font_family;
                             font-size: header_font_size * 0.55;
                             font-weight: 800;
@@ -212,14 +215,17 @@ export component AppWindow inherits Window {
                                 width: self.height;
                                 y: (parent.height - self.height) / 2;
                             }
+
                             Rectangle {
                                 width: layout_spacing * 0.8;
                             }
+
                             Text {
-                                text: wallpaper_date_time_information;
+                                text: splash_wallpaper_date_time_information;
                                 font-size: header_font_size * 0.46;
                                 vertical-alignment: center;
                             }
+
                             Rectangle {
                                 width: scaling_factor * 37.5px + layout_spacing * 0.8;
                             }
@@ -230,9 +236,11 @@ export component AppWindow inherits Window {
                                 width: self.height;
                                 y: (parent.height - self.height) / 2;
                             }
+
                             Rectangle {
                                 width: layout_spacing * 1.3;
                             }
+
                             Text {
                                 text: "\{battery_level} %";
                                 font-size: header_font_size * 0.46;
@@ -733,6 +741,34 @@ export component AppWindow inherits Window {
                             }
                         }
 
+                        HorizontalLayout {
+                            padding-left: layout_padding;
+                            padding-right: self.padding-left;
+                            spacing: layout_spacing;
+                            Rectangle {
+                                Text {
+                                    text: "Splash wallpaper model";
+                                    font-family: regular_font_family;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle { }
+
+                            HList {
+                                border-radius: radius;
+                                element-width: switch_width * 2.5;
+                                button-width: switch_width * 0.5 - layout_spacing * 1.35 - 2px;
+                                spacing: layout_spacing;
+                                height: switch_height;
+                                list: splash_wallpaper_models_list;
+                                index: splash_wallpaper_models_list_index;
+                                index_changed(i) => {
+                                    change_splash_wallpaper_model(self.current-text);
+                                }
+                            }
+                        }
+
                         Rectangle { }
                     }
                 }
@@ -1125,7 +1161,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_wallpaper(false);
+                            generate_splash_wallpaper(false);
                             page = Page.ShutDownSplash;
                             direct_power_off();
                         }
@@ -1287,7 +1323,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_wallpaper(false);
+                            generate_splash_wallpaper(false);
                             page = Page.ShutDownSplash;
                             root.power_off();
                         }
@@ -1300,7 +1336,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_wallpaper(false);
+                            generate_splash_wallpaper(false);
                             page = Page.ShutDownSplash;
                             root.reboot();
                         }
@@ -1930,7 +1966,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
-                    generate_wallpaper(false);
+                    generate_splash_wallpaper(false);
                     if page == Page.UserLogin {
                         shutdown_command = RootFsShutDownCommand.PowerOff;
                         page = Page.ShutDownSplash;
@@ -1954,7 +1990,7 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
-                    generate_wallpaper(false);
+                    generate_splash_wallpaper(false);
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
                         shutdown_command = RootFsShutDownCommand.Reboot;

@@ -55,6 +55,7 @@ pub fn setup_gui(
     let first_boot_done;
 
     // Boot configuration
+    // TODO: Update this dynamically when changing between settings pages
     {
         let boot_config_mutex = boot_config_mutex.clone();
         let boot_config_guard = boot_config_mutex.lock().unwrap();
@@ -75,6 +76,30 @@ pub fn setup_gui(
             ScreenRotation::Cw90 => gui.set_orientations_list_index(1),
             ScreenRotation::Cw180 => gui.set_orientations_list_index(2),
             ScreenRotation::Cw270 => gui.set_orientations_list_index(3),
+        }
+
+        // Splash wallpaper settings
+        let splash_wallpapers_models_vec: Vec<SharedString> = splash::WALLPAPER_MODELS_LIST
+            .iter()
+            .map(|user| SharedString::from(*user))
+            .collect();
+        gui.set_splash_wallpaper_models_list(slint::ModelRc::new(slint::VecModel::from(
+            splash_wallpapers_models_vec,
+        )));
+
+        if let Some(splash_wallpaper_model) = &boot_config_guard
+            .system
+            .splash_wallpaper_options
+            .splash_wallpaper
+        {
+            // ChatGPT did help here...
+            let index = splash::WALLPAPER_MODELS_LIST
+                .iter()
+                .position(|&name| name == splash_wallpaper_model)
+                .map(|i| i as i32);
+            if let Some(i) = index {
+                gui.set_splash_wallpaper_models_list_index(i);
+            }
         }
     }
 
@@ -242,7 +267,7 @@ pub fn setup_gui(
                 if let Ok(shut_down_type) = splash_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
                         set_wallpaper_splash_text(&gui, &shut_down_type);
-                        gui.invoke_generate_wallpaper(true);
+                        gui.invoke_generate_splash_wallpaper(true);
                     }
                 }
             }
@@ -992,10 +1017,11 @@ pub fn setup_gui(
         }
     });
 
-    gui.on_generate_wallpaper({
+    gui.on_generate_splash_wallpaper({
         let gui_weak = gui_weak.clone();
         let set_page_sender = set_page_sender.clone();
         let splash_ready_sender = splash_ready_sender.clone();
+        let boot_config_mutex = boot_config_mutex.clone();
         move |from_socket| {
             if let Some(gui) = gui_weak.upgrade() {
                 if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
@@ -1015,6 +1041,18 @@ pub fn setup_gui(
                     let _ = splash_ready_sender.send(());
                 }
             }
+        }
+    });
+
+    gui.on_change_splash_wallpaper_model({
+        let boot_config_mutex = boot_config_mutex.clone();
+        move |wallpaper| {
+            info!("Changing splash wallpaper model to '{}'", &wallpaper);
+            let mut locked_boot_config = boot_config_mutex.lock().unwrap();
+            locked_boot_config
+                .system
+                .splash_wallpaper_options
+                .splash_wallpaper = Some(wallpaper.to_string());
         }
     });
 
@@ -1098,18 +1136,18 @@ fn set_wallpaper_splash_text(gui: &AppWindow, shut_down_type: &PrimitiveShutDown
     match shut_down_type {
         PrimitiveShutDownType::PowerOff => {
             let current_time: DateTime<Local> = Local::now();
-            gui.set_wallpaper_splash_text(SharedString::from("Powered off"));
-            gui.set_wallpaper_date_time_information(SharedString::from(
+            gui.set_splash_wallpaper_text(SharedString::from("Powered off"));
+            gui.set_splash_wallpaper_date_time_information(SharedString::from(
                 current_time.format("%d/%m").to_string(),
             ));
         }
         PrimitiveShutDownType::Reboot => {
-            gui.set_wallpaper_splash_text(SharedString::from("Rebooting"));
-            gui.set_wallpaper_date_time_information(gui.get_current_time());
+            gui.set_splash_wallpaper_text(SharedString::from("Rebooting"));
+            gui.set_splash_wallpaper_date_time_information(gui.get_current_time());
         }
         PrimitiveShutDownType::Sleep => {
-            gui.set_wallpaper_splash_text(SharedString::from("Sleeping"));
-            gui.set_wallpaper_date_time_information(gui.get_current_time());
+            gui.set_splash_wallpaper_text(SharedString::from("Sleeping"));
+            gui.set_splash_wallpaper_date_time_information(gui.get_current_time());
         }
     }
 }
