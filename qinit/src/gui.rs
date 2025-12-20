@@ -266,11 +266,15 @@ pub fn setup_gui(
         std::time::Duration::from_millis(100),
         {
             let gui_weak = gui_weak.clone();
+            let set_page_sender = set_page_sender.clone();
             move || {
                 if let Ok(shut_down_type) = splash_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
                         set_wallpaper_splash_text(&gui, &shut_down_type);
-                        gui.invoke_generate_splash_wallpaper(true);
+                        if shut_down_type != PrimitiveShutDownType::Reboot {
+                            gui.invoke_generate_splash_wallpaper(true);
+                        }
+                        let _ = set_page_sender.send(Page::ShutDownSplash);
                     }
                 }
             }
@@ -1024,7 +1028,6 @@ pub fn setup_gui(
 
     gui.on_generate_splash_wallpaper({
         let gui_weak = gui_weak.clone();
-        let set_page_sender = set_page_sender.clone();
         let splash_ready_sender = splash_ready_sender.clone();
         let boot_config_mutex = boot_config_mutex.clone();
         move |from_socket| {
@@ -1042,7 +1045,6 @@ pub fn setup_gui(
                 }
 
                 if from_socket {
-                    let _ = set_page_sender.send(Page::ShutDownSplash);
                     let _ = splash_ready_sender.send(());
                 }
             }

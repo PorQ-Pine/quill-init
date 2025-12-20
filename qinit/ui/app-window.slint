@@ -1334,7 +1334,6 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_splash_wallpaper(false);
                             page = Page.ShutDownSplash;
                             root.reboot();
                         }
@@ -1988,7 +1987,6 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
-                    generate_splash_wallpaper(false);
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
                         shutdown_command = RootFsShutDownCommand.Reboot;
