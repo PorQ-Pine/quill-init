@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use log::info;
 use serde_json;
-use std::fs;
+use std::{fs, thread};
 
 use crate::system::{is_mountpoint, run_command};
 
@@ -105,6 +105,13 @@ pub fn mount_storage(user: &str, password: &str) -> Result<()> {
     let home_path_base = format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &crate::SYSTEM_HOME_DIR);
     let home_path_encrypted = format!("{}/.{}", &home_path_base, &user);
     let home_mountpoint_path = format!("{}/{}", &home_path_base, &user);
+
+    loop {
+        if is_mountpoint(&home_path_base)? {
+            break;
+        }
+        thread::sleep(std::time::Duration::from_millis(250));
+    }
 
     if !is_mountpoint(&home_mountpoint_path)? {
         run_command(

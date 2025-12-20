@@ -162,11 +162,14 @@ pub fn setup_gui(
         set_page_sender.send(Page::QuillBoot)?;
     } else if boot_config_valid {
         // Trigger normal boot automatically
+        let login_credentials_sender = login_credentials_sender.clone();
         boot_normal(
+            &gui,
             &boot_sender,
             &set_page_sender,
             &default_user,
             first_boot_done,
+            login_credentials_sender,
         )?;
     }
 
@@ -639,26 +642,27 @@ pub fn setup_gui(
     gui.on_boot_default({
         let boot_sender = boot_sender.clone();
         let set_page_sender = set_page_sender.clone();
-        let gui_weak = gui_weak.clone();
         let wifi_command_sender = wifi_command_sender.clone();
+        let login_credentials_sender = login_credentials_sender.clone();
+        let gui_weak = gui_weak.clone();
         move || {
-            // Turn off Wi-Fi
-            if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
-                command_type: wifi::CommandType::Disable,
-                arguments: None,
-            }) {
-                if let Some(gui) = gui_weak.upgrade() {
+            if let Some(gui) = gui_weak.upgrade() {
+                // Turn off Wi-Fi
+                if let Err(e) = wifi_command_sender.send(wifi::CommandForm {
+                    command_type: wifi::CommandType::Disable,
+                    arguments: None,
+                }) {
                     error_toast(&gui, "Failed to disable Wi-Fi", e.into());
                 }
-            }
-            if let Err(e) = boot_normal(
-                &boot_sender,
-                &set_page_sender,
-                &default_user,
-                first_boot_done,
-            ) {
-                if let Some(gui) = gui_weak.upgrade() {
-                    error_toast(&gui, "Failed to send boot command", e.into());
+                if let Err(e) = boot_normal(
+                    &gui,
+                    &boot_sender,
+                    &set_page_sender,
+                    &default_user,
+                    first_boot_done,
+                    login_credentials_sender.clone(),
+                ) {
+                    error_toast(&gui, "Failed to send boot command", e.into())
                 }
             }
         }
@@ -986,6 +990,7 @@ pub fn setup_gui(
     gui.on_login({
         let gui_weak = gui_weak.clone();
         let set_page_sender = set_page_sender.clone();
+        let login_credentials_sender = login_credentials_sender.clone();
         move |username, password| {
             if let Some(gui) = gui_weak.upgrade() {
                 if let Err(e) = storage_encryption::mount_storage(&username, &password) {
@@ -1081,31 +1086,54 @@ fn refresh_storage_encryption_ui(gui: &AppWindow) {
 }
 
 fn boot_normal(
+    gui: &AppWindow,
     boot_sender: &Sender<BootCommand>,
     set_page_sender: &Sender<Page>,
     default_user: &str,
     first_boot_done: bool,
+    login_credentials_sender: Sender<LoginForm>,
 ) -> Result<()> {
     let mut wait_for_login = false;
+    let default_user = default_user.to_string();
 
     if first_boot_done {
         let encryption_users_list = storage_encryption::get_users_using_storage_encryption()?;
         if !encryption_users_list.is_empty()
-            && encryption_users_list.contains(&default_user.to_string())
+            && encryption_users_list.contains(&default_user)
+            && storage_encryption::get_user_storage_encryption_status(&default_user)?
         {
             wait_for_login = true;
         } else {
             if default_user.is_empty() {
                 wait_for_login = true;
+            } else {
+                info!(
+                    "Triggering automatic login for default user '{}'",
+                    &default_user
+                );
+                boot_sender.send(BootCommand::NormalBoot)?;
+                storage_encryption::mount_storage(
+                    &default_user,
+                    &storage_encryption::DISABLED_MODE_PASSWORD,
+                )?;
+                if let Err(e) = login_credentials_sender.send(LoginForm {
+                    username: default_user,
+                    password: storage_encryption::DISABLED_MODE_PASSWORD.to_string(),
+                }) {
+                    error_toast(
+                        &gui,
+                        "Failed to send credentials for automatic login",
+                        e.into(),
+                    );
+                }
             }
         }
 
         if wait_for_login {
             set_page_sender.send(Page::UserLogin)?;
+            boot_sender.send(BootCommand::NormalBoot)?;
         }
     }
-
-    boot_sender.send(BootCommand::NormalBoot)?;
 
     Ok(())
 }

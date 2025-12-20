@@ -9,7 +9,6 @@ cfg_if::cfg_if! {
         pub mod brightness;
         pub mod battery;
         pub mod networking;
-        pub mod splash;
     }
 }
 pub mod boot_config;
@@ -17,6 +16,7 @@ pub mod eink;
 pub mod rootfs;
 pub mod rootfs_socket;
 pub mod signing;
+pub mod splash;
 pub mod system;
 
 pub const BOOT_PART: &str = "/dev/mmcblk0p7";

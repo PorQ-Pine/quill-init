@@ -459,10 +459,10 @@ pub fn bulletproof_unmount(path: &str) -> Result<()> {
 pub fn is_mountpoint(path: &str) -> Result<bool> {
     // Could be replaced by proper Rust logic further on
     if let Err(_e) = run_command("/bin/mountpoint", &[&path]) {
-        info!("Path '{}' is not a mountpoint", &path);
+        debug!("Path '{}' is not a mountpoint", &path);
         return Ok(false);
     } else {
-        info!("Path '{}' is a mountpoint", &path);
+        debug!("Path '{}' is a mountpoint", &path);
         return Ok(true);
     }
 }

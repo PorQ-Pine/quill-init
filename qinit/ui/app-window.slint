@@ -444,7 +444,6 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            root.page = Page.None;
                             root.boot_default();
                         }
                     }
@@ -1177,7 +1176,6 @@ export component AppWindow inherits Window {
                             if quill_recovery {
                                 root.page = Page.QuillBoot;
                             } else {
-                                root.page = Page.None;
                                 boot_default();
                             }
                         }

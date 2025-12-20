@@ -79,28 +79,35 @@ impl BootConfig {
         let mut boot_config_to_return = Self::default_boot_config();
         let mut boot_config_valid = false;
 
-        if let Ok(boot_config_str) = fs::read_to_string(&path) {
-            if let Ok(boot_config) = ron::from_str::<BootConfig>(&boot_config_str) {
-                info!("Found valid boot configuration");
-                boot_config_valid = true;
-                boot_config_to_return = boot_config;
+        if fs::exists(&path)? {
+            if let Ok(boot_config_str) = fs::read_to_string(&path) {
+                if let Ok(boot_config) = ron::from_str::<BootConfig>(&boot_config_str) {
+                    info!("Found valid boot configuration");
+                    boot_config_valid = true;
+                    boot_config_to_return = boot_config;
+                } else {
+                    warn!(
+                        "Found invalid boot configuration (possibly corrupted or incomplete?): returning default configuration, but enabling 'first_boot_done'"
+                    );
+                    let backup_path = format!("{}.bak", &path);
+                    info!("Backing old configuration up to path '{}'", &backup_path);
+                    fs::copy(&path, &backup_path)?;
+
+                    boot_config_to_return.flags.first_boot_done = true;
+
+                    info!("Writing new boot configuration with defaults");
+                    Self::write(&boot_config_to_return, true)?;
+                }
             } else {
-                warn!(
-                    "Found invalid boot configuration (possibly corrupted or incomplete?): returning default configuration, but enabling 'first_boot_done'"
+                boot_config_valid = true;
+                info!(
+                    "Could not read boot configuration to string (hint: it might not exist yet). Returning the default one"
                 );
-                let backup_path = format!("{}.bak", &path);
-                info!("Backing old configuration up to path '{}'", &backup_path);
-                fs::copy(&path, &backup_path)?;
-
-                boot_config_to_return.flags.first_boot_done = true;
-
-                info!("Writing new boot configuration with defaults");
-                Self::write(&boot_config_to_return, true)?;
+                Self::write(&boot_config_to_return, false)?;
             }
         } else {
-            boot_config_valid = true;
             info!(
-                "Could not read boot configuration to string (hint: it might not exist yet). Returning the default one"
+                "Did not find any existing boot configuration: writing and returning a fresh one"
             );
             Self::write(&boot_config_to_return, false)?;
         }

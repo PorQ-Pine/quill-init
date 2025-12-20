@@ -183,7 +183,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             #[cfg(not(feature = "gui_only"))]
             {
                 #[cfg(feature = "debug")]
-                if let Err(e) = debug::start_debug_framework(&pubkey, &mut boot_config).with_context(|| "Failed to start debug framework") {
+                if let Err(e) = debug::start_debug_framework(&pubkey, &mut boot_config) {
                     error!("Failed to initialize debug framework: {}", &e);
                 }
 
