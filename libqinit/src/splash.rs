@@ -2,9 +2,10 @@ use crate::boot_config::BootConfig;
 use crate::system::{self, QINIT_BINARIES_DIR_PATH, run_command};
 use anyhow::Result;
 use log::info;
+use rand::{prelude::*, rng};
 use std::sync::{Arc, Mutex};
 
-pub const DEFAULT_WALLPAPER_MODEL: &str = "flow";
+pub const DEFAULT_WALLPAPER_MODEL: &str = "random";
 pub const DEFAULT_FLOW_PARTICLES_AMOUNT: u64 = 5000;
 pub const WALLPAPER_OUT_FILE_PATH: &str = "/tmp/splash_wallpaper.png";
 pub const WALLPAPER_MODELS_LIST: &[&str] = &[
@@ -15,15 +16,17 @@ pub const WALLPAPER_MODELS_LIST: &[&str] = &[
     "nearestpoint",
     "tangles",
     "cellularone",
+    // Too many squares
     "squares",
-    "squareshor",
-    "squaresver",
-    "squaresdiag",
+    // "squareshor",
+    // "squaresver",
+    // "squaresdiag",
     "squares2",
-    "squares2h",
-    "squares2v",
+    // "squares2h",
+    // "squares2v",
     "nearestgradient",
     "pattern",
+    "random",
 ];
 const MAX_GENERATION_RETRIES: u8 = 3;
 
@@ -42,6 +45,22 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
             .clone()
         {
             wallpaper_type = wt;
+        }
+
+        if wallpaper_type == "random" {
+            let mut rng = rng();
+            let available_wallpapers: Vec<&str> = WALLPAPER_MODELS_LIST
+                .iter()
+                .filter(|&w| *w != "random")
+                .cloned()
+                .collect();
+            if let Some(selected) = available_wallpapers.choose(&mut rng) {
+                wallpaper_type = selected.to_string();
+                // info!("Selected random wallpaper type: {}", wallpaper_type);
+            } else {
+                info!("Rng failed somehow, going with the first type.");
+                wallpaper_type = WALLPAPER_MODELS_LIST.first().unwrap().to_string();
+            }
         }
 
         if let Some(fp) = locked_boot_config
