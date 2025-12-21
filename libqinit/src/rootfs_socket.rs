@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use pinenote_service::ioctls::rockchip_ebc::global_refresh_iowr;
 use core::ops::Deref;
 use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
 use log::{debug, info};
@@ -90,6 +91,10 @@ pub fn listen_for_commands(
                     .with_context(|| "Failed to receive message from splash readiness sender")?;
                 // Conservative wait time to allow display to complete refresh after wallpaper generation is done
                 thread::sleep(std::time::Duration::from_millis(2000));
+
+                // Calling new here is well, bad (because possible wrong default values), but we shut down in a second, so no one should care
+                let ebc = pinenote_service::drivers::rockchip_ebc::RockchipEbc::new();
+                ebc.global_refresh().ok();
 
                 let reply = to_allocvec(&AnswerFromQinit::SplashReady)?;
                 unix_stream
