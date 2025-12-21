@@ -84,15 +84,6 @@ pub fn setup(pubkey: &PKey<Public>, persistent: bool) -> Result<()> {
         run_command("/bin/mount", &[&rootfs_file_path, &ro_mountpoint])
             .with_context(|| "Failed to mount root filesystem's SquashFS archive")?;
 
-        /*bind_mount(
-            &system::MODULES_DIR_PATH,
-            &format!("{}/{}", &ro_mountpoint, &system::MODULES_DIR_PATH),
-        )?;
-        bind_mount(
-            &system::FIRMWARE_DIR_PATH,
-            &format!("{}/{}", &ro_mountpoint, &system::FIRMWARE_DIR_PATH),
-        )?;*/
-
         info!("Setting up overlay filesystem");
         run_command(
             "/bin/mount",
