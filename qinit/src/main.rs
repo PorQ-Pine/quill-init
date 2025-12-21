@@ -34,7 +34,7 @@ cfg_if::cfg_if! {
         cfg_if::cfg_if! {
             if #[cfg(not(feature = "gui_only"))] {
                 use libqinit::eink;
-                use libqinit::system::{mount_firmware, set_workdir, run_command, set_timezone};
+                use libqinit::system::{mount_modules, mount_firmware, set_workdir, run_command, set_timezone};
                 use libqinit::rootfs;
                 use libqinit::systemd;
 
@@ -168,6 +168,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 set_workdir("/").with_context(|| "Failed to set current directory to / (not in chroot)")?;
                 fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT).with_context(|| "Failed to create default mountpoint's directory")?;
 
+                mount_modules()?;
                 let _ = mount_firmware(&pubkey);
             }
 

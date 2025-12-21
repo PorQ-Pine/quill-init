@@ -13,7 +13,11 @@ use crate::system::{self, bind_mount, generate_random_string, rm_dir_all, run_co
 pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 const RO_DIR: &str = "read/";
 const RW_WRITE_DIR: &str = "write/";
+const RW_MODULES_WRITE_DIR: &str = "write-modules/";
+const RW_FIRMWARE_WRITE_DIR: &str = "write-firmware/";
 const RW_WORK_DIR: &str = "work/";
+const RW_MODULES_WORK_DIR: &str = "work-modules/";
+const RW_FIRMWARE_WORK_DIR: &str = "work-firmware/";
 
 pub fn setup(pubkey: &PKey<Public>, persistent: bool) -> Result<()> {
     info!("Mounting root filesystem SquashFS archive");
@@ -33,58 +37,122 @@ pub fn setup(pubkey: &PKey<Public>, persistent: bool) -> Result<()> {
             .with_context(|| "Failed to mount tmpfs at overlay work directory")?;
 
         let ro_mountpoint = format!("{}/{}", &crate::OVERLAY_WORKDIR, &RO_DIR);
+        let rw_dir_path_base;
+
         let rw_write_dir_path;
+        let rw_modules_write_dir_path;
+        let rw_firmware_write_dir_path;
         let rw_work_dir_path;
+        let rw_modules_work_dir_path;
+        let rw_firmware_work_dir_path;
         if persistent {
-            rw_write_dir_path = format!(
-                "{}/{}/{}/{}",
+            rw_dir_path_base = format!(
+                "{}/{}/{}",
                 &crate::MAIN_PART_MOUNTPOINT,
                 &crate::SYSTEM_DIR,
                 &crate::ROOTFS_DIR,
-                &RW_WRITE_DIR,
             );
-            rw_work_dir_path = format!(
-                "{}/{}/{}/{}",
-                &crate::MAIN_PART_MOUNTPOINT,
-                &crate::SYSTEM_DIR,
-                &crate::ROOTFS_DIR,
-                &RW_WORK_DIR,
-            );
+            rw_write_dir_path = format!("{}/{}", &rw_dir_path_base, &RW_WRITE_DIR);
+            rw_modules_write_dir_path = format!("{}/{}", &rw_dir_path_base, &RW_MODULES_WRITE_DIR);
+            rw_firmware_write_dir_path =
+                format!("{}/{}", &rw_dir_path_base, &RW_FIRMWARE_WRITE_DIR);
+            rw_work_dir_path = format!("{}/{}", &rw_dir_path_base, &RW_WORK_DIR);
+            rw_modules_work_dir_path = format!("{}/{}", &rw_dir_path_base, &RW_MODULES_WORK_DIR);
+            rw_firmware_work_dir_path = format!("{}/{}", &rw_dir_path_base, &RW_FIRMWARE_WORK_DIR);
         } else {
-            rw_write_dir_path = format!("{}/{}", &crate::OVERLAY_WORKDIR, "write");
-            rw_work_dir_path = format!("{}/{}", &crate::OVERLAY_WORKDIR, "work");
+            rw_write_dir_path = format!("{}/{}", &crate::OVERLAY_WORKDIR, &RW_WRITE_DIR);
+            rw_modules_write_dir_path =
+                format!("{}/{}", &crate::OVERLAY_WORKDIR, &RW_MODULES_WRITE_DIR);
+            rw_firmware_write_dir_path =
+                format!("{}/{}", &crate::OVERLAY_WORKDIR, &RW_FIRMWARE_WRITE_DIR);
+            rw_work_dir_path = format!("{}/{}", &crate::OVERLAY_WORKDIR, &RW_WORK_DIR);
+            rw_modules_work_dir_path =
+                format!("{}/{}", &crate::OVERLAY_WORKDIR, &RW_MODULES_WORK_DIR);
+            rw_firmware_work_dir_path =
+                format!("{}/{}", &crate::OVERLAY_MOUNTPOINT, &RW_FIRMWARE_WORK_DIR);
         }
         fs::create_dir_all(&ro_mountpoint)?;
         fs::create_dir_all(&rw_write_dir_path)?;
+        fs::create_dir_all(&rw_modules_write_dir_path)?;
+        fs::create_dir_all(&rw_firmware_write_dir_path)?;
         fs::create_dir_all(&rw_work_dir_path)?;
+        fs::create_dir_all(&rw_modules_work_dir_path)?;
+        fs::create_dir_all(&rw_firmware_work_dir_path)?;
         fs::create_dir_all(&crate::OVERLAY_MOUNTPOINT)
             .with_context(|| "Failed to create overlay mountpoint's directory")?;
 
         run_command("/bin/mount", &[&rootfs_file_path, &ro_mountpoint])
             .with_context(|| "Failed to mount root filesystem's SquashFS archive")?;
 
-        bind_mount(
+        /*bind_mount(
             &system::MODULES_DIR_PATH,
             &format!("{}/{}", &ro_mountpoint, &system::MODULES_DIR_PATH),
         )?;
         bind_mount(
             &system::FIRMWARE_DIR_PATH,
             &format!("{}/{}", &ro_mountpoint, &system::FIRMWARE_DIR_PATH),
-        )?;
+        )?;*/
 
-        info!("Setting up fuse-overlayfs overlay");
+        info!("Setting up overlay filesystem");
         run_command(
-            "/usr/bin/fuse-overlayfs",
+            "/bin/mount",
             &[
+                "-t",
+                "overlay",
                 "-o",
                 &format!(
-                    "allow_other,lowerdir={},upperdir={},workdir={}",
+                    "lowerdir={},upperdir={},workdir={}",
                     &ro_mountpoint, &rw_write_dir_path, &rw_work_dir_path
                 ),
+                "none",
                 &crate::OVERLAY_MOUNTPOINT,
             ],
         )
-        .with_context(|| "Failed to mount fuse-overlayfs filesystem at overlay's mountpoint")?;
+        .with_context(|| "Failed to mount overlay filesystem at overlay's mountpoint")?;
+        info!("Setting up modules overlay filesystem");
+        run_command(
+            "/bin/mount",
+            &[
+                "-t",
+                "overlay",
+                "-o",
+                &format!(
+                    "lowerdir={},upperdir={},workdir={}",
+                    &system::MODULES_DIR_PATH,
+                    &rw_modules_write_dir_path,
+                    &rw_modules_work_dir_path
+                ),
+                "none",
+                &format!(
+                    "{}/{}",
+                    &crate::OVERLAY_MOUNTPOINT,
+                    &system::MODULES_DIR_PATH
+                ),
+            ],
+        )
+        .with_context(|| "Failed to mount overlay filesystem at modules overlay's mountpoint")?;
+        info!("Setting up firmware overlay filesystem");
+        run_command(
+            "/bin/mount",
+            &[
+                "-t",
+                "overlay",
+                "-o",
+                &format!(
+                    "lowerdir={},upperdir={},workdir={}",
+                    &system::FIRMWARE_DIR_PATH,
+                    &rw_firmware_write_dir_path,
+                    &rw_firmware_work_dir_path
+                ),
+                "none",
+                &format!(
+                    "{}/{}",
+                    &crate::OVERLAY_MOUNTPOINT,
+                    &system::FIRMWARE_DIR_PATH
+                ),
+            ],
+        )
+        .with_context(|| "Failed to mount overlay filesystem at firmware overlay's mountpoint")?;
         setup_mounts()?;
     } else {
         return Err(anyhow::anyhow!(
@@ -111,7 +179,7 @@ pub fn tear_down() -> Result<()> {
 }
 
 pub fn setup_mounts() -> Result<()> {
-    info!("Mounting filesystems in fuse-overlayfs overlay");
+    info!("Mounting filesystems in overlay");
 
     Mount::builder()
         .fstype("proc")

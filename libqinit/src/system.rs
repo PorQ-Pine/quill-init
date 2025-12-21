@@ -20,6 +20,7 @@ use crate::rootfs::run_chroot_command;
 use crate::signing::check_signature;
 
 pub const MODULES_DIR_PATH: &str = "/lib/modules";
+pub const MODULES_ARCHIVE: &str = "modules.squashfs";
 pub const FIRMWARE_DIR_PATH: &str = "/lib/firmware";
 pub const FIRMWARE_ARCHIVE: &str = "firmware.squashfs";
 pub const WAVEFORM_DIR_PATH: &str = "/lib/firmware/rockchip/";
@@ -179,6 +180,18 @@ pub fn mount_base_partitions() -> Result<()> {
         &crate::MAIN_PART_MOUNTPOINT,
         &crate::SYSTEM_HOME_DIR
     ))?;
+
+    Ok(())
+}
+
+pub fn mount_modules() -> Result<()> {
+    info!("Mounting kernel modules SquashFS archive");
+
+    fs::create_dir_all(&MODULES_DIR_PATH)?;
+    let modules_archive_path = format!("/lib/{}", &MODULES_ARCHIVE);
+
+    run_command("/bin/mount", &[&modules_archive_path, &MODULES_DIR_PATH])
+        .with_context(|| "Failed to mount kernel modules archive")?;
 
     Ok(())
 }
