@@ -265,8 +265,6 @@ pub fn restart_service(service: &str) -> Result<()> {
 }
 
 pub fn real_shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode) -> Result<()> {
-    thread::sleep(std::time::Duration::from_millis(2000));
-
     match shut_down_type {
         PrimitiveShutDownType::PowerOff => warn!("Powering off"),
         PrimitiveShutDownType::Reboot => warn!("Rebooting"),

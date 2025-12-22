@@ -1195,6 +1195,7 @@ fn boot_normal(
                 can_shut_down: None,
             });
         }
+    } else {
     }
 
     Ok(())
