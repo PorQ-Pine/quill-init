@@ -1,10 +1,3 @@
-use std::{
-    sync::{
-        Arc, Mutex,
-        mpsc::{Receiver, Sender},
-    },
-    thread,
-};
 use anyhow::{Context, Result};
 use core::ops::Deref;
 use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
@@ -12,8 +5,14 @@ use log::{debug, info};
 use postcard::to_allocvec;
 use socket::PrimitiveShutDownType;
 use std::io::Write;
-
-use crate::eink;
+use std::{
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{Receiver, Sender},
+    },
+    thread,
+};
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 
@@ -21,6 +20,7 @@ pub fn initialize(
     login_credentials_receiver: Receiver<LoginForm>,
     splash_sender: Sender<PrimitiveShutDownType>,
     splash_ready_receiver: Receiver<()>,
+    can_shut_down: Arc<AtomicBool>,
 ) -> Result<()> {
     let login_form_mutex = Arc::new(Mutex::new(None));
     thread::spawn({
@@ -30,7 +30,14 @@ pub fn initialize(
 
     thread::spawn({
         let login_form_mutex = login_form_mutex.clone();
-        move || listen_for_commands(login_form_mutex, splash_sender, splash_ready_receiver)
+        move || {
+            listen_for_commands(
+                login_form_mutex,
+                splash_sender,
+                splash_ready_receiver,
+                can_shut_down,
+            )
+        }
     });
 
     Ok(())
@@ -59,6 +66,7 @@ pub fn listen_for_commands(
     login_form_mutex: Arc<Mutex<Option<LoginForm>>>,
     splash_sender: Sender<PrimitiveShutDownType>,
     splash_ready_receiver: Receiver<()>,
+    can_shut_down: Arc<AtomicBool>,
 ) -> Result<()> {
     info!("Listening for commands");
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
@@ -89,9 +97,13 @@ pub fn listen_for_commands(
                 splash_ready_receiver
                     .recv()
                     .with_context(|| "Failed to receive message from splash readiness sender")?;
-                // Conservative wait time to allow display to complete refresh after wallpaper generation is done
-                thread::sleep(std::time::Duration::from_millis(2000));
-                eink::full_refresh();
+
+                loop {
+                    if can_shut_down.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    thread::sleep(std::time::Duration::from_millis(100));
+                }
 
                 let reply = to_allocvec(&AnswerFromQinit::SplashReady)?;
                 unix_stream

@@ -316,7 +316,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
                 let _ = socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
 
-                thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver, splash_sender, splash_ready_receiver));
+                thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver, splash_sender, splash_ready_receiver, can_shut_down.clone()));
 
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
@@ -351,7 +351,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
     Ok(())
 }
-
 
 #[cfg(not(feature = "init_wrapper"))]
 fn handle_boot_command(boot_command_form: BootCommandForm) -> (BootCommand, Arc<AtomicBool>) {

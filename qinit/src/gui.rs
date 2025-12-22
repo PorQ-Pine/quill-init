@@ -206,11 +206,9 @@ pub fn setup_gui(
                             match gui.get_shutdown_command() {
                                 RootFsShutDownCommand::PowerOff => {
                                     command = BootCommand::PowerOffRootFS;
-                                    set_wallpaper_splash_text(&gui, &PrimitiveShutDownType::PowerOff);
                                 }
                                 RootFsShutDownCommand::Reboot => {
                                     command = BootCommand::RebootRootFS;
-                                    set_wallpaper_splash_text(&gui, &PrimitiveShutDownType::Reboot);
                                 }
                                 RootFsShutDownCommand::None => command = BootCommand::BootFinished,
                             };
@@ -277,12 +275,15 @@ pub fn setup_gui(
         {
             let gui_weak = gui_weak.clone();
             let set_page_sender = set_page_sender.clone();
+            let can_shut_down = can_shut_down.clone();
             move || {
                 if let Ok(shut_down_type) = splash_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
                         set_wallpaper_splash_text(&gui, &shut_down_type);
-                        if shut_down_type != PrimitiveShutDownType::Reboot {
+                        if shut_down_type == PrimitiveShutDownType::PowerOff {
                             gui.invoke_generate_splash_wallpaper(true);
+                        } else {
+                            handle_screen_refresh(true, can_shut_down.clone());
                         }
                         let _ = set_page_sender.send(Page::ShutDownSplash);
                     }
@@ -561,15 +562,16 @@ pub fn setup_gui(
                     command: BootCommand::PowerOff,
                     can_shut_down: Some(can_shut_down.clone()),
                 }) {
-                    let mut display_error = true;
-                    if gui.get_page() == Page::Error {
-                        if let Err(_e) =
-                            shut_down(shut_down_type, PowerDownMode::Normal, can_shut_down.clone())
-                        {
-                            display_error = true;
-                        } else {
-                            display_error = false;
-                        }
+                    let display_error;
+                    if let Err(_e) = gui_shut_down(
+                        &gui,
+                        shut_down_type,
+                        PowerDownMode::Normal,
+                        can_shut_down.clone(),
+                    ) {
+                        display_error = true;
+                    } else {
+                        display_error = false;
                     }
 
                     if display_error {
@@ -610,15 +612,16 @@ pub fn setup_gui(
                     command: BootCommand::Reboot,
                     can_shut_down: Some(can_shut_down.clone()),
                 }) {
-                    let mut display_error = true;
-                    if gui.get_page() == Page::Error {
-                        if let Err(_e) =
-                            shut_down(shut_down_type, PowerDownMode::Normal, can_shut_down.clone())
-                        {
-                            display_error = true;
-                        } else {
-                            display_error = false;
-                        }
+                    let display_error;
+                    if let Err(_e) = gui_shut_down(
+                        &gui,
+                        shut_down_type,
+                        PowerDownMode::Normal,
+                        can_shut_down.clone(),
+                    ) {
+                        display_error = true;
+                    } else {
+                        display_error = false;
                     }
 
                     if display_error {
@@ -1061,6 +1064,7 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         let splash_ready_sender = splash_ready_sender.clone();
         let boot_config_mutex = boot_config_mutex.clone();
+        let can_shut_down = can_shut_down.clone();
         move |from_socket| {
             if let Some(gui) = gui_weak.upgrade() {
                 if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
@@ -1074,6 +1078,18 @@ pub fn setup_gui(
                         Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
                     }
                 }
+
+                match gui.get_shutdown_command() {
+                    RootFsShutDownCommand::PowerOff => {
+                        set_wallpaper_splash_text(&gui, &PrimitiveShutDownType::PowerOff)
+                    }
+                    RootFsShutDownCommand::Reboot => {
+                        set_wallpaper_splash_text(&gui, &PrimitiveShutDownType::Reboot)
+                    }
+                    _ => {}
+                };
+
+                handle_screen_refresh(true, can_shut_down.clone());
 
                 if from_socket {
                     let _ = splash_ready_sender.send(());
@@ -1094,16 +1110,10 @@ pub fn setup_gui(
         }
     });
 
-    gui.on_refresh_screen(move |prepare_shut_down| {
-        if prepare_shut_down {
-            let can_shut_down = can_shut_down.clone();
-            thread::spawn(move || {
-                thread::sleep(std::time::Duration::from_millis(2000));
-                eink::full_refresh();
-                can_shut_down.store(true, Ordering::SeqCst);
-            });
-        } else {
-            eink::full_refresh();
+    gui.on_refresh_screen({
+        let can_shut_down = can_shut_down.clone();
+        move |prepare_shut_down| {
+            handle_screen_refresh(prepare_shut_down, can_shut_down.clone());
         }
     });
 
@@ -1208,7 +1218,7 @@ fn gui_shut_down(
     can_shut_down: Arc<AtomicBool>,
 ) -> Result<()> {
     set_wallpaper_splash_text(&gui, &shut_down_type);
-    shut_down(shut_down_type, mode, can_shut_down)?;
+    thread::spawn(move || shut_down(shut_down_type, mode, can_shut_down.clone()));
 
     Ok(())
 }
@@ -1230,5 +1240,18 @@ fn set_wallpaper_splash_text(gui: &AppWindow, shut_down_type: &PrimitiveShutDown
             gui.set_splash_wallpaper_text(SharedString::from("Sleeping"));
             gui.set_splash_wallpaper_date_time_information(gui.get_current_time());
         }
+    }
+}
+
+fn handle_screen_refresh(prepare_shut_down: bool, can_shut_down: Arc<AtomicBool>) {
+    if prepare_shut_down {
+        let can_shut_down = can_shut_down.clone();
+        thread::spawn(move || {
+            thread::sleep(std::time::Duration::from_millis(2000));
+            eink::full_refresh();
+            can_shut_down.store(true, Ordering::SeqCst);
+        });
+    } else {
+        eink::full_refresh();
     }
 }

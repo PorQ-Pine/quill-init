@@ -81,8 +81,10 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
         }
     }
     let wallpaper_models: HashMap<&'static str, u64> =
-    WALLPAPER_PARTICLES_AMOUNT.iter().copied().collect();
-    let flow_particles_amount = *wallpaper_models.get(wallpaper_type.as_str()).unwrap_or(&FALLBACK_PARTICLES);
+        WALLPAPER_PARTICLES_AMOUNT.iter().copied().collect();
+    let flow_particles_amount = *wallpaper_models
+        .get(wallpaper_type.as_str())
+        .unwrap_or(&FALLBACK_PARTICLES);
 
     system::mount_qinit_binaries()?;
 

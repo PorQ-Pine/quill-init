@@ -3,8 +3,11 @@ use crate::system::{modprobe, run_command, start_service};
 use anyhow::{Context, Result};
 use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::{fs::{self, File}, thread};
 use std::process::Command;
+use std::{
+    fs::{self, File},
+    thread,
+};
 
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
 const WAVEFORM_FILE: &str = "ebc.wbf";

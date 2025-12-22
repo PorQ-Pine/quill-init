@@ -12,7 +12,10 @@ use sha256;
 use std::env;
 use std::os::unix::fs::symlink;
 use std::path::Path;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
 
@@ -295,7 +298,11 @@ pub fn real_shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode
     Ok(())
 }
 
-pub fn shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode, can_shut_down: Arc<AtomicBool>) -> Result<()> {
+pub fn shut_down(
+    shut_down_type: PrimitiveShutDownType,
+    mode: PowerDownMode,
+    can_shut_down: Arc<AtomicBool>,
+) -> Result<()> {
     loop {
         if can_shut_down.load(Ordering::SeqCst) {
             can_shut_down.store(false, Ordering::SeqCst);
