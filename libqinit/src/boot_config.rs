@@ -32,7 +32,6 @@ pub struct System {
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct SplashWallpaperOptions {
     pub splash_wallpaper: Option<String>,
-    pub flow_particles_amount: Option<u64>,
 }
 
 #[cfg(feature = "debug")]
@@ -64,11 +63,6 @@ impl BootConfig {
         boot_config.system.recovery_features = true;
         boot_config.system.splash_wallpaper_options.splash_wallpaper =
             Some(crate::splash::DEFAULT_WALLPAPER_MODEL.to_string());
-        boot_config
-            .system
-            .splash_wallpaper_options
-            .flow_particles_amount = Some(crate::splash::DEFAULT_FLOW_PARTICLES_AMOUNT);
-
         return boot_config;
     }
 

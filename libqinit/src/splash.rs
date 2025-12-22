@@ -3,10 +3,10 @@ use crate::system::{self, QINIT_BINARIES_DIR_PATH, run_command};
 use anyhow::Result;
 use log::info;
 use rand::{prelude::*, rng};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub const DEFAULT_WALLPAPER_MODEL: &str = "random";
-pub const DEFAULT_FLOW_PARTICLES_AMOUNT: u64 = 5000;
 pub const WALLPAPER_OUT_FILE_PATH: &str = "/tmp/splash_wallpaper.png";
 pub const WALLPAPER_MODELS_LIST: &[&str] = &[
     "flow",
@@ -25,16 +25,30 @@ pub const WALLPAPER_MODELS_LIST: &[&str] = &[
     // "squares2h",
     // "squares2v",
     "nearestgradient",
-    "pattern",
+    // "pattern", ugly
     "random",
 ];
 const MAX_GENERATION_RETRIES: u8 = 3;
+// const hasmaps aren't possible, so we have this
+const WALLPAPER_PARTICLES_AMOUNT: &[(&str, u64)] = &[
+    ("flow", 5000),
+    ("clouds", 3000),
+    ("islands", 3000),
+    ("lightning", 5000),
+    ("nearestpoint", 5000),
+    ("tangles", 5000),
+    ("cellularone", 1000),
+    ("squares", 5000),
+    ("squares2", 5000),
+    ("nearestgradient", 1000),
+    ("random", 5000),
+];
+const FALLBACK_PARTICLES: u64 = 1000;
 
 pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<()> {
     info!("Generating procedural splash wallpaper");
 
     let mut wallpaper_type = DEFAULT_WALLPAPER_MODEL.to_string();
-    let mut flow_particles_amount = DEFAULT_FLOW_PARTICLES_AMOUNT;
     {
         let boot_config_mutex = boot_config_mutex.clone();
         let locked_boot_config = boot_config_mutex.lock().unwrap();
@@ -62,15 +76,10 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
                 wallpaper_type = WALLPAPER_MODELS_LIST.first().unwrap().to_string();
             }
         }
-
-        if let Some(fp) = locked_boot_config
-            .system
-            .splash_wallpaper_options
-            .flow_particles_amount
-        {
-            flow_particles_amount = fp;
-        }
     }
+    let wallpaper_models: HashMap<&'static str, u64> =
+    WALLPAPER_PARTICLES_AMOUNT.iter().copied().collect();
+    let flow_particles_amount = *wallpaper_models.get(wallpaper_type.as_str()).unwrap_or(&FALLBACK_PARTICLES);
 
     system::mount_qinit_binaries()?;
 
@@ -88,6 +97,8 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
                 &format!("{}", crate::SCREEN_W),
                 "-h",
                 &format!("{}", crate::SCREEN_H),
+                "-s",
+                &rand::random::<u32>().to_string(),
                 "-f",
                 &format!("{}", &flow_particles_amount),
             ],
