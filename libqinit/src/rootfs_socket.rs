@@ -7,7 +7,6 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use pinenote_service::ioctls::rockchip_ebc::global_refresh_iowr;
 use core::ops::Deref;
 use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
 use log::{debug, info};
