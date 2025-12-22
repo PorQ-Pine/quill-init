@@ -98,7 +98,7 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
                 "-h",
                 &format!("{}", crate::SCREEN_H),
                 "-s",
-                &rand::random::<u32>().to_string(),
+                &rand::random::<i32>().to_string(),
                 "-f",
                 &format!("{}", &flow_particles_amount),
             ],
