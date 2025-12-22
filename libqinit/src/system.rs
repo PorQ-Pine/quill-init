@@ -12,6 +12,7 @@ use sha256;
 use std::env;
 use std::os::unix::fs::symlink;
 use std::path::Path;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
 
@@ -38,6 +39,11 @@ pub enum BootCommand {
     RebootRootFS,
     NormalBoot,
     BootFinished,
+}
+
+pub struct BootCommandForm {
+    pub command: BootCommand,
+    pub can_shut_down: Option<Arc<AtomicBool>>,
 }
 
 #[derive(PartialEq)]
@@ -289,7 +295,15 @@ pub fn real_shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode
     Ok(())
 }
 
-pub fn shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode) -> Result<()> {
+pub fn shut_down(shut_down_type: PrimitiveShutDownType, mode: PowerDownMode, can_shut_down: Arc<AtomicBool>) -> Result<()> {
+    loop {
+        if can_shut_down.load(Ordering::SeqCst) {
+            can_shut_down.store(false, Ordering::SeqCst);
+            break;
+        }
+        thread::sleep(std::time::Duration::from_millis(100));
+    }
+
     thread::spawn(move || real_shut_down(shut_down_type, mode));
 
     Ok(())

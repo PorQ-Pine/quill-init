@@ -1,10 +1,9 @@
 use crate::boot_config::BootConfig;
 use crate::system::{modprobe, run_command, start_service};
 use anyhow::{Context, Result};
-use log::{info, warn};
+use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::fs::File;
+use std::{fs::{self, File}, thread};
 use std::process::Command;
 
 const WAVEFORM_PART: &str = "/dev/mmcblk0p2";
@@ -119,4 +118,15 @@ pub fn setup_touchscreen(boot_config: &mut BootConfig) -> Result<()> {
     start_service("udev-settle")?;
 
     Ok(())
+}
+
+pub fn full_refresh() {
+    debug!("Triggering full screen refresh");
+    // Calling new here is, well, bad (because of possible wrong default values),
+    // but we shut down in a second, so no one should care
+    let ebc = pinenote_service::drivers::rockchip_ebc::RockchipEbc::new();
+    ebc.global_refresh().ok();
+    // TODO: Find a way to interact with EPDC so that it tells us when screen updates
+    // are done to avoid doing this kind of horrible things
+    thread::sleep(std::time::Duration::from_millis(1000));
 }

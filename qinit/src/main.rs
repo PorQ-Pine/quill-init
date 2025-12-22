@@ -48,11 +48,11 @@ cfg_if::cfg_if! {
         mod gui;
 
         use libqinit::signing::{read_public_key};
-        use libqinit::system::{generate_version_string, generate_short_version_string, shut_down, BootCommand};
+        use libqinit::system::{generate_version_string, generate_short_version_string, shut_down, BootCommand, BootCommandForm};
         use libqinit::rootfs_socket;
         use std::time::Duration;
         use std::thread;
-        use std::sync::{Arc, Mutex};
+        use std::sync::{Arc, atomic::AtomicBool, Mutex};
 
         const SYSTEMD_NO_TARGETS: i32 = -1;
         const QINIT_SOCKET: &str = "qinit.sock";
@@ -220,7 +220,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-            let (boot_sender, boot_receiver): (Sender<BootCommand>, Receiver<BootCommand>) = channel();
+            let (boot_sender, boot_receiver): (Sender<BootCommandForm>, Receiver<BootCommandForm>) = channel();
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
             let (login_credentials_sender, login_credentials_receiver): (Sender<socket::LoginForm>, Receiver<socket::LoginForm>) = channel();
             let (splash_sender, splash_receiver): (Sender<socket::PrimitiveShutDownType>, Receiver<socket::PrimitiveShutDownType>) = channel();
@@ -236,7 +236,9 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             });
 
             // Block this function until the main thread receives a signal to continue booting (allowing a user to perform recovery tasks, for example)
-            let mut boot_command = boot_receiver.recv()?;
+            let boot_command_form  = boot_receiver.recv()?;
+            let (mut boot_command, can_shut_down) = handle_boot_command(boot_command_form);
+
             boot_config = boot_config_mutex.lock().unwrap().clone();
             info!("Boot configuration after possible modifications: {:?}", &boot_config);
 
@@ -255,7 +257,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     toast_sender.send("Applying changes".to_string())?;
                     BootConfig::write(&mut boot_config, false)?;
                     std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
-                    shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
+
+                    shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal, Arc::new(AtomicBool::new(true)))?;
                 }
             } else {
                 // Trigger switch to boot splash page
@@ -273,11 +276,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOff => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::Normal)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::Normal, can_shut_down)?;
                         return Ok(());
                     },
                     BootCommand::Reboot => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal, can_shut_down)?;
                         return Ok(());
                     },
                     _ => {},
@@ -324,7 +327,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 }
 
                 // Wait until systemd startup has completed
-                let boot_command = boot_receiver.recv()?;
+                let boot_command_form = boot_receiver.recv()?;
+                let (boot_command, can_shut_down) = handle_boot_command(boot_command_form);
                 info!("systemd startup complete");
                 if !boot_config_valid || boot_config != original_boot_config {
                     BootConfig::write(&mut boot_config, false)?;
@@ -332,11 +336,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOffRootFS => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::RootFS)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::RootFS, can_shut_down)?;
                         return Ok(());
                     },
                     BootCommand::RebootRootFS => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::RootFS)?;
+                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::RootFS, can_shut_down)?;
                         return Ok(());
                     }
                     BootCommand::BootFinished | _ => {}
@@ -346,6 +350,17 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
     }
 
     Ok(())
+}
+
+
+#[cfg(not(feature = "init_wrapper"))]
+fn handle_boot_command(boot_command_form: BootCommandForm) -> (BootCommand, Arc<AtomicBool>) {
+    return (
+        boot_command_form.command,
+        boot_command_form
+            .can_shut_down
+            .unwrap_or_else(|| Arc::new(AtomicBool::new(false))),
+    );
 }
 
 cfg_if::cfg_if! {

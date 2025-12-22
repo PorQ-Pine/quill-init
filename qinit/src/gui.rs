@@ -1,21 +1,24 @@
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 use anyhow::Result;
 use chrono::prelude::*;
 use libqinit::battery;
 use libqinit::boot_config::BootConfig;
 use libqinit::brightness;
-use libqinit::eink::ScreenRotation;
+use libqinit::eink::{self, ScreenRotation};
 use libqinit::networking;
 use libqinit::recovery::soft_reset;
 use libqinit::rootfs::change_user_password;
 use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, PowerDownMode, compress_string_to_xz, get_cmdline_bool, keep_last_lines,
-    read_kernel_buffer_singleshot, shut_down,
+    BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
+    keep_last_lines, read_kernel_buffer_singleshot, shut_down,
 };
 use libqinit::wifi;
 use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
@@ -35,7 +38,7 @@ const QR_CODE_NOT_AVAILABLE_TAB_INDEX: i32 = 1;
 
 pub fn setup_gui(
     progress_receiver: Receiver<f32>,
-    boot_sender: Sender<BootCommand>,
+    boot_sender: Sender<BootCommandForm>,
     login_credentials_sender: Sender<LoginForm>,
     splash_receiver: Receiver<PrimitiveShutDownType>,
     splash_ready_sender: Sender<()>,
@@ -53,6 +56,7 @@ pub fn setup_gui(
     let mut default_user = String::new();
     let pubkey = pubkey.to_owned();
     let first_boot_done;
+    let can_shut_down = Arc::new(AtomicBool::new(false));
 
     // Boot configuration
     // TODO: Update this dynamically when changing between settings pages
@@ -182,6 +186,7 @@ pub fn setup_gui(
             let gui_weak = gui_weak.clone();
             let boot_sender = boot_sender.clone();
             let set_page_sender = set_page_sender.clone();
+            let can_shut_down = can_shut_down.clone();
             move || {
                 if let Ok(progress) = progress_receiver.try_recv() {
                     if let Some(gui) = gui_weak.upgrade() {
@@ -200,14 +205,19 @@ pub fn setup_gui(
                             let command: BootCommand;
                             match gui.get_shutdown_command() {
                                 RootFsShutDownCommand::PowerOff => {
-                                    command = BootCommand::PowerOffRootFS
+                                    command = BootCommand::PowerOffRootFS;
+                                    set_wallpaper_splash_text(&gui, &PrimitiveShutDownType::PowerOff);
                                 }
                                 RootFsShutDownCommand::Reboot => {
-                                    command = BootCommand::RebootRootFS
+                                    command = BootCommand::RebootRootFS;
+                                    set_wallpaper_splash_text(&gui, &PrimitiveShutDownType::Reboot);
                                 }
                                 RootFsShutDownCommand::None => command = BootCommand::BootFinished,
                             };
-                            let _ = boot_sender.send(command);
+                            let _ = boot_sender.send(BootCommandForm {
+                                command: command,
+                                can_shut_down: Some(can_shut_down.clone()),
+                            });
                         }
                     }
                 }
@@ -542,14 +552,20 @@ pub fn setup_gui(
     gui.on_power_off({
         let boot_sender = boot_sender.clone();
         let gui_weak = gui_weak.clone();
+        let can_shut_down = can_shut_down.clone();
         move || {
             let shut_down_type = PrimitiveShutDownType::PowerOff;
             if let Some(gui) = gui_weak.upgrade() {
                 set_wallpaper_splash_text(&gui, &shut_down_type);
-                if let Err(e) = boot_sender.send(BootCommand::PowerOff) {
+                if let Err(e) = boot_sender.send(BootCommandForm {
+                    command: BootCommand::PowerOff,
+                    can_shut_down: Some(can_shut_down.clone()),
+                }) {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = shut_down(shut_down_type, PowerDownMode::Normal) {
+                        if let Err(_e) =
+                            shut_down(shut_down_type, PowerDownMode::Normal, can_shut_down.clone())
+                        {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -566,12 +582,16 @@ pub fn setup_gui(
 
     gui.on_direct_power_off({
         let gui_weak = gui_weak.clone();
+        let can_shut_down = can_shut_down.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 let power_down_mode = determine_power_down_mode(&gui);
-                if let Err(e) =
-                    gui_shut_down(&gui, PrimitiveShutDownType::PowerOff, power_down_mode)
-                {
+                if let Err(e) = gui_shut_down(
+                    &gui,
+                    PrimitiveShutDownType::PowerOff,
+                    power_down_mode,
+                    can_shut_down.clone(),
+                ) {
                     error_toast(&gui, "Failed to power off", e.into());
                 }
             }
@@ -580,15 +600,21 @@ pub fn setup_gui(
 
     gui.on_reboot({
         let boot_sender = boot_sender.clone();
+        let can_shut_down = can_shut_down.clone();
         let gui_weak = gui_weak.clone();
         move || {
             let shut_down_type = PrimitiveShutDownType::Reboot;
             if let Some(gui) = gui_weak.upgrade() {
                 set_wallpaper_splash_text(&gui, &shut_down_type);
-                if let Err(e) = boot_sender.send(BootCommand::Reboot) {
+                if let Err(e) = boot_sender.send(BootCommandForm {
+                    command: BootCommand::Reboot,
+                    can_shut_down: Some(can_shut_down.clone()),
+                }) {
                     let mut display_error = true;
                     if gui.get_page() == Page::Error {
-                        if let Err(_e) = shut_down(shut_down_type, PowerDownMode::Normal) {
+                        if let Err(_e) =
+                            shut_down(shut_down_type, PowerDownMode::Normal, can_shut_down.clone())
+                        {
                             display_error = true;
                         } else {
                             display_error = false;
@@ -604,12 +630,17 @@ pub fn setup_gui(
     });
 
     gui.on_direct_reboot({
+        let can_shut_down = can_shut_down.clone();
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
                 let power_down_mode = determine_power_down_mode(&gui);
-                if let Err(e) = gui_shut_down(&gui, PrimitiveShutDownType::Reboot, power_down_mode)
-                {
+                if let Err(e) = gui_shut_down(
+                    &gui,
+                    PrimitiveShutDownType::Reboot,
+                    power_down_mode,
+                    can_shut_down.clone(),
+                ) {
                     error_toast(&gui, "Failed to reboot", e.into());
                 }
             }
@@ -1063,6 +1094,19 @@ pub fn setup_gui(
         }
     });
 
+    gui.on_refresh_screen(move |prepare_shut_down| {
+        if prepare_shut_down {
+            let can_shut_down = can_shut_down.clone();
+            thread::spawn(move || {
+                thread::sleep(std::time::Duration::from_millis(2000));
+                eink::full_refresh();
+                can_shut_down.store(true, Ordering::SeqCst);
+            });
+        } else {
+            eink::full_refresh();
+        }
+    });
+
     gui.run()?;
 
     Ok(())
@@ -1089,7 +1133,7 @@ fn refresh_storage_encryption_ui(gui: &AppWindow) {
 
 fn boot_normal(
     gui: &AppWindow,
-    boot_sender: &Sender<BootCommand>,
+    boot_sender: &Sender<BootCommandForm>,
     set_page_sender: &Sender<Page>,
     default_user: &str,
     first_boot_done: bool,
@@ -1113,7 +1157,10 @@ fn boot_normal(
                     "Triggering automatic login for default user '{}'",
                     &default_user
                 );
-                boot_sender.send(BootCommand::NormalBoot)?;
+                let _ = boot_sender.send(BootCommandForm {
+                    command: BootCommand::NormalBoot,
+                    can_shut_down: None,
+                });
                 storage_encryption::mount_storage(
                     &default_user,
                     &storage_encryption::DISABLED_MODE_PASSWORD,
@@ -1133,7 +1180,10 @@ fn boot_normal(
 
         if wait_for_login {
             set_page_sender.send(Page::UserLogin)?;
-            boot_sender.send(BootCommand::NormalBoot)?;
+            let _ = boot_sender.send(BootCommandForm {
+                command: BootCommand::NormalBoot,
+                can_shut_down: None,
+            });
         }
     }
 
@@ -1155,9 +1205,10 @@ fn gui_shut_down(
     gui: &AppWindow,
     shut_down_type: PrimitiveShutDownType,
     mode: PowerDownMode,
+    can_shut_down: Arc<AtomicBool>,
 ) -> Result<()> {
     set_wallpaper_splash_text(&gui, &shut_down_type);
-    shut_down(shut_down_type, mode)?;
+    shut_down(shut_down_type, mode, can_shut_down)?;
 
     Ok(())
 }

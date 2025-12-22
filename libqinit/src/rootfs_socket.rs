@@ -5,15 +5,15 @@ use std::{
     },
     thread,
 };
-
 use anyhow::{Context, Result};
-use pinenote_service::ioctls::rockchip_ebc::global_refresh_iowr;
 use core::ops::Deref;
 use libquillcom::socket::{self, AnswerFromQinit, CommandToQinit, LoginForm};
 use log::{debug, info};
 use postcard::to_allocvec;
 use socket::PrimitiveShutDownType;
 use std::io::Write;
+
+use crate::eink;
 
 pub const ROOTFS_SOCKET_PATH: &str = "/overlay/run/qinit_rootfs.sock";
 
@@ -91,10 +91,7 @@ pub fn listen_for_commands(
                     .with_context(|| "Failed to receive message from splash readiness sender")?;
                 // Conservative wait time to allow display to complete refresh after wallpaper generation is done
                 thread::sleep(std::time::Duration::from_millis(2000));
-
-                // Calling new here is well, bad (because possible wrong default values), but we shut down in a second, so no one should care
-                let ebc = pinenote_service::drivers::rockchip_ebc::RockchipEbc::new();
-                ebc.global_refresh().ok();
+                eink::full_refresh();
 
                 let reply = to_allocvec(&AnswerFromQinit::SplashReady)?;
                 unix_stream

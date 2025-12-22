@@ -61,6 +61,7 @@ export component AppWindow inherits Window {
     callback change_initial_screen_rotation(int);
     callback change_splash_wallpaper_model(string);
     callback generate_splash_wallpaper(bool);
+    callback refresh_screen(bool);
     // In-out properties
     in-out property <string> version_string;
     in-out property <string> short_version_string;
@@ -155,6 +156,12 @@ export component AppWindow inherits Window {
     property <color> item_border_color: #a5a5a5;
     property <color> item_selected_color: #dbdada;
     property <string> version_info_header: "About";
+
+    function prepare_splash_wallpaper() {
+        generate_splash_wallpaper(false);
+        page = Page.ShutDownSplash;
+        refresh_screen(true);
+    }
 
     if (page == Page.ShutDownSplash): VerticalLayout {
         Image {
@@ -1160,8 +1167,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_splash_wallpaper(false);
-                            page = Page.ShutDownSplash;
+                            prepare_splash_wallpaper();
                             direct_power_off();
                         }
                     }
@@ -1321,8 +1327,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header_font_family;
                         clicked => {
-                            generate_splash_wallpaper(false);
-                            page = Page.ShutDownSplash;
+                            prepare_splash_wallpaper();
                             root.power_off();
                         }
                     }
@@ -1335,6 +1340,7 @@ export component AppWindow inherits Window {
                         font-family: header_font_family;
                         clicked => {
                             page = Page.ShutDownSplash;
+                            refresh_screen(true);
                             root.reboot();
                         }
                     }
@@ -1963,15 +1969,14 @@ export component AppWindow inherits Window {
                 clicked => {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.None;
-                    generate_splash_wallpaper(false);
                     if page == Page.UserLogin {
                         shutdown_command = RootFsShutDownCommand.PowerOff;
-                        page = Page.ShutDownSplash;
+                        prepare_splash_wallpaper();
                         if startup_finished {
                             direct_power_off();
                         }
                     } else {
-                        page = Page.ShutDownSplash;
+                        prepare_splash_wallpaper();
                         power_off();
                     }
                 }
@@ -1989,12 +1994,14 @@ export component AppWindow inherits Window {
                     dialog = DialogType.None;
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
+                        refresh_screen(true);
                         shutdown_command = RootFsShutDownCommand.Reboot;
                         if startup_finished {
                             direct_reboot();
                         }
                     } else {
                         page = Page.ShutDownSplash;
+                        refresh_screen(true);
                         reboot();
                     }
                 }
