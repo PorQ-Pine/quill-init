@@ -655,12 +655,12 @@ pub fn setup_gui(
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
-                if gui.get_scaling_factor() == 1 {
+                if gui.get_scaling_factor() == 1.0 {
                     gui.set_button_scaling_multiplier(0.6);
-                    gui.set_scaling_factor(2);
+                    gui.set_scaling_factor(1.25);
                 } else {
                     gui.set_button_scaling_multiplier(1.0);
-                    gui.set_scaling_factor(1);
+                    gui.set_scaling_factor(1.0);
                 }
             }
         }

@@ -1,0 +1,46 @@
+export global Properties {
+    in-out property <float> scaling-factor: 1;
+    in-out property <float> button-scaling-multiplier: 1;
+    in-out property <length> default-font-size: 40px * scaling-factor;
+    in-out property <length> rwidth: 1404px;
+    in-out property <length> rheight: 1872px;
+    // Generic multipliers for default-sized and smaller-sized items
+    in-out property <float> wmultiplier: 0.25;
+    in-out property <float> hmultiplier: 0.05;
+    in-out property <float> swmultiplier: 0.25;
+    in-out property <float> shmultiplier: 0.03;
+    in-out property <float> dialog-sizes-multiplier: 0.9;
+    // Default sizes/radii/properties; there may be elements that don't enforce them for various reasons
+    in-out property <relative-font-size> header-font-size: 2rem;
+    in-out property <length> layout-padding: 30px;
+    in-out property <length> layout-spacing: 10px;
+    in-out property <length> button-width: rwidth * wmultiplier * scaling-factor * button-scaling-multiplier;
+    in-out property <length> button-height: rheight * hmultiplier * scaling-factor * button-scaling-multiplier;
+    in-out property <length> icon-button-height: button-height * 0.5;
+    in-out property <length> bar-button-height: button-height * 0.7;
+    in-out property <length> slider-height: 15px * scaling-factor;
+    in-out property <length> section-button-height: button-height * 1.25;
+    in-out property <length> switch-width: button-width * 0.45;
+    in-out property <length> switch-height: button-height * 0.7;
+    in-out property <length> radius: 10px;
+    in-out property <length> logo-width: 0.45 * rwidth;
+    in-out property <length> logo-height: logo-width;
+    in-out property <length> medium-logo-width: logo-width * 0.55;
+    in-out property <length> medium-logo-height: medium-logo-width;
+    in-out property <string> header-font-family: "Inter";
+    in-out property <string> console-font-family: "Roboto Mono";
+    in-out property <string> regular-font-family: "U001";
+    in-out property <length> console-header-font-size: 0.8 * self.default-font-size;
+    in-out property <length> console-body-font-size: 0.6 * self.default-font-size;
+    in-out property <length> tab-rectangle-border-width: 2px;
+    in-out property <color> tab-rectangle-border-color: darkgrey;
+    in-out property <length> dialog-rectangle-thickness: 6px;
+    in-out property <length> keyboard-key-height: 0.055 * rheight;
+    in-out property <length> approx-keyboard-height: keyboard-key-height * 4.15;
+    in-out property <length> approx-bar-height: layout-padding + bar-button-height + layout-spacing + 0.5 * 5px + 3px + layout-spacing + 0.5 * 5px;
+    in-out property <length> bar-icon-button-padding: 7.5px;
+    in-out property <length> space-between-keyboard-and-widget: 100px;
+    in-out property <color> item-border-color: #a5a5a5;
+    in-out property <color> item-selected-color: #dbdada;
+    in-out property <string> version-info-header: "About";
+}
