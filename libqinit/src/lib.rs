@@ -5,7 +5,6 @@ cfg_if::cfg_if! {
         pub mod recovery;
         pub mod systemd;
         pub mod wifi;
-        pub mod storage_encryption;
         pub mod brightness;
         pub mod battery;
         pub mod networking;
@@ -18,6 +17,7 @@ pub mod rootfs_socket;
 pub mod signing;
 pub mod splash;
 pub mod system;
+pub mod storage_encryption;
 
 pub const BOOT_PART: &str = "/dev/mmcblk0p7";
 pub const MAIN_PART: &str = "/dev/mmcblk0p9";
