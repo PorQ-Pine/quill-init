@@ -1,0 +1,23 @@
+import { Properties as P } from "properties.slint";
+
+export component Toast inherits Rectangle {
+    in property <string> dialog-message;
+    width: 0.6 * P.rwidth;
+    height: 0.07 * P.rheight;
+
+    border-color: black;
+    border-width: P.dialog-rectangle-thickness;
+    border-radius: P.radius;
+    background: white;
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        enabled: true;
+    }
+
+    Text {
+        text: dialog-message;
+        font-family: P.header-font-family;
+        font-weight: P.bold-font-weight;
+    }
+}

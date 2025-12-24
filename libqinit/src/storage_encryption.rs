@@ -5,8 +5,8 @@ use std::{fs, thread};
 
 use crate::system::{is_mountpoint, run_command};
 
-const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
-const DISABLED_MODE_FILE: &str = "encryption_disabled";
+pub const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
+pub const DISABLED_MODE_FILE: &str = "encryption_disabled";
 pub const DISABLED_MODE_PASSWORD: &str = "ENCRYPTION DISABLED";
 
 pub struct UserDetails {
@@ -52,6 +52,8 @@ pub fn get_user_storage_encryption_status(user: &str) -> Result<bool> {
 }
 
 pub fn get_encryption_user_details(user: &str) -> Result<UserDetails> {
+    info!("Retrieving encryption user details for '{}'", &user);
+
     let encryption_enabled = get_user_storage_encryption_status(&user)?;
 
     let json: serde_json::Value = serde_json::from_reader(
@@ -129,62 +131,6 @@ pub fn mount_storage(user: &str, password: &str) -> Result<()> {
             "User home directory seems to be already mounted"
         ));
     }
-
-    Ok(())
-}
-
-pub fn change_password(user: &str, old_password: &str, new_password: &str) -> Result<()> {
-    run_command(
-        "/bin/sh",
-        &[
-            "-c",
-            &format!(
-                "printf '{}\n{}' | {} -passwd {}/{}/.{}",
-                &old_password,
-                &new_password,
-                &GOCRYPTFS_BINARY,
-                &crate::MAIN_PART_MOUNTPOINT,
-                &crate::SYSTEM_HOME_DIR,
-                &user
-            ),
-        ],
-    )
-    .with_context(|| {
-        format!(
-            "Failed to change encrypted storage's password for user '{}'",
-            &user
-        )
-    })?;
-
-    let encryption_disabled_file_path = format!(
-        "{}/{}/.{}/{}",
-        &crate::MAIN_PART_MOUNTPOINT,
-        &crate::SYSTEM_HOME_DIR,
-        &user,
-        &DISABLED_MODE_FILE
-    );
-    if new_password != DISABLED_MODE_PASSWORD && fs::exists(&encryption_disabled_file_path)? {
-        fs::remove_file(&encryption_disabled_file_path)?;
-    }
-
-    Ok(())
-}
-
-pub fn disable(user: &str, password: &str) -> Result<()> {
-    change_password(&user, &password, &DISABLED_MODE_PASSWORD)?;
-    fs::File::create(&format!(
-        "{}/{}/.{}/{}",
-        &crate::MAIN_PART_MOUNTPOINT,
-        &crate::SYSTEM_HOME_DIR,
-        &user,
-        &DISABLED_MODE_FILE,
-    ))
-    .with_context(|| {
-        format!(
-            "Failed to create file disabling encryption for user '{}'",
-            &user
-        )
-    })?;
 
     Ok(())
 }

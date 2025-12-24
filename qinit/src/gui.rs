@@ -16,6 +16,7 @@ use libqinit::recovery::soft_reset;
 use libqinit::rootfs::change_user_password;
 use libqinit::splash;
 use libqinit::storage_encryption;
+use libcoresettings::users;
 use libqinit::system::{
     BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
     keep_last_lines, read_kernel_buffer_singleshot, shut_down,
@@ -883,7 +884,7 @@ pub fn setup_gui(
                         {
                             error_toast(&gui, "Failed to change user password", e.into());
                         } else {
-                            if let Err(e) = storage_encryption::change_password(
+                            if let Err(e) = users::change_password(
                                 &user.to_string(),
                                 &old_password.to_string(),
                                 &new_password.to_string(),
@@ -922,7 +923,7 @@ pub fn setup_gui(
                         }
 
                         if let Err(e) =
-                            storage_encryption::disable(&user.to_string(), &password.to_string())
+                            users::disable_encryption(&user.to_string(), &password.to_string())
                         {
                             error_toast(&gui, "Failed to disable encryption", e.into());
                         } else {
