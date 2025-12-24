@@ -17,6 +17,7 @@ export component SectionButton inherits TouchArea {
                 height: parent.height * 0.6;
                 width: self.height;
                 y: (parent.height - self.height) / 2;
+                colorize: i-container.background == #000000 ? #ffffff : #000000;
             }
 
             i-text := Text {
@@ -32,6 +33,7 @@ export component SectionButton inherits TouchArea {
                 height: parent.height * 0.8;
                 width: self.height;
                 y: (parent.height - self.height) / 2;
+                colorize: i-container.background == #000000 ? #ffffff : #000000;
             }
         }
     }

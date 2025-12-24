@@ -36,8 +36,8 @@ export component AppWindow inherits Window {
     // Scaling
     in-out property <float> scaling-factor <=> P.scaling-factor;
     // Root properties
-    default-font-family: P.regular-font-family;
-    default-font-size: 40px * scaling-factor;
+    default-font-family <=> P.regular-font-family;
+    default-font-size <=> P.default-font-size;
     page: Page.None;
     // Callbacks
     callback power-off();
