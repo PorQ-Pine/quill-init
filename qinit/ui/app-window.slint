@@ -18,19 +18,12 @@ import {
 import { HList } from "../../ui-common/hlist.slint";
 import { Properties as P } from "../../ui-common/properties.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, StorageEncryptionOptions, UserLogin, InvalidBootConfig, Error, ShutDownSplash }
+export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, UserLogin, InvalidBootConfig, Error, ShutDownSplash }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
-export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, EncryptionConfirmPassword, EncryptionChangePassword, EncryptionNewPassword, Brightness, BatteryStatus, PowerOptions }
+export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, Brightness, BatteryStatus, PowerOptions }
 export enum RootFsShutDownCommand { None, PowerOff, Reboot }
 export { VirtualKeyboardHandler, KeyModel }
-
-export struct SystemUser {
-    name: string,
-    encryption: bool,
-    encrypted-key: string,
-    salt: string,
-}
 
 export component AppWindow inherits Window {
     // Scaling
@@ -51,10 +44,6 @@ export component AppWindow inherits Window {
     callback soft-reset();
     callback get-networks();
     callback connect-to-wifi-network(string, string);
-    callback get-users-using-storage-encryption();
-    callback get-selected-encryption-user-details(string);
-    callback change-user-password(string, string, string, bool);
-    callback disable-storage-encryption(string, string);
     callback set-brightness-sliders-levels;
     callback change-cool-brightness(int);
     callback change-warm-brightness(int);
@@ -105,8 +94,6 @@ export component AppWindow inherits Window {
     in-out property <string> potential-wifi-network;
     in property <[string]> wifi-network-names;
     in property <[bool]> wifi-network-open-vec;
-    in property <[string]> users-using-storage-encryption;
-    in-out property <SystemUser> selected-encryption-user;
     in property <string> current-time;
     in property <int> cool-brightness;
     in property <int> warm-brightness;
@@ -284,7 +271,7 @@ export component AppWindow inherits Window {
                             root.page = Page.UserLogin;
                         } else if root.page == Page.Options || root.page == Page.VersionInfo {
                             root.page = Page.QuillBoot;
-                        } else if root.page == Page.RecoveryOptions || root.page == Page.BootConfiguration || root.page == Page.StorageEncryptionOptions {
+                        } else if root.page == Page.RecoveryOptions || root.page == Page.BootConfiguration {
                             section-header-title = "Options";
                             root.page = Page.Options;
                         }
@@ -616,21 +603,6 @@ export component AppWindow inherits Window {
                     }
 
                     SectionButton {
-                        text: "Users & storage encryption";
-                        height: section-button-height;
-                        border-radius: radius;
-                        font-family: header-font-family;
-                        scaling-factor: scaling-factor;
-                        icon: @image-url("../../icons/key.svg");
-                        clicked => {
-                            get-users-using-storage-encryption();
-                            section-header-title = self.text;
-                            selected-encryption-user.name = "";
-                            page = Page.StorageEncryptionOptions;
-                        }
-                    }
-
-                    SectionButton {
                         text: "System & boot configuration";
                         height: section-button-height;
                         border-radius: radius;
@@ -776,223 +748,6 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { }
-                    }
-                }
-            }
-
-            if (page == Page.StorageEncryptionOptions): VerticalLayout {
-                HorizontalLayout {
-                    spacing: layout-spacing;
-                    if (users-using-storage-encryption.length > 0): ScrollView {
-                        mouse-drag-pan-enabled: true;
-                        width: 35%;
-                        VerticalLayout {
-                            spacing: layout-spacing;
-                            for username[index] in users-using-storage-encryption: i-user-using-encryption-button := TouchArea {
-                                i-user-using-encryption-container := Rectangle {
-                                    border-color: item-border-color;
-                                    border-radius: radius;
-                                    border-width: 3px;
-                                    background: username == selected-encryption-user.name ? item-selected-color : #ffffff;
-                                    HorizontalLayout {
-                                        padding: 20px;
-                                        spacing: layout-spacing * 1.5;
-                                        VerticalLayout {
-                                            alignment: center;
-                                            Image {
-                                                source: @image-url("../../icons/user.svg");
-                                                height: icon-button-height * 1.15;
-                                                width: self.height;
-                                                colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
-                                            }
-                                        }
-
-                                        i-user-using-encryption-text := Text {
-                                            font-family: regular-font-family;
-                                            font-size: root.default-font-size * dialog-sizes-multiplier;
-                                            vertical-alignment: center;
-                                            wrap: word-wrap;
-                                            text: username;
-                                        }
-
-                                        VerticalLayout {
-                                            alignment: center;
-                                            Image {
-                                                source: @image-url("../../icons/key.svg");
-                                                height: icon-button-height * 1.15;
-                                                width: self.height;
-                                                colorize: i-user-using-encryption-button.pressed ? #ffffff : #000000;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                states [
-                                    pressed when self.pressed: {
-                                        i-user-using-encryption-container.background: #000000;
-                                        i-user-using-encryption-text.color: #ffffff;
-                                    }
-                                ]
-
-                                clicked => {
-                                    get-selected-encryption-user-details(username);
-                                }
-                            }
-                            Rectangle { }
-                        }
-                    }
-
-                    if (users-using-storage-encryption.length > 0): VLine {
-                        thickness: 2px;
-                    }
-
-                    if (selected-encryption-user.name.is-empty): VerticalLayout {
-                        alignment: center;
-                        Text {
-                            text: users-using-storage-encryption.length == 0 ? "No users using storage encryption found" : "Select a user to manage its settings";
-                            horizontal-alignment: center;
-                            font-family: regular-font-family;
-                            wrap: word-wrap;
-                        }
-                    }
-                    if (!selected-encryption-user.name.is-empty): ScrollView {
-                        mouse-drag-pan-enabled: true;
-                        VerticalLayout {
-                            spacing: layout-spacing / dialog-sizes-multiplier;
-                            padding-top: self.spacing;
-                            padding-bottom: self.spacing;
-                            HorizontalLayout {
-                                padding-left: layout-padding * dialog-sizes-multiplier;
-                                padding-right: self.padding-left;
-                                Text {
-                                    text: "Encryption";
-                                    vertical-alignment: center;
-                                }
-
-                                Switch {
-                                    y: (parent.height - self.height) / 2;
-                                    width: switch-width * dialog-sizes-multiplier;
-                                    height: switch-height * dialog-sizes-multiplier;
-                                    border-radius: radius;
-                                    activated: selected-encryption-user.encryption;
-                                    special-activation: true;
-                                    toggled => {
-                                        TextInputInterface.text-input-focused = true;
-                                        if selected-encryption-user.encryption {
-                                            dialog = DialogType.EncryptionConfirmPassword;
-                                        } else {
-                                            dialog = DialogType.EncryptionNewPassword;
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (selected-encryption-user.encryption): HLine {
-                                thickness: 1px;
-                            }
-
-                            if (selected-encryption-user.encryption): HorizontalLayout {
-                                padding-left: layout-padding * dialog-sizes-multiplier;
-                                padding-right: self.padding-left;
-                                Text {
-                                    text: "Password";
-                                    vertical-alignment: center;
-                                }
-
-                                Button {
-                                    width: button-width * dialog-sizes-multiplier;
-                                    height: button-height * dialog-sizes-multiplier;
-                                    font-family: header-font-family;
-                                    font-size: root.default-font-size * dialog-sizes-multiplier;
-                                    border-radius: radius;
-                                    text: "Change";
-                                    clicked => {
-                                        TextInputInterface.text-input-focused = true;
-                                        dialog = DialogType.EncryptionChangePassword;
-                                    }
-                                }
-                            }
-
-                            if (selected-encryption-user.encryption): HLine {
-                                thickness: 1px;
-                            }
-
-                            if (selected-encryption-user.encryption): HorizontalLayout {
-                                padding-left: layout-padding * dialog-sizes-multiplier;
-                                padding-right: self.padding-left;
-                                Text {
-                                    text: "Key";
-                                    vertical-alignment: center;
-                                }
-
-                                Rectangle {
-                                    width: 50px;
-                                }
-
-                                Text {
-                                    text: selected-encryption-user.encrypted-key;
-                                    font-family: console-font-family;
-                                    font-size: console-body-font-size;
-                                    wrap: char-wrap;
-                                    vertical-alignment: center;
-                                    horizontal-alignment: right;
-                                }
-                            }
-
-                            if (selected-encryption-user.encryption): HLine {
-                                thickness: 1px;
-                            }
-
-                            if (selected-encryption-user.encryption): HorizontalLayout {
-                                padding-left: layout-padding * dialog-sizes-multiplier;
-                                padding-right: self.padding-left;
-                                Text {
-                                    text: "Salt";
-                                    vertical-alignment: center;
-                                }
-
-                                Rectangle {
-                                    width: 50px;
-                                }
-
-                                Text {
-                                    text: selected-encryption-user.salt;
-                                    font-family: console-font-family;
-                                    font-size: console-body-font-size;
-                                    wrap: char-wrap;
-                                    vertical-alignment: center;
-                                    horizontal-alignment: right;
-                                }
-                            }
-
-                            HLine {
-                                thickness: 1px;
-                            }
-
-                            HorizontalLayout {
-                                padding-left: layout-padding * dialog-sizes-multiplier;
-                                padding-right: self.padding-left;
-                                Text {
-                                    text: "Default user";
-                                    vertical-alignment: center;
-                                }
-
-                                Rectangle {
-                                    width: 50px;
-                                }
-
-                                Text {
-                                    text: default-user == selected-encryption-user.name ? "Yes" : "No";
-                                    font-family: console-font-family;
-                                    font-size: console-body-font-size;
-                                    wrap: char-wrap;
-                                    vertical-alignment: center;
-                                    horizontal-alignment: right;
-                                }
-                            }
-
-                            Rectangle { }
-                        }
                     }
                 }
             }
@@ -1405,7 +1160,7 @@ export component AppWindow inherits Window {
         }
     }
     // Generic Confirm/Cancel dialog
-    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.EncryptionConfirmPassword && dialog != DialogType.EncryptionChangePassword && dialog != DialogType.EncryptionNewPassword && dialog != DialogType.Brightness && dialog != DialogType.BatteryStatus && dialog != DialogType.PowerOptions): Dialog {
+    if (dialog != DialogType.None && dialog != DialogType.Toast && dialog != DialogType.WifiUI && dialog != DialogType.WifiPassphrase && dialog != DialogType.Brightness && dialog != DialogType.BatteryStatus && dialog != DialogType.PowerOptions): Dialog {
         border-radius: radius;
         width: 0.45 * scaling-factor * root.width;
         height: 0.3 * scaling-factor * root.height;
@@ -1682,136 +1437,6 @@ export component AppWindow inherits Window {
                     TextInputInterface.text-input-focused = false;
                     dialog = DialogType.WifiUI;
                     connect-to-wifi-network(potential-wifi-network, wifi-passphrase-edit.text);
-                }
-            }
-        }
-    }
-    // Storage encryption passphrase dialog
-    if (dialog == DialogType.EncryptionConfirmPassword || dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword): Rectangle {
-        border-width: dialog-rectangle-thickness;
-        border-color: black;
-        border-radius: radius;
-        background: white;
-        width: scaling-factor > 1 ? root.width * 0.65 : root.width * 0.45;
-        height: scaling-factor > 1 ? root.height * 0.5 : root.height * 0.4;
-        x: (root.width - self.width) / 2;
-        y: root.height - self.height - approx-keyboard-height - space-between-keyboard-and-widget;
-        TouchArea {
-            width: parent.width;
-            height: parent.height;
-            enabled: true;
-        }
-
-        VerticalLayout {
-            padding: layout-padding;
-            HorizontalLayout {
-                IconButton {
-                    icon: @image-url("../../icons/arrow-back.svg");
-                    border-radius: radius;
-                    height: icon-button-height;
-                    width: self.height;
-                    y: (parent.height - self.height) / 2;
-                    clicked => {
-                        TextInputInterface.text-input-focused = false;
-                        dialog = DialogType.None;
-                    }
-                }
-
-                Text {
-                    text: dialog == DialogType.EncryptionChangePassword ? "Changing password" : dialog == DialogType.EncryptionConfirmPassword ? "Confirming password" : "Setting password";
-                    font-family: header-font-family;
-                    font-size: root.default-font-size * dialog-sizes-multiplier;
-                    font-weight: 800;
-                    wrap: word-wrap;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-
-                Rectangle {
-                    height: icon-button-height;
-                    width: self.height;
-                    y: (parent.height - self.height) / 2;
-                }
-            }
-
-            HLine {
-                top-padding-multiplier: 4.0;
-                bottom-padding-multiplier: self.top-padding-multiplier;
-            }
-
-            encryption-current-password-edit := LineEdit {
-                default-height: dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionConfirmPassword ? parent.height * 0.08 : 0;
-                scaling-factor: scaling-factor;
-                border-radius: radius;
-                font-size: root.default-font-size * dialog-sizes-multiplier;
-                placeholder-text: "Current password";
-                input-type: password;
-                visible: dialog != DialogType.EncryptionNewPassword;
-            }
-
-            Rectangle {
-                vertical-stretch: dialog == DialogType.EncryptionChangePassword ? 0.05 : 0;
-            }
-
-            encryption-new-password-edit := LineEdit {
-                default-height: parent.height * 0.08;
-                scaling-factor: scaling-factor;
-                border-radius: radius;
-                font-size: root.default-font-size * dialog-sizes-multiplier;
-                placeholder-text: "New password";
-                visible: dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword;
-                input-type: password;
-            }
-
-            Rectangle {
-                vertical-stretch: 0.05;
-                visible: dialog == DialogType.EncryptionChangePassword;
-            }
-
-            encryption-confirm-password-edit := LineEdit {
-                default-height: parent.height * 0.08;
-                scaling-factor: scaling-factor;
-                border-radius: radius;
-                font-size: root.default-font-size * dialog-sizes-multiplier;
-                placeholder-text: "Confirm new password";
-                visible: dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword;
-                input-type: password;
-            }
-
-            Rectangle { }
-
-            Button {
-                width: 100%;
-                height: button-height * dialog-sizes-multiplier;
-                font-family: header-font-family;
-                font-size: root.default-font-size * dialog-sizes-multiplier;
-                border-radius: radius;
-                text: "Confirm";
-                clicked => {
-                    if encryption-current-password-edit.text.is-empty && dialog != DialogType.EncryptionNewPassword {
-                        dialog-message = "Please provide current password";
-                        dialog = DialogType.Toast;
-                    } else if encryption-new-password-edit.text != encryption-confirm-password-edit.text && (dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword) {
-                        dialog-message = "Passwords do not match";
-                        dialog = DialogType.Toast;
-                    } else if encryption-new-password-edit.text == encryption-confirm-password-edit.text && encryption-new-password-edit.text.is-empty && (dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword) {
-                        dialog-message = "Cannot set empty password";
-                        dialog = DialogType.Toast;
-                    } else {
-                        if dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword {
-                            dialog-message = "Setting password";
-                        } else if dialog == DialogType.EncryptionConfirmPassword {
-                            dialog-message = "Disabling encrypted storage"
-                        }
-                        if dialog == DialogType.EncryptionChangePassword || dialog == DialogType.EncryptionNewPassword {
-                            change-user-password(selected-encryption-user.name, encryption-current-password-edit.text, encryption-new-password-edit.text, !selected-encryption-user.encryption);
-                        } else if dialog == DialogType.EncryptionConfirmPassword {
-                            disable-storage-encryption(selected-encryption-user.name, encryption-current-password-edit.text);
-                        }
-                        sticky-toast = true;
-                        dialog = DialogType.Toast;
-                    }
-                    TextInputInterface.text-input-focused = false;
                 }
             }
         }

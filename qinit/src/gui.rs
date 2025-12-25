@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{
     Arc, Mutex,
@@ -13,10 +12,8 @@ use libqinit::brightness;
 use libqinit::eink::{self, ScreenRotation};
 use libqinit::networking;
 use libqinit::recovery::soft_reset;
-use libqinit::rootfs::change_user_password;
 use libqinit::splash;
 use libqinit::storage_encryption;
-use libcoresettings::users;
 use libqinit::system::{
     BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
     keep_last_lines, read_kernel_buffer_singleshot, shut_down,
@@ -24,7 +21,6 @@ use libqinit::system::{
 use libqinit::wifi;
 use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
 use log::{debug, error, info};
-use openssl::pkey::{PKey, Public};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
 use std::{fs, path::Path, thread};
@@ -49,13 +45,11 @@ pub fn setup_gui(
     short_version_string: String,
     display_progress_bar: bool,
     boot_config_mutex: Arc<Mutex<BootConfig>>,
-    pubkey: &PKey<Public>,
     boot_config_valid: bool,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
     let mut default_user = String::new();
-    let pubkey = pubkey.to_owned();
     let first_boot_done;
     let can_shut_down = Arc::new(AtomicBool::new(false));
 
@@ -810,132 +804,6 @@ pub fn setup_gui(
         }
     });
 
-    // Storage encryption
-    gui.on_get_users_using_storage_encryption({
-        let gui_weak = gui_weak.clone();
-        let set_page_sender = set_page_sender.clone();
-        move || {
-            if let Some(gui) = gui_weak.upgrade() {
-                match storage_encryption::get_users_using_storage_encryption() {
-                    Ok(users_using_storage_encryption) => {
-                        let users_shared_string_vec: Vec<SharedString> =
-                            users_using_storage_encryption
-                                .iter()
-                                .map(|user| SharedString::from(user))
-                                .collect();
-                        gui.set_users_using_storage_encryption(slint::ModelRc::new(
-                            slint::VecModel::from(users_shared_string_vec),
-                        ));
-                    }
-                    Err(e) => {
-                        error_toast(&gui, "Failed to get users list", e.into());
-                        let _ = set_page_sender.send(Page::Options);
-                    }
-                }
-            }
-        }
-    });
-
-    gui.on_get_selected_encryption_user_details({
-        let gui_weak = gui_weak.clone();
-        move |user| {
-            if let Some(gui) = gui_weak.upgrade() {
-                match storage_encryption::get_encryption_user_details(&user) {
-                    Ok(details) => gui.set_selected_encryption_user(SystemUser {
-                        encryption: details.encryption_enabled,
-                        name: user,
-                        encrypted_key: SharedString::from(&details.encrypted_key),
-                        salt: SharedString::from(&details.salt),
-                    }),
-                    Err(e) => {
-                        gui.set_selected_encryption_user(SystemUser {
-                            // Default to false if there is an error, I guess
-                            encryption: false,
-                            name: user,
-                            encrypted_key: SharedString::new(),
-                            salt: SharedString::new(),
-                        });
-                        error_toast(&gui, "Failed to get user's details", e.into())
-                    }
-                }
-            }
-        }
-    });
-
-    let encryption_change_password_timer = Rc::new(Timer::default());
-    gui.on_change_user_password({
-        let gui_weak = gui_weak.clone();
-        let pubkey = pubkey.clone();
-        move |user, mut old_password, new_password, encrypted_storage_was_disabled| {
-            let gui_weak = gui_weak.clone();
-            let pubkey = pubkey.clone();
-            encryption_change_password_timer.start(
-                TimerMode::SingleShot,
-                std::time::Duration::from_millis(100),
-                move || {
-                    if let Some(gui) = gui_weak.upgrade() {
-                        if encrypted_storage_was_disabled {
-                            old_password =
-                                SharedString::from(storage_encryption::DISABLED_MODE_PASSWORD);
-                        }
-
-                        if let Err(e) =
-                            change_user_password(&pubkey, &user, &old_password, &new_password)
-                        {
-                            error_toast(&gui, "Failed to change user password", e.into());
-                        } else {
-                            if let Err(e) = users::change_password(
-                                &user.to_string(),
-                                &old_password.to_string(),
-                                &new_password.to_string(),
-                            ) {
-                                error_toast(&gui, "Failed to change encryption password", e.into());
-                            } else {
-                                toast(&gui, "Password set successfully");
-                            }
-                        }
-                        refresh_storage_encryption_ui(&gui);
-                    }
-                },
-            );
-        }
-    });
-
-    let encryption_disable_timer = Rc::new(Timer::default());
-    gui.on_disable_storage_encryption({
-        let gui_weak = gui_weak.clone();
-        let pubkey = pubkey.clone();
-        move |user, password| {
-            let gui_weak = gui_weak.clone();
-            let pubkey = pubkey.clone();
-            encryption_disable_timer.start(
-                TimerMode::SingleShot,
-                std::time::Duration::from_millis(100),
-                move || {
-                    if let Some(gui) = gui_weak.upgrade() {
-                        if let Err(e) = change_user_password(
-                            &pubkey,
-                            &user,
-                            &password.to_string(),
-                            &String::new(),
-                        ) {
-                            error_toast(&gui, "Failed to change user password", e.into());
-                        }
-
-                        if let Err(e) =
-                            users::disable_encryption(&user.to_string(), &password.to_string())
-                        {
-                            error_toast(&gui, "Failed to disable encryption", e.into());
-                        } else {
-                            toast(&gui, "Encryption successfully disabled");
-                        }
-                        refresh_storage_encryption_ui(&gui);
-                    }
-                },
-            );
-        }
-    });
-
     // Brightness
     gui.on_set_brightness_sliders_levels({
         let gui_weak = gui_weak.clone();
@@ -1135,11 +1003,6 @@ fn error_toast(gui: &AppWindow, message: &str, e: anyhow::Error) {
     gui.set_dialog_message(SharedString::from(message));
     gui.set_dialog(DialogType::Toast);
     error!("{}: {}", &message, e);
-}
-
-fn refresh_storage_encryption_ui(gui: &AppWindow) {
-    gui.invoke_get_users_using_storage_encryption();
-    gui.invoke_get_selected_encryption_user_details(gui.get_selected_encryption_user().name);
 }
 
 fn boot_normal(

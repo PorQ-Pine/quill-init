@@ -229,9 +229,8 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
                 let boot_config_mutex = boot_config_mutex.clone();
-                let pubkey = pubkey.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, login_credentials_sender, splash_receiver, splash_ready_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, &pubkey, boot_config_valid)
+                    gui::setup_gui(progress_receiver, boot_sender, login_credentials_sender, splash_receiver, splash_ready_sender, interrupt_receiver, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, boot_config_valid)
                 }
             });
 
