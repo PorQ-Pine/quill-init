@@ -16,8 +16,8 @@ pub mod rootfs;
 pub mod rootfs_socket;
 pub mod signing;
 pub mod splash;
-pub mod system;
 pub mod storage_encryption;
+pub mod system;
 
 pub const BOOT_PART: &str = "/dev/mmcblk0p7";
 pub const MAIN_PART: &str = "/dev/mmcblk0p9";

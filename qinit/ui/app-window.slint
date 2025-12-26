@@ -52,6 +52,7 @@ export component AppWindow inherits Window {
     callback change-splash-wallpaper-model(string);
     callback generate-splash-wallpaper(bool);
     callback refresh-screen(bool);
+    callback launch-core-settings();
     // In-out properties
     in-out property <string> version-string;
     in-out property <string> short-version-string;
@@ -73,6 +74,7 @@ export component AppWindow inherits Window {
     in-out property <int> debug-tab-index: 0;
     in-out property <string> section-header-title;
     in-out property <image> wifi-icon: @image-url("../../icons/wifi-init.svg");
+    in-out property <image> core-settings-button-icon: @image-url("../../icons/settings.svg");
     in-out property <image> battery-icon;
     in-out property <bool> sticky-toast: false;
     property <[string]> orientations-list: ["0", "90", "180", "270"];
@@ -105,6 +107,7 @@ export component AppWindow inherits Window {
     out property <RootFsShutDownCommand> shutdown-command: RootFsShutDownCommand.None;
     in property <string> splash-wallpaper-text;
     in property <string> splash-wallpaper-date-time-information;
+    in property <bool> enable-ui: true;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier <=> P.wmultiplier;
     property <float> hmultiplier <=> P.hmultiplier;
@@ -318,6 +321,26 @@ export component AppWindow inherits Window {
                     clicked => {
                         dialog = DialogType.WifiUI;
                     }
+                }
+
+                if (page == Page.UserLogin): IconButton {
+                    icon: @image-url("../../icons/info.svg");
+                    border-radius: radius;
+                    height: bar-button-height;
+                    width: self.height;
+                    padding-value: bar-icon-button-padding;
+                    y: (parent.height - self.height) / 2;
+                    clicked => {
+                        TextInputInterface.text-input-focused = false;
+                        section-header-title = version-info-header;
+                        root.page = Page.VersionInfo;
+                    }
+                }
+
+                if (page == Page.UserLogin): VLine {
+                    thickness: 1px;
+                    left-padding-multiplier: 0.05;
+                    right-padding-multiplier: self.left-padding-multiplier;
                 }
 
                 if (page != Page.UserLogin): VLine {
@@ -770,16 +793,14 @@ export component AppWindow inherits Window {
                 HorizontalLayout {
                     alignment: center;
                     IconButton {
-                        icon: @image-url("../../icons/info.svg");
+                        icon: core-settings-button-icon;
                         border-radius: radius;
                         height: button-height;
                         width: self.height;
                         y: (parent.height - self.height) / 2;
                         padding-value: bar-icon-button-padding * 0.2;
                         clicked => {
-                            TextInputInterface.text-input-focused = false;
-                            section-header-title = version-info-header;
-                            page = Page.VersionInfo;
+                            launch-core-settings();
                         }
                     }
 
@@ -1660,5 +1681,11 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        enabled: !enable-ui;
     }
 }

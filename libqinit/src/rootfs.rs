@@ -8,7 +8,9 @@ use sys_mount::Mount;
 use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
 use crate::system::bulletproof_unmount;
-use crate::system::{self, bind_mount, generate_random_string, rm_dir_all, run_command};
+use crate::system::{
+    self, bind_mount, generate_random_string, is_mountpoint, rm_dir_all, run_command,
+};
 
 pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 const RO_DIR: &str = "read/";
@@ -287,8 +289,13 @@ pub fn change_user_password(
         &user
     );
 
-    // Overlay should never be mounted when this function is called
-    setup(&pubkey, true)?;
+    let handle_rootfs;
+    if !is_mountpoint(&crate::OVERLAY_MOUNTPOINT)? {
+        setup(&pubkey, true)?;
+        handle_rootfs = true;
+    } else {
+        handle_rootfs = false;
+    }
 
     let temporary_password = generate_random_string(128)?;
     info!("Temporary password is '{}'", &temporary_password);
@@ -318,7 +325,9 @@ pub fn change_user_password(
         }
     }
 
-    tear_down()?;
+    if handle_rootfs {
+        tear_down()?;
+    }
 
     if do_error {
         return Err(anyhow::anyhow!(

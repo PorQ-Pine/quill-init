@@ -15,14 +15,16 @@ use libqinit::recovery::soft_reset;
 use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
-    keep_last_lines, read_kernel_buffer_singleshot, shut_down,
+    BootCommand, BootCommandForm, PowerDownMode, QINIT_BINARIES_DIR_PATH, compress_string_to_xz,
+    get_cmdline_bool, keep_last_lines, mount_qinit_binaries, read_kernel_buffer_singleshot,
+    run_command, shut_down,
 };
 use libqinit::wifi;
 use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
 use log::{debug, error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
+use std::rc::Rc;
 use std::{fs, path::Path, thread};
 slint::include_modules!();
 
@@ -983,6 +985,57 @@ pub fn setup_gui(
         let can_shut_down = can_shut_down.clone();
         move |prepare_shut_down| {
             handle_screen_refresh(prepare_shut_down, can_shut_down.clone());
+        }
+    });
+
+    let core_settings_button_enable_timer = Rc::new(Timer::default());
+    gui.on_launch_core_settings({
+        let gui_weak = gui_weak.clone();
+        let set_hourglass_icon = false;
+        let timer = core_settings_button_enable_timer.clone();
+        move || {
+            let gui_weak = gui_weak.clone();
+            let timer = timer.clone();
+            core_settings_button_enable_timer.start(
+                TimerMode::Repeated,
+                std::time::Duration::from_millis(100),
+                move || {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        gui.set_enable_ui(false);
+                        if gui.get_startup_finished() {
+                            if let Err(e) = mount_qinit_binaries() {
+                                error_toast(&gui, "Failed to mount qinit binaries", e.into());
+                            }
+                            if let Err(e) = run_command(
+                                &format!("{}/core_settings", &QINIT_BINARIES_DIR_PATH),
+                                &[],
+                            ) {
+                                error_toast(
+                                    &gui,
+                                    "Failed to launch Core Settings binary",
+                                    e.into(),
+                                );
+                            }
+                            if let Ok(buffer) = Image::load_from_svg_data(include_bytes!(
+                                "../../icons/settings.svg"
+                            )) {
+                                gui.set_core_settings_button_icon(buffer);
+                            }
+                            gui.set_enable_ui(true);
+                            info!("timer loop");
+                            timer.stop();
+                        } else {
+                            if !set_hourglass_icon {
+                                if let Ok(buffer) = Image::load_from_svg_data(include_bytes!(
+                                    "../../icons/hourglass-top.svg"
+                                )) {
+                                    gui.set_core_settings_button_icon(buffer);
+                                }
+                            }
+                        }
+                    }
+                },
+            );
         }
     });
 
