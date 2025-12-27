@@ -6,7 +6,6 @@ use std::sync::{
 
 use anyhow::Result;
 use chrono::prelude::*;
-use libqinit::battery;
 use libqinit::boot_config::BootConfig;
 use libqinit::brightness;
 use libqinit::eink::{self, ScreenRotation};
@@ -15,16 +14,15 @@ use libqinit::recovery::soft_reset;
 use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, BootCommandForm, PowerDownMode, QINIT_BINARIES_DIR_PATH, compress_string_to_xz,
-    get_cmdline_bool, keep_last_lines, mount_qinit_binaries, read_kernel_buffer_singleshot,
-    run_command, shut_down,
+    BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
+    keep_last_lines, read_kernel_buffer_singleshot, shut_down,
 };
 use libqinit::wifi;
+use libqinit::{battery, system};
 use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
 use log::{debug, error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Image, SharedString, Timer, TimerMode};
-use std::rc::Rc;
 use std::{fs, path::Path, thread};
 slint::include_modules!();
 
@@ -42,6 +40,7 @@ pub fn setup_gui(
     splash_receiver: Receiver<PrimitiveShutDownType>,
     splash_ready_sender: Sender<()>,
     interrupt_receiver: Receiver<String>,
+    toast_sender: Sender<String>,
     toast_receiver: Receiver<String>,
     version_string: String,
     short_version_string: String,
@@ -54,6 +53,8 @@ pub fn setup_gui(
     let mut default_user = String::new();
     let first_boot_done;
     let can_shut_down = Arc::new(AtomicBool::new(false));
+    let core_settings_finished_running = Arc::new(AtomicBool::new(false));
+    let (core_settings_sender, core_settings_receiver): (Sender<()>, Receiver<()>) = channel();
 
     // Boot configuration
     // TODO: Update this dynamically when changing between settings pages
@@ -988,54 +989,87 @@ pub fn setup_gui(
         }
     });
 
-    let core_settings_button_enable_timer = Rc::new(Timer::default());
-    gui.on_launch_core_settings({
-        let gui_weak = gui_weak.clone();
-        let set_hourglass_icon = false;
-        let timer = core_settings_button_enable_timer.clone();
-        move || {
+    let core_settings_receiver_timer = Timer::default();
+    core_settings_receiver_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(100),
+        {
             let gui_weak = gui_weak.clone();
-            let timer = timer.clone();
-            core_settings_button_enable_timer.start(
-                TimerMode::Repeated,
-                std::time::Duration::from_millis(100),
-                move || {
+            let finished = core_settings_finished_running.clone();
+            let set_page_sender = set_page_sender.clone();
+            let toast_sender = toast_sender.clone();
+            let mut has_to_launch = false;
+            move || {
+                if has_to_launch {
                     if let Some(gui) = gui_weak.upgrade() {
-                        gui.set_enable_ui(false);
                         if gui.get_startup_finished() {
-                            if let Err(e) = mount_qinit_binaries() {
-                                error_toast(&gui, "Failed to mount qinit binaries", e.into());
-                            }
-                            if let Err(e) = run_command(
-                                &format!("{}/core_settings", &QINIT_BINARIES_DIR_PATH),
-                                &[],
-                            ) {
-                                error_toast(
-                                    &gui,
-                                    "Failed to launch Core Settings binary",
-                                    e.into(),
-                                );
-                            }
-                            if let Ok(buffer) = Image::load_from_svg_data(include_bytes!(
-                                "../../icons/settings.svg"
-                            )) {
-                                gui.set_core_settings_button_icon(buffer);
-                            }
-                            gui.set_enable_ui(true);
-                            info!("timer loop");
-                            timer.stop();
-                        } else {
-                            if !set_hourglass_icon {
-                                if let Ok(buffer) = Image::load_from_svg_data(include_bytes!(
-                                    "../../icons/hourglass-top.svg"
-                                )) {
-                                    gui.set_core_settings_button_icon(buffer);
-                                }
-                            }
+                            has_to_launch = false;
+                            thread_launch_core_settings(
+                                &set_page_sender,
+                                finished.clone(),
+                                &toast_sender,
+                            );
                         }
                     }
-                },
-            );
+                }
+
+                if let Ok(()) = core_settings_receiver.try_recv() {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        if gui.get_startup_finished() {
+                            thread_launch_core_settings(
+                                &set_page_sender,
+                                finished.clone(),
+                                &toast_sender,
+                            );
+                        } else {
+                            has_to_launch = true;
+                        }
+                    }
+                }
+            }
+        },
+    );
+
+    let core_settings_finished_running_timer = Timer::default();
+    core_settings_finished_running_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(250),
+        {
+            let finished = core_settings_finished_running.clone();
+            let set_page_sender = set_page_sender.clone();
+            let gui_weak = gui_weak.clone();
+            move || {
+                if finished.load(Ordering::SeqCst) {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        finished.store(false, Ordering::SeqCst);
+                        let _ = set_page_sender.send(Page::UserLogin);
+                        gui.set_enable_ui(true);
+                        if let Ok(buffer) =
+                            Image::load_from_svg_data(include_bytes!("../../icons/settings.svg"))
+                        {
+                            gui.set_core_settings_button_icon(buffer);
+                        }
+                    }
+                }
+            }
+        },
+    );
+
+    gui.on_launch_core_settings({
+        let gui_weak = gui_weak.clone();
+        let core_settings_sender = core_settings_sender.clone();
+        move || {
+            if let Some(gui) = gui_weak.upgrade() {
+                gui.set_enable_ui(false);
+                if !gui.get_startup_finished() {
+                    if let Ok(buffer) =
+                        Image::load_from_svg_data(include_bytes!("../../icons/hourglass-top.svg"))
+                    {
+                        gui.set_core_settings_button_icon(buffer);
+                    }
+                }
+                let _ = core_settings_sender.send(());
+            }
         }
     });
 
@@ -1172,4 +1206,24 @@ fn handle_screen_refresh(prepare_shut_down: bool, can_shut_down: Arc<AtomicBool>
     } else {
         eink::full_refresh();
     }
+}
+
+fn thread_launch_core_settings(
+    set_page_sender: &Sender<Page>,
+    finished: Arc<AtomicBool>,
+    toast_sender: &Sender<String>,
+) {
+    let _ = set_page_sender.send(Page::None);
+    thread::spawn({
+        let finished = finished.clone();
+        let toast_sender = toast_sender.clone();
+        move || {
+            if let Err(e) = system::run_core_settings() {
+                let err_msg = "Failed to run Core Settings binary".to_string();
+                error!("{}: {}", &err_msg, &e);
+                let _ = toast_sender.send(err_msg);
+            }
+            finished.store(true, Ordering::SeqCst);
+        }
+    });
 }

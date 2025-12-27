@@ -522,3 +522,10 @@ pub fn mount_qinit_binaries() -> Result<()> {
 
     Ok(())
 }
+
+pub fn run_core_settings() -> Result<()> {
+    mount_qinit_binaries()?;
+    run_command(&format!("{}/core_settings", &QINIT_BINARIES_DIR_PATH), &[])?;
+
+    Ok(())
+}
