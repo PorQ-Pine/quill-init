@@ -1,25 +1,44 @@
+import { Properties as P } from "properties.slint";
+
 export component MinorButton inherits TouchArea {
     in property <string> text <=> i-text.text;
     in property <string> font-family <=> i-text.font-family;
     in property <int> font-weight <=> i-text.font-weight;
+    in property <length> font-size <=> i-text.font-size;
+    in property <TextHorizontalAlignment> horizontal-text-alignment <=> i-text.horizontal-alignment;
+    in property <TextVerticalAlignment> vertical-text-alignment <=> i-text.vertical-alignment;
+    in property <length> layout-padding;
+    in property <bool> show-icon: false;
+    in property <image> icon;
 
     i-container := Rectangle {
-        border-radius: 10px;
+        border-radius: P.radius;
         border-color: #000000;
         background: #ffffff;
 
-        HorizontalLayout {  
-            padding: 4px;
+        i-layout := HorizontalLayout {
+            padding-left: layout-padding;
+            padding-right: layout-padding;
 
             i-text := Text {
                 color: #000000;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
+
+            Rectangle { }
+
+            if (show-icon): Image {
+                y: (parent.height - self.height) / 2;
+                source: icon;
+                height: P.icon-button-height;
+                width: self.height;
+                colorize: root.pressed ? #ffffff : #000000;
+            }
         }
     }
 
-    states [  
+    states [
         pressed when root.pressed: {
             i-container.background: #000000;
             i-text.color: #ffffff;
