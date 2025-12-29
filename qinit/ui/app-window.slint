@@ -1641,8 +1641,8 @@ export component AppWindow inherits Window {
                     dialog = DialogType.None;
                     if page == Page.UserLogin {
                         page = Page.ShutDownSplash;
-                        refresh-screen(true);
                         shutdown-command = RootFsShutDownCommand.Reboot;
+                        prepare-splash-wallpaper();
                         if startup-finished {
                             direct-reboot();
                         }

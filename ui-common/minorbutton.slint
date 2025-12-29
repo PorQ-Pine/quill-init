@@ -10,18 +10,19 @@ export component MinorButton inherits TouchArea {
     in property <length> layout-padding;
     in property <bool> show-icon: false;
     in property <image> icon;
+    in property <bool> invert-colorization: false;
 
     i-container := Rectangle {
         border-radius: P.radius;
         border-color: #000000;
-        background: #ffffff;
+        background: invert-colorization ? #000000 : #ffffff;
 
         i-layout := HorizontalLayout {
             padding-left: layout-padding;
             padding-right: layout-padding;
 
             i-text := Text {
-                color: #000000;
+                color: invert-colorization ? #ffffff : #000000;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -33,15 +34,15 @@ export component MinorButton inherits TouchArea {
                 source: icon;
                 height: P.icon-button-height;
                 width: self.height;
-                colorize: root.pressed ? #ffffff : #000000;
+                colorize: root.pressed ? (invert-colorization ? #000000 : #ffffff) : (invert-colorization ? #ffffff : #000000);
             }
         }
     }
 
     states [
         pressed when root.pressed: {
-            i-container.background: #000000;
-            i-text.color: #ffffff;
+            i-container.background: invert-colorization ? #ffffff : #000000;
+            i-text.color: invert-colorization ? #000000 : #ffffff;
         }
     ]
 }

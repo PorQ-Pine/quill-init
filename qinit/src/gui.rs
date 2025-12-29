@@ -939,15 +939,18 @@ pub fn setup_gui(
         let can_shut_down = can_shut_down.clone();
         move |from_socket| {
             if let Some(gui) = gui_weak.upgrade() {
-                if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
-                    error_toast(&gui, "Failed to generate wallpaper", e.into());
-                } else {
-                    match Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH)) {
-                        Ok(wallpaper) => {
-                            gui.set_splash_wallpaper(wallpaper);
-                            let _ = fs::remove_file(&splash::WALLPAPER_OUT_FILE_PATH);
+                let shut_down_command = gui.get_shutdown_command();
+                if shut_down_command != RootFsShutDownCommand::Reboot {
+                    if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
+                        error_toast(&gui, "Failed to generate wallpaper", e.into());
+                    } else {
+                        match Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH)) {
+                            Ok(wallpaper) => {
+                                gui.set_splash_wallpaper(wallpaper);
+                                let _ = fs::remove_file(&splash::WALLPAPER_OUT_FILE_PATH);
+                            }
+                            Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
                         }
-                        Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
                     }
                 }
 
