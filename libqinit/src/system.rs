@@ -483,6 +483,7 @@ pub fn rm_dir_all(path: &str) -> Result<()> {
 }
 
 pub fn bulletproof_unmount(path: &str) -> Result<()> {
+    sync_disks()?;
     unmount(&path, UnmountFlags::DETACH | UnmountFlags::FORCE)?;
 
     Ok(())

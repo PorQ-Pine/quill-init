@@ -2521,6 +2521,8 @@ dependencies = [
  "anyhow",
  "env_logger",
  "libqinit",
+ "log",
+ "openssl",
 ]
 
 [[package]]

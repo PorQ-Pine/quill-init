@@ -3,7 +3,7 @@ use log::info;
 use serde_json;
 use std::{fs, thread};
 
-use crate::system::{is_mountpoint, run_command};
+use crate::system::{bulletproof_unmount, is_mountpoint, run_command};
 
 pub const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
 pub const DISABLED_MODE_FILE: &str = "encryption_disabled";
@@ -131,6 +131,18 @@ pub fn mount_storage(user: &str, password: &str) -> Result<()> {
             "User home directory seems to be already mounted"
         ));
     }
+
+    Ok(())
+}
+
+pub fn unmount_storage(user: &str) -> Result<()> {
+    info!("Unmounting encrypted storage for user '{}'", &user);
+    bulletproof_unmount(&format!(
+        "{}/{}/{}",
+        &crate::OVERLAY_MOUNTPOINT,
+        &crate::SYSTEM_HOME_DIR,
+        &user
+    ))?;
 
     Ok(())
 }

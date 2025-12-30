@@ -165,6 +165,7 @@ pub fn setup_gui(
     } else if boot_config_valid {
         // Trigger normal boot automatically
         let login_credentials_sender = login_credentials_sender.clone();
+        let core_settings_sender = core_settings_sender.clone();
         boot_normal(
             &gui,
             &boot_sender,
@@ -172,6 +173,7 @@ pub fn setup_gui(
             &default_user,
             first_boot_done,
             login_credentials_sender,
+            core_settings_sender,
         )?;
     }
 
@@ -680,6 +682,7 @@ pub fn setup_gui(
         let set_page_sender = set_page_sender.clone();
         let wifi_command_sender = wifi_command_sender.clone();
         let login_credentials_sender = login_credentials_sender.clone();
+        let core_settings_sender = core_settings_sender.clone();
         let gui_weak = gui_weak.clone();
         move || {
             if let Some(gui) = gui_weak.upgrade() {
@@ -697,6 +700,7 @@ pub fn setup_gui(
                     &default_user,
                     first_boot_done,
                     login_credentials_sender.clone(),
+                    core_settings_sender.clone(),
                 ) {
                     error_toast(&gui, "Failed to send boot command", e.into())
                 }
@@ -1017,6 +1021,7 @@ pub fn setup_gui(
                 }
 
                 if let Ok(()) = core_settings_receiver.try_recv() {
+                    info!("Received request to run Core Settings binary");
                     if let Some(gui) = gui_weak.upgrade() {
                         if gui.get_startup_finished() {
                             thread_launch_core_settings(
@@ -1102,6 +1107,7 @@ fn boot_normal(
     default_user: &str,
     first_boot_done: bool,
     login_credentials_sender: Sender<LoginForm>,
+    core_settings_sender: Sender<()>,
 ) -> Result<()> {
     let mut wait_for_login = false;
     let default_user = default_user.to_string();
@@ -1150,6 +1156,12 @@ fn boot_normal(
             });
         }
     } else {
+        info!("First boot has not been done yet: triggering OOBE");
+        let _ = boot_sender.send(BootCommandForm {
+            command: BootCommand::NormalBoot,
+            can_shut_down: None,
+        });
+        let _ = core_settings_sender.send(());
     }
 
     Ok(())

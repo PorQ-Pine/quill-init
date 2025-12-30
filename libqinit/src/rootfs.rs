@@ -1,16 +1,12 @@
 use anyhow::{Context, Result};
-use log::{debug, error, info};
+use log::{debug, info};
 use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use std::fs;
 use sys_mount::Mount;
 
-use crate::boot_config::BootConfig;
 use crate::signing::check_signature;
-use crate::system::bulletproof_unmount;
-use crate::system::{
-    self, bind_mount, generate_random_string, is_mountpoint, rm_dir_all, run_command,
-};
+use crate::system::{self, bind_mount, bulletproof_unmount, rm_dir_all, run_command};
 
 pub const ROOTFS_MOUNTED_PROGRESS_VALUE: f32 = 0.1;
 const RO_DIR: &str = "read/";
@@ -212,16 +208,6 @@ pub fn setup_mounts() -> Result<()> {
     Ok(())
 }
 
-pub fn setup_misc(boot_config: &mut BootConfig) -> Result<()> {
-    let first_boot_done = boot_config.flags.first_boot_done;
-    if !first_boot_done {
-        info!("Running first boot setup commands, if any");
-        boot_config.flags.first_boot_done = true;
-    }
-
-    Ok(())
-}
-
 pub fn run_chroot_command(command: &[&str]) -> Result<()> {
     debug!("Running command in chroot: {:?}", &command);
 
@@ -230,111 +216,6 @@ pub fn run_chroot_command(command: &[&str]) -> Result<()> {
     args.extend_from_slice(&command);
 
     run_command("/usr/sbin/chroot", &args)?;
-
-    Ok(())
-}
-
-fn change_user_password_chroot_command(
-    chroot_path: &str,
-    user: &str,
-    old_password: &str,
-    new_password: &str,
-    verify: bool,
-) -> Result<()> {
-    let passwd_path = "/usr/bin/passwd";
-    if verify {
-        run_command(
-            "/usr/sbin/chroot",
-            &[
-                &chroot_path,
-                "/bin/su",
-                "-s",
-                "/bin/sh",
-                "-c",
-                &format!(
-                    "printf '{}\n{}\n{}' | {} {}",
-                    &old_password, &new_password, &new_password, &passwd_path, &user
-                ),
-                &user,
-            ],
-        )
-        .with_context(|| "Provided login credentials were incorrect")?;
-    } else {
-        run_command(
-            "/usr/sbin/chroot",
-            &[
-                &chroot_path,
-                "/bin/sh",
-                "-c",
-                &format!(
-                    "printf '{}\n{}' | {} {}",
-                    &new_password, &new_password, &passwd_path, &user
-                ),
-            ],
-        )
-        .with_context(|| "Error setting password")?;
-    }
-
-    Ok(())
-}
-
-pub fn change_user_password(
-    pubkey: &PKey<Public>,
-    user: &str,
-    old_password: &str,
-    new_password: &str,
-) -> Result<()> {
-    info!(
-        "Attempting to change system user password for user '{}'",
-        &user
-    );
-
-    let handle_rootfs;
-    if !is_mountpoint(&crate::OVERLAY_MOUNTPOINT)? {
-        setup(&pubkey, true)?;
-        handle_rootfs = true;
-    } else {
-        handle_rootfs = false;
-    }
-
-    let temporary_password = generate_random_string(128)?;
-    info!("Temporary password is '{}'", &temporary_password);
-
-    let mut do_error = false;
-    info!("Setting temporary password for verification");
-    if let Err(e) = change_user_password_chroot_command(
-        &crate::OVERLAY_MOUNTPOINT,
-        &user,
-        &old_password,
-        &temporary_password,
-        true,
-    ) {
-        do_error = true;
-        error!("{}", &e);
-    } else {
-        info!("Setting new requested password");
-        if let Err(e) = change_user_password_chroot_command(
-            &crate::OVERLAY_MOUNTPOINT,
-            &user,
-            &temporary_password,
-            &new_password,
-            false,
-        ) {
-            do_error = true;
-            error!("{}", &e);
-        }
-    }
-
-    if handle_rootfs {
-        tear_down()?;
-    }
-
-    if do_error {
-        return Err(anyhow::anyhow!(
-            "Failed to set new password for user '{}'",
-            &user
-        ));
-    }
 
     Ok(())
 }
