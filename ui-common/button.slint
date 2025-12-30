@@ -1,3 +1,5 @@
+import { Properties as P } from "properties.slint";
+
 export component Button inherits TouchArea {
     in property <string> text <=> i-text.text;
     in property <length> border-radius <=> i-container.border-radius;
@@ -6,14 +8,14 @@ export component Button inherits TouchArea {
 
     i-container := Rectangle {
         border-width: 3px;
-        border-color: #000000;
-        background: #dbdada;
+        border-color: root.enabled ? #000000 : P.item-disabled-color;
+        background: root.enabled ? #dbdada : #ffffff;
 
         HorizontalLayout {
             padding: 4px;
 
             i-text := Text {
-                color: #000000;
+                color: root.enabled ? #000000 : P.item-disabled-color;
                 horizontal-alignment: center;
                 vertical-alignment: center;
                 font-weight: 800;

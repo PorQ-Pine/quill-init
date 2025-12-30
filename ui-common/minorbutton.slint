@@ -23,7 +23,7 @@ export component MinorButton inherits TouchArea {
             padding-right: layout-padding;
 
             i-text := Text {
-                color: invert-colorization ? #ffffff : #000000;
+                color: root.enabled ? (invert-colorization ? #ffffff : #000000) : P.item-disabled-color;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -35,7 +35,7 @@ export component MinorButton inherits TouchArea {
                 source: icon;
                 height: P.icon-button-height;
                 width: self.height;
-                colorize: root.pressed ? (invert-colorization ? #000000 : #ffffff) : (invert-colorization ? #ffffff : #000000);
+                colorize: root.enabled ? (root.pressed ? (invert-colorization ? #000000 : #ffffff) : (invert-colorization ? #ffffff : #000000)) : P.item-disabled-color;
             }
         }
     }
