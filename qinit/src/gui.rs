@@ -50,25 +50,18 @@ pub fn setup_gui(
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
-    let mut default_user = String::new();
     let first_boot_done;
     let can_shut_down = Arc::new(AtomicBool::new(false));
     let core_settings_finished_running = Arc::new(AtomicBool::new(false));
     let (core_settings_sender, core_settings_receiver): (Sender<()>, Receiver<()>) = channel();
 
     // Boot configuration
-    // TODO: Update this dynamically when changing between settings pages
+    set_default_user_from_boot_config(&gui, boot_config_mutex.clone());
     {
         let boot_config_mutex = boot_config_mutex.clone();
         let boot_config_guard = boot_config_mutex.lock().unwrap();
 
         first_boot_done = boot_config_guard.flags.first_boot_done;
-
-        if let Some(user) = &boot_config_guard.system.default_user {
-            info!("Found default user in boot configuration: '{}'", &user);
-            default_user = user.to_string();
-            gui.set_default_user(SharedString::from(format!("{}", &user)));
-        }
 
         // Activate switches if needed
         gui.set_persistent_rootfs(boot_config_guard.rootfs.persistent_storage);
@@ -170,7 +163,7 @@ pub fn setup_gui(
             &gui,
             &boot_sender,
             &set_page_sender,
-            &default_user,
+            &gui.get_default_user().to_string(),
             first_boot_done,
             login_credentials_sender,
             core_settings_sender,
@@ -697,7 +690,7 @@ pub fn setup_gui(
                     &gui,
                     &boot_sender,
                     &set_page_sender,
-                    &default_user,
+                    &gui.get_default_user().to_string(),
                     first_boot_done,
                     login_credentials_sender.clone(),
                     core_settings_sender.clone(),
@@ -1045,11 +1038,19 @@ pub fn setup_gui(
         {
             let finished = core_settings_finished_running.clone();
             let set_page_sender = set_page_sender.clone();
+            let boot_config = boot_config_mutex.clone();
             let gui_weak = gui_weak.clone();
             move || {
                 if finished.load(Ordering::SeqCst) {
                     if let Some(gui) = gui_weak.upgrade() {
                         finished.store(false, Ordering::SeqCst);
+
+                        if let Ok((new_boot_config, _)) = BootConfig::read() {
+                            boot_config.lock().unwrap().system.default_user =
+                                new_boot_config.system.default_user;
+                        }
+
+                        set_default_user_from_boot_config(&gui, boot_config.clone());
                         let _ = set_page_sender.send(Page::UserLogin);
                         gui.set_enable_ui(true);
                         if let Ok(buffer) =
@@ -1241,4 +1242,13 @@ fn thread_launch_core_settings(
             finished.store(true, Ordering::SeqCst);
         }
     });
+}
+
+fn set_default_user_from_boot_config(gui: &AppWindow, boot_config: Arc<Mutex<BootConfig>>) {
+    if let Some(user) = &boot_config.lock().unwrap().system.default_user {
+        info!("Found default user in boot configuration: '{}'", &user);
+        gui.set_default_user(SharedString::from(format!("{}", &user)));
+    } else {
+        info!("Did not find a default user in boot configuration");
+    }
 }
