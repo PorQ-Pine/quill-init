@@ -121,9 +121,6 @@ pub fn setup_gui(
                     if gui.get_page() == Page::Error {
                         error!("Denying request: current page is '{:?}'", Page::Error);
                     } else {
-                        if page == Page::UserLogin {
-                            gui.set_login_captive_portal(true);
-                        }
                         gui.set_page(page);
                     }
                 }
@@ -1150,6 +1147,7 @@ fn boot_normal(
         }
 
         if wait_for_login {
+            gui.set_login_captive_portal(true);
             set_page_sender.send(Page::UserLogin)?;
             let _ = boot_sender.send(BootCommandForm {
                 command: BootCommand::NormalBoot,

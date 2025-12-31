@@ -200,7 +200,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 // Flush stdout to ensure prompt is shown before waiting
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
-                if event::poll(Duration::from_secs(1)).unwrap() {
+                if event::poll(Duration::from_millis(500)).unwrap() {
                     if let Event::Key(_) = event::read().unwrap() {
                         loop {
                             let _ = run_command("/sbin/getty", &["-L", "ttyS2", "1500000", "linux"]);
