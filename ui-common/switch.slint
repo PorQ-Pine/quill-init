@@ -1,3 +1,5 @@
+import { Properties as P } from "properties.slint";
+
 export component Switch {
     in property <length> border-radius <=> i-container.border-radius;
     in-out property <bool> activated;
@@ -10,8 +12,8 @@ export component Switch {
     touch-area := TouchArea {
         i-container := Rectangle {
             border-width: 3px;
-            border-color: #000000;
-            background: #000000;
+            border-color: enabled ? #000000 : P.item-disabled-color;
+            background: enabled ? #000000 : P.item-disabled-color;
             Rectangle {
                 border-radius: parent.border-radius;
                 width: parent.width * handle_width_multiplier;
@@ -21,7 +23,7 @@ export component Switch {
                     x: activated ? parent.width * 0.5 : 0;
                     border-radius: parent.border-radius;
                     border-width: 3px;
-                    border-color: #000000;
+                    border-color: enabled ? #000000 : P.item-disabled-color;
                     background: #ffffff;
                 }
             }

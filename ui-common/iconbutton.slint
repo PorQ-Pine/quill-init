@@ -1,3 +1,5 @@
+import { Properties as P } from "properties.slint";
+
 export component IconButton inherits TouchArea {
     in property <image> icon <=> i-icon.source;
     in property <length> border-radius <=> i-container.border-radius;
@@ -10,7 +12,7 @@ export component IconButton inherits TouchArea {
         i-layout := HorizontalLayout {
             padding: padding-value;
             i-icon := Image {
-                colorize: i-container.background == #000000 ? #ffffff : #000000;
+                colorize: root.enabled ? (i-container.background == #000000 ? #ffffff : #000000) : P.item-disabled-color;
             }
         }
     }
