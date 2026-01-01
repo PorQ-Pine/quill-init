@@ -248,16 +248,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-pidfd"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "958321a23896f573a3f1809437af5816f3bc90dd2d5ffe8b1cd5645f42230c17"
-dependencies = [
- "async-io",
- "libc",
-]
-
-[[package]]
 name = "async-process"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3653,7 +3643,6 @@ dependencies = [
  "nix",
  "num_enum",
  "serde",
- "swayipc-async",
  "thiserror 2.0.17",
  "tokio",
  "uuid",
@@ -4745,31 +4734,6 @@ dependencies = [
  "skrifa",
  "yazi",
  "zeno",
-]
-
-[[package]]
-name = "swayipc-async"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e9e1551434c06489179b75e4d1f3499bdd05d9abee3c9ea4de53f990811d8eb"
-dependencies = [
- "async-io",
- "async-pidfd",
- "futures-lite",
- "serde",
- "serde_json",
- "swayipc-types",
-]
-
-[[package]]
-name = "swayipc-types"
-version = "1.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a59277899d1da02e8d04f5118d780ba8d769c3c3c9f9fdbae4c2e77a56312a4f"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.17",
 ]
 
 [[package]]
