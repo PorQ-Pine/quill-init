@@ -55,6 +55,9 @@ pub fn setup_gui(
     let core_settings_finished_running = Arc::new(AtomicBool::new(false));
     let (core_settings_sender, core_settings_receiver): (Sender<()>, Receiver<()>) = channel();
 
+    // Copyright year
+    gui.set_max_copyright_year(SharedString::from(format!("{}", &crate::MAX_COPYRIGHT_YEAR)));
+
     // Boot configuration
     set_default_user_from_boot_config(&gui, boot_config_mutex.clone());
     {

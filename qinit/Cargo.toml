@@ -29,6 +29,7 @@ libcoresettings = { path = "../../core_settings/libcoresettings" }
 
 [build-dependencies]
 slint-build = { version = "1.14.1" }
+chrono = { version = "0.4.42" }
 
 [features]
 debug = ["libqinit/debug"]

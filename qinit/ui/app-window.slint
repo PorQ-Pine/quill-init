@@ -109,6 +109,7 @@ export component AppWindow inherits Window {
     in property <string> splash-wallpaper-text;
     in property <string> splash-wallpaper-date-time-information;
     in property <bool> enable-ui: true;
+    in property <string> max-copyright-year;
     // Generic multipliers for default-sized and smaller-sized items
     property <float> wmultiplier <=> P.wmultiplier;
     property <float> hmultiplier <=> P.hmultiplier;
@@ -573,7 +574,7 @@ export component AppWindow inherits Window {
                         }
 
                         Text {
-                            text: "Copyright © 2021-2025";
+                            text: "Copyright © 2021-\{max_copyright_year}";
                             horizontal-alignment: center;
                             font-family: header-font-family;
                             font-weight: 800;

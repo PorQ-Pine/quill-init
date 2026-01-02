@@ -1,6 +1,6 @@
 /*
  * quill-init: Initialization program of Quill OS
- * Copyright (C) 2025 Nicolas Mailloux <nicolecrivain@gmail.com>
+ * Copyright (C) 2025-2026 Nicolas Mailloux <nicolecrivain@gmail.com>
  * SPDX-License-Identifier: GPL-3.0-only
  *
  * This program is free software: you can redistribute it and/or modify
@@ -69,6 +69,7 @@ use std::fs;
 use std::sync::mpsc::{Receiver, Sender, channel};
 pub const QINIT_LOG_DIR: &str = "/var/log";
 pub const QINIT_LOG_FILE: &str = "qinit.log";
+pub const MAX_COPYRIGHT_YEAR: &str = env!("BUILD_YEAR");
 const BOOT_SOCKET_PATH: &str = "/qinit.sock";
 
 #[derive(Serialize, Deserialize)]
@@ -194,7 +195,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 set_timezone(&boot_config.system.timezone)?;
 
-                println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-2025 Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", &kernel_version, &kernel_commit);
+                println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-{} Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", &kernel_version, &kernel_commit, &MAX_COPYRIGHT_YEAR);
                 print!("(initrd) Hit any key to stop auto-boot ... ");
 
                 // Flush stdout to ensure prompt is shown before waiting
