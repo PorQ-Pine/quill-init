@@ -131,22 +131,39 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             } else {
                 rotation_env_var = format!("{}270", &rotation_env_var_base);
             }
-            first_stage_info(&format!("Initial screen rotation is {:?}", &boot_config.system.initial_screen_rotation));
+            first_stage_info(&format!(
+                "Initial screen rotation is {:?}",
+                &boot_config.system.initial_screen_rotation
+            ));
 
             first_stage_info("Spawning second stage qinit binary");
             fs::create_dir_all(&QINIT_LOG_DIR)?;
-            Command::new("/bin/sh").args(&["-c", &format!("env {} {} 2>&1 | tee -a {}", &rotation_env_var, &QINIT_PATH, &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE))]).spawn().with_context(|| "Failed to spawn second stage qinit binary")?;
+            Command::new("/bin/sh")
+                .args(&[
+                    "-c",
+                    &format!(
+                        "env RUST_LOG_STYLE=always {} {} 2>&1 | tee -a {}",
+                        &rotation_env_var,
+                        &QINIT_PATH,
+                        &format!("{}/{}", &QINIT_LOG_DIR, &QINIT_LOG_FILE)
+                    ),
+                ])
+                .spawn()
+                .with_context(|| "Failed to spawn second stage qinit binary")?;
 
             first_stage_info("Waiting for status message from second stage qinit binary");
             let status = from_bytes::<OverlayStatus>(socket::read(&boot_unix_listener)?.deref())?;
 
             if status.ready {
                 first_stage_info("Ready for systemd initialization");
-                fs::remove_file(&BOOT_SOCKET_PATH).with_context(|| "Failed to remove qinit UNIX socket file")?;
+                fs::remove_file(&BOOT_SOCKET_PATH)
+                    .with_context(|| "Failed to remove qinit UNIX socket file")?;
 
                 first_stage_info("Entering rootfs chroot, goodbye");
-                unix::fs::chroot(&OVERLAY_MOUNTPOINT).with_context(|| "Failed to chroot to overlay filesytem's mountpoint")?;
-                std::env::set_current_dir("/").with_context(|| "Failed to set current directory to / (chroot)")?;
+                unix::fs::chroot(&OVERLAY_MOUNTPOINT)
+                    .with_context(|| "Failed to chroot to overlay filesytem's mountpoint")?;
+                std::env::set_current_dir("/")
+                    .with_context(|| "Failed to set current directory to / (chroot)")?;
                 let _ = exec::Command::new("/sbin/init").exec();
             }
         } else {
@@ -155,19 +172,25 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             #[cfg(not(feature = "gui_only"))]
             {
                 sethostname("pinenote").with_context(|| "Failed to set device's hostname")?;
-                run_command("/sbin/ifconfig", &["lo", "up"]).with_context(|| "Failed to set loopback network device up")?;
+                run_command("/sbin/ifconfig", &["lo", "up"])
+                    .with_context(|| "Failed to set loopback network device up")?;
             }
 
             // Boot info
-            let mut kernel_version = fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?; kernel_version.pop();
-            let mut kernel_commit = fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?; kernel_commit.pop();
+            let mut kernel_version =
+                fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?;
+            kernel_version.pop();
+            let mut kernel_commit =
+                fs::read_to_string("/.commit").with_context(|| "Failed to read kernel commit")?;
+            kernel_commit.pop();
 
             let pubkey = read_public_key()?;
 
             #[cfg(not(feature = "gui_only"))]
             {
                 set_workdir("/").with_context(|| "Failed to set current directory to / (not in chroot)")?;
-                fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT).with_context(|| "Failed to create default mountpoint's directory")?;
+                fs::create_dir_all(&libqinit::DEFAULT_MOUNTPOINT)
+                    .with_context(|| "Failed to create default mountpoint's directory")?;
 
                 mount_modules()?;
                 let _ = mount_firmware(&pubkey);
@@ -179,7 +202,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             let mut boot_config = original_boot_config.clone();
 
             // Version strings
-            let version_string = generate_version_string(&mut boot_config, &git_const::git_hash!()[0..12], &kernel_commit);
+            let version_string = generate_version_string(
+                &mut boot_config,
+                &git_const::git_hash!()[0..12],
+                &kernel_commit,
+            );
             let short_version_string = generate_short_version_string(&kernel_commit, &kernel_version);
 
             #[cfg(not(feature = "gui_only"))]
@@ -195,7 +222,10 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 set_timezone(&boot_config.system.timezone)?;
 
-                println!("{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-{} Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n", &kernel_version, &kernel_commit, &MAX_COPYRIGHT_YEAR);
+                println!(
+                    "{}\n\nQuill OS, kernel commit {}\nCopyright (C) 2021-{} Nicolas Mailloux <nicolecrivain@gmail.com> and Szybet <https://github.com/Szybet>\n",
+                    &kernel_version, &kernel_commit, &MAX_COPYRIGHT_YEAR
+                );
                 print!("(initrd) Hit any key to stop auto-boot ... ");
 
                 // Flush stdout to ensure prompt is shown before waiting
@@ -221,10 +251,17 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
             let display_progress_bar = systemd_targets_total != SYSTEMD_NO_TARGETS;
             let (progress_sender, progress_receiver): (Sender<f32>, Receiver<f32>) = channel();
-            let (boot_sender, boot_receiver): (Sender<BootCommandForm>, Receiver<BootCommandForm>) = channel();
+            let (boot_sender, boot_receiver): (Sender<BootCommandForm>, Receiver<BootCommandForm>) =
+                channel();
             let (toast_sender, toast_receiver): (Sender<String>, Receiver<String>) = channel();
-            let (login_credentials_sender, login_credentials_receiver): (Sender<socket::LoginForm>, Receiver<socket::LoginForm>) = channel();
-            let (splash_sender, splash_receiver): (Sender<socket::PrimitiveShutDownType>, Receiver<socket::PrimitiveShutDownType>) = channel();
+            let (login_credentials_sender, login_credentials_receiver): (
+                Sender<socket::LoginForm>,
+                Receiver<socket::LoginForm>,
+            ) = channel();
+            let (splash_sender, splash_receiver): (
+                Sender<socket::PrimitiveShutDownType>,
+                Receiver<socket::PrimitiveShutDownType>,
+            ) = channel();
             let (splash_ready_sender, splash_ready_receiver): (Sender<()>, Receiver<()>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
@@ -232,16 +269,33 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 let boot_config_mutex = boot_config_mutex.clone();
                 let toast_sender = toast_sender.clone();
                 move || {
-                    gui::setup_gui(progress_receiver, boot_sender, login_credentials_sender, splash_receiver, splash_ready_sender, interrupt_receiver, toast_sender, toast_receiver, version_string, short_version_string, display_progress_bar, boot_config_mutex, boot_config_valid)
+                    gui::setup_gui(
+                        progress_receiver,
+                        boot_sender,
+                        login_credentials_sender,
+                        splash_receiver,
+                        splash_ready_sender,
+                        interrupt_receiver,
+                        toast_sender,
+                        toast_receiver,
+                        version_string,
+                        short_version_string,
+                        display_progress_bar,
+                        boot_config_mutex,
+                        boot_config_valid,
+                    )
                 }
             });
 
             // Block this function until the main thread receives a signal to continue booting (allowing a user to perform recovery tasks, for example)
-            let boot_command_form  = boot_receiver.recv()?;
+            let boot_command_form = boot_receiver.recv()?;
             let (mut boot_command, can_shut_down) = handle_boot_command(boot_command_form);
 
             boot_config = boot_config_mutex.lock().unwrap().clone();
-            info!("Boot configuration after possible modifications: {:?}", &boot_config);
+            info!(
+                "Boot configuration after possible modifications: {:?}",
+                &boot_config
+            );
 
             // Check if we need to force a reboot here to apply configuration changes
             let mut config_force_reboot = true;
@@ -259,7 +313,11 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     BootConfig::write(&mut boot_config, false)?;
                     std::thread::sleep(Duration::from_millis(gui::TOAST_DURATION_MILLIS as u64));
 
-                    shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal, Arc::new(AtomicBool::new(true)))?;
+                    shut_down(
+                        libquillcom::socket::PrimitiveShutDownType::Reboot,
+                        libqinit::system::PowerDownMode::Normal,
+                        Arc::new(AtomicBool::new(true)),
+                    )?;
                 }
             } else {
                 // Trigger switch to boot splash page
@@ -277,14 +335,22 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOff => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::Normal, can_shut_down)?;
+                        shut_down(
+                            libquillcom::socket::PrimitiveShutDownType::PowerOff,
+                            libqinit::system::PowerDownMode::Normal,
+                            can_shut_down,
+                        )?;
                         return Ok(());
-                    },
+                    }
                     BootCommand::Reboot => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::Normal, can_shut_down)?;
+                        shut_down(
+                            libquillcom::socket::PrimitiveShutDownType::Reboot,
+                            libqinit::system::PowerDownMode::Normal,
+                            can_shut_down,
+                        )?;
                         return Ok(());
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 };
             }
 
@@ -304,7 +370,9 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     // This is a one-time call: any more fatal errors are useless since we already block the UI until the next boot
                     if let Ok(qinit_unix_listener_socket) = socket::read(&qinit_unix_listener) {
                         info!("Received request to show fatal error splash: proceeding");
-                        if let Ok(error_details) = from_bytes::<socket::ErrorDetails>(&qinit_unix_listener_socket) {
+                        if let Ok(error_details) =
+                            from_bytes::<socket::ErrorDetails>(&qinit_unix_listener_socket)
+                        {
                             let _ = interrupt_sender.send(error_details.error_reason);
                             let _ = fs::remove_file(&qinit_socket_path);
                         }
@@ -312,11 +380,20 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 }
             });
 
-            #[cfg(not(feature = "gui_only"))] {
-                let overlay_status = to_allocvec(&OverlayStatus { ready: true }).with_context(|| "Failed to create vector with boot command")?;
+            #[cfg(not(feature = "gui_only"))]
+            {
+                let overlay_status = to_allocvec(&OverlayStatus { ready: true })
+                    .with_context(|| "Failed to create vector with boot command")?;
                 let _ = socket::write(&BOOT_SOCKET_PATH, &overlay_status)?;
 
-                thread::spawn(move || rootfs_socket::initialize(login_credentials_receiver, splash_sender, splash_ready_receiver, can_shut_down.clone()));
+                thread::spawn(move || {
+                    rootfs_socket::initialize(
+                        login_credentials_receiver,
+                        splash_sender,
+                        splash_ready_receiver,
+                        can_shut_down.clone(),
+                    )
+                });
 
                 if display_progress_bar {
                     progress_sender.send(rootfs::ROOTFS_MOUNTED_PROGRESS_VALUE)?;
@@ -336,11 +413,19 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
                 match boot_command {
                     BootCommand::PowerOffRootFS => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::PowerOff, libqinit::system::PowerDownMode::RootFS, can_shut_down)?;
+                        shut_down(
+                            libquillcom::socket::PrimitiveShutDownType::PowerOff,
+                            libqinit::system::PowerDownMode::RootFS,
+                            can_shut_down,
+                        )?;
                         return Ok(());
-                    },
+                    }
                     BootCommand::RebootRootFS => {
-                        shut_down(libquillcom::socket::PrimitiveShutDownType::Reboot, libqinit::system::PowerDownMode::RootFS, can_shut_down)?;
+                        shut_down(
+                            libquillcom::socket::PrimitiveShutDownType::Reboot,
+                            libqinit::system::PowerDownMode::RootFS,
+                            can_shut_down,
+                        )?;
                         return Ok(());
                     }
                     BootCommand::BootFinished | _ => {}

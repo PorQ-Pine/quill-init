@@ -28,7 +28,7 @@ export component MinorButton inherits TouchArea {
                 vertical-alignment: center;
             }
 
-            Rectangle { }
+            if (show-icon): Rectangle { }
 
             if (show-icon): Image {
                 y: (parent.height - self.height) / 2;

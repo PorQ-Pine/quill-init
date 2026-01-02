@@ -3,6 +3,7 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
+use std::time::Duration;
 
 use anyhow::Result;
 use chrono::prelude::*;
@@ -702,15 +703,24 @@ pub fn setup_gui(
     });
 
     // Soft reset
+    let soft_reset_timer = Timer::default();
     gui.on_soft_reset({
+        let boot_config_mutex = boot_config_mutex.clone();
         let gui_weak = gui_weak.clone();
         move || {
-            if let Some(gui) = gui_weak.upgrade() {
-                // Can be blocking because these operations should be relatively fast
-                if let Err(e) = soft_reset() {
-                    error_toast(&gui, "Failed to soft-reset", e.into());
+            let boot_config_mutex = boot_config_mutex.clone();
+            let gui_weak = gui_weak.clone();
+            soft_reset_timer.start(TimerMode::SingleShot, Duration::from_millis(100), move || {
+                if let Some(gui) = gui_weak.upgrade() {
+                    gui.set_enable_ui(false);
+                    if let Err(e) = soft_reset(boot_config_mutex.clone()) {
+                        error_toast(&gui, "Failed to soft-reset", e.into());
+                        gui.set_enable_ui(true);
+                    } else {
+                        gui.invoke_standard_reboot();
+                    }
                 }
-            }
+            })
         }
     });
 

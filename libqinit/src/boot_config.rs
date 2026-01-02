@@ -51,7 +51,7 @@ pub struct BootConfig {
 }
 
 impl BootConfig {
-    fn default_boot_config() -> BootConfig {
+    pub fn default_boot_config() -> BootConfig {
         let mut boot_config = BootConfig::default();
 
         // Flags

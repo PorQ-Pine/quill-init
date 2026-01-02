@@ -155,6 +155,13 @@ export component AppWindow inherits Window {
         page = Page.ShutDownSplash;
     }
 
+    public function standard-reboot() {
+        dialog = DialogType.None;
+        page = Page.ShutDownSplash;
+        refresh-screen(true);
+        root.reboot();
+    }
+
     if (page == Page.ShutDownSplash): VerticalLayout {
         Image {
             source: splash-wallpaper;
@@ -1117,9 +1124,7 @@ export component AppWindow inherits Window {
                         border-radius: radius;
                         font-family: header-font-family;
                         clicked => {
-                            page = Page.ShutDownSplash;
-                            refresh-screen(true);
-                            root.reboot();
+                            standard-reboot();
                         }
                     }
                 }
@@ -1196,9 +1201,10 @@ export component AppWindow inherits Window {
         }
         confirm => {
             if dialog == DialogType.SoftReset {
+                dialog-message = "Soft reset in progress";
+                dialog = DialogType.Toast;
                 soft-reset();
             }
-            dialog = DialogType.None;
         }
     }
     // Wi-Fi UI dialog
@@ -1648,9 +1654,7 @@ export component AppWindow inherits Window {
                             direct-reboot();
                         }
                     } else {
-                        page = Page.ShutDownSplash;
-                        refresh-screen(true);
-                        reboot();
+                        standard-reboot();
                     }
                 }
             }
