@@ -1,4 +1,4 @@
-use chrono::{Utc, Datelike};
+use chrono::{Datelike, Utc};
 
 fn main() {
     let year = Utc::now().year();

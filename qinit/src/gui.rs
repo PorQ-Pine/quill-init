@@ -48,6 +48,7 @@ pub fn setup_gui(
     display_progress_bar: bool,
     boot_config_mutex: Arc<Mutex<BootConfig>>,
     boot_config_valid: bool,
+    login_page_trigger_receiver: Receiver<()>,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
@@ -57,7 +58,10 @@ pub fn setup_gui(
     let (core_settings_sender, core_settings_receiver): (Sender<()>, Receiver<()>) = channel();
 
     // Copyright year
-    gui.set_max_copyright_year(SharedString::from(format!("{}", &crate::MAX_COPYRIGHT_YEAR)));
+    gui.set_max_copyright_year(SharedString::from(format!(
+        "{}",
+        &crate::MAX_COPYRIGHT_YEAR
+    )));
 
     // Boot configuration
     set_default_user_from_boot_config(&gui, boot_config_mutex.clone());
@@ -233,6 +237,19 @@ pub fn setup_gui(
             }
         },
     );
+
+    let login_page_trigger_timer = Timer::default();
+    login_page_trigger_timer.start(TimerMode::Repeated, Duration::from_millis(100), {
+        let set_page_sender = set_page_sender.clone();
+        let gui_weak = gui_weak.clone();
+        move || {
+            if let Ok(()) = login_page_trigger_receiver.try_recv() {
+                if let Some(gui) = gui_weak.upgrade() {
+                    switch_to_login_page(&gui, &set_page_sender);
+                }
+            }
+        }
+    });
 
     // Toasts garbage collector
     // It's not perfect - even though it's probably not noticeable, it doesn't precisely enforce TOAST_DURATION_MILLIS - but considering the small scale of this UI, I think it's more than enough
@@ -710,17 +727,21 @@ pub fn setup_gui(
         move || {
             let boot_config_mutex = boot_config_mutex.clone();
             let gui_weak = gui_weak.clone();
-            soft_reset_timer.start(TimerMode::SingleShot, Duration::from_millis(100), move || {
-                if let Some(gui) = gui_weak.upgrade() {
-                    gui.set_enable_ui(false);
-                    if let Err(e) = soft_reset(boot_config_mutex.clone()) {
-                        error_toast(&gui, "Failed to soft-reset", e.into());
-                        gui.set_enable_ui(true);
-                    } else {
-                        gui.invoke_standard_reboot();
+            soft_reset_timer.start(
+                TimerMode::SingleShot,
+                Duration::from_millis(100),
+                move || {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        gui.set_enable_ui(false);
+                        if let Err(e) = soft_reset(boot_config_mutex.clone()) {
+                            error_toast(&gui, "Failed to soft-reset", e.into());
+                            gui.set_enable_ui(true);
+                        } else {
+                            gui.invoke_standard_reboot();
+                        }
                     }
-                }
-            })
+                },
+            )
         }
     });
 
@@ -1160,8 +1181,7 @@ fn boot_normal(
         }
 
         if wait_for_login {
-            gui.set_login_captive_portal(true);
-            set_page_sender.send(Page::UserLogin)?;
+            switch_to_login_page(&gui, &set_page_sender);
             let _ = boot_sender.send(BootCommandForm {
                 command: BootCommand::NormalBoot,
                 can_shut_down: None,
@@ -1262,4 +1282,9 @@ fn set_default_user_from_boot_config(gui: &AppWindow, boot_config: Arc<Mutex<Boo
     } else {
         info!("Did not find a default user in boot configuration");
     }
+}
+
+fn switch_to_login_page(gui: &AppWindow, set_page_sender: &Sender<Page>) {
+    gui.set_login_captive_portal(true);
+    let _ = set_page_sender.send(Page::UserLogin);
 }

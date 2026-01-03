@@ -263,6 +263,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 Receiver<socket::PrimitiveShutDownType>,
             ) = channel();
             let (splash_ready_sender, splash_ready_receiver): (Sender<()>, Receiver<()>) = channel();
+            let (login_page_trigger_sender, login_page_trigger_receiver): (Sender<()>, Receiver<()>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
@@ -283,6 +284,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                         display_progress_bar,
                         boot_config_mutex,
                         boot_config_valid,
+                        login_page_trigger_receiver,
                     )
                 }
             });
@@ -392,6 +394,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                         splash_sender,
                         splash_ready_receiver,
                         can_shut_down.clone(),
+                        login_page_trigger_sender,
                     )
                 });
 

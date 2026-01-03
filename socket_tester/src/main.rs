@@ -19,6 +19,9 @@ struct ExclusiveOptions {
 
     #[arg(long, short = 'p', group = "exclusive")]
     trigger_poweroff_splash: bool,
+
+    #[arg(long, short = 'l', group = "exclusive")]
+    trigger_login_page_switch: bool,
 }
 
 #[derive(Parser)]
@@ -49,6 +52,8 @@ fn main() -> Result<()> {
         .with_context(|| "Failed to create vector with boot command")?;
     } else if args.exclusive_options.get_login_credentials {
         vector = to_allocvec(&socket::CommandToQinit::GetLoginCredentials)?;
+    } else if args.exclusive_options.trigger_login_page_switch {
+        vector = to_allocvec(&socket::CommandToQinit::TriggerSwitchToLoginPage)?;
     } else {
         vector = to_allocvec(&socket::CommandToQinit::TriggerSplash(socket::PrimitiveShutDownType::PowerOff))?;
     }

@@ -21,6 +21,7 @@ pub fn initialize(
     splash_sender: Sender<PrimitiveShutDownType>,
     splash_ready_receiver: Receiver<()>,
     can_shut_down: Arc<AtomicBool>,
+    login_page_trigger_sender: Sender<()>,
 ) -> Result<()> {
     let login_form_mutex = Arc::new(Mutex::new(None));
     thread::spawn({
@@ -36,6 +37,7 @@ pub fn initialize(
                 splash_sender,
                 splash_ready_receiver,
                 can_shut_down,
+                login_page_trigger_sender,
             )
         }
     });
@@ -67,6 +69,7 @@ pub fn listen_for_commands(
     splash_sender: Sender<PrimitiveShutDownType>,
     splash_ready_receiver: Receiver<()>,
     can_shut_down: Arc<AtomicBool>,
+    login_page_trigger_sender: Sender<()>,
 ) -> Result<()> {
     info!("Listening for commands");
     let unix_listener = socket::bind(&ROOTFS_SOCKET_PATH)?;
@@ -109,6 +112,9 @@ pub fn listen_for_commands(
                 unix_stream
                     .write_all(&reply)
                     .with_context(|| "Failed to send splash readiness status")?;
+            }
+            CommandToQinit::TriggerSwitchToLoginPage => {
+                let _ = login_page_trigger_sender.send(());
             }
             CommandToQinit::StopListening => {
                 break;
