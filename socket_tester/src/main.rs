@@ -59,7 +59,7 @@ fn main() -> Result<()> {
     }
 
     let mut reply = Vec::new();
-    if args.exclusive_options.get_login_credentials || args.exclusive_options.trigger_poweroff_splash {
+    if args.exclusive_options.get_login_credentials || args.exclusive_options.trigger_poweroff_splash || args.exclusive_options.trigger_login_page_switch {
         reply = socket::write_and_read(&args.socket_path, &vector)?;
     } else {
         socket::write(&args.socket_path, &vector)?;
