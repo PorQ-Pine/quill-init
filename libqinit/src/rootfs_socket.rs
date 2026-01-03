@@ -81,9 +81,10 @@ pub fn listen_for_commands(
             CommandToQinit::GetLoginCredentials => {
                 debug!("Sending login credentials to root filesystem");
 
-                let login_form_guard = login_form_mutex.lock().unwrap().clone();
+                let mut login_form_guard = login_form_mutex.lock().unwrap().clone();
                 let login_form_vec = to_allocvec(&AnswerFromQinit::Login(login_form_guard))
                     .with_context(|| "Failed to create vector with login credentials")?;
+                login_form_guard = None;
 
                 unix_stream
                     .write_all(&login_form_vec)
@@ -115,6 +116,11 @@ pub fn listen_for_commands(
             }
             CommandToQinit::TriggerSwitchToLoginPage => {
                 let _ = login_page_trigger_sender.send(());
+
+                let reply = to_allocvec(&AnswerFromQinit::LoginPageReady)?;
+                unix_stream
+                    .write_all(&reply)
+                    .with_context(|| "Failed to send login page readiness status")?;
             }
             CommandToQinit::StopListening => {
                 break;
