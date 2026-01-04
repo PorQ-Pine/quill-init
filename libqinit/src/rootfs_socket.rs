@@ -81,15 +81,10 @@ pub fn listen_for_commands(
             CommandToQinit::GetLoginCredentials => {
                 debug!("Sending login credentials to root filesystem");
 
-                let login_form_guard;
-                {
-                    login_form_guard = login_form_mutex.lock().unwrap().clone();
-                }
-                let login_form_vec = to_allocvec(&AnswerFromQinit::Login(login_form_guard))
-                    .with_context(|| "Failed to create vector with login credentials")?;
-                {
-                    *login_form_mutex.lock().unwrap() = None;
-                }
+                let login_form_vec = to_allocvec(&AnswerFromQinit::Login(
+                    login_form_mutex.lock().unwrap().take(),
+                ))
+                .with_context(|| "Failed to create vector with login credentials")?;
 
                 unix_stream
                     .write_all(&login_form_vec)
