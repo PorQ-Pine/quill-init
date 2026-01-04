@@ -433,6 +433,10 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                     }
                     BootCommand::BootFinished | _ => {}
                 }
+
+                if let Err(e) = rootfs::set_timezone(&boot_config.system.timezone) {
+                    error!("Failed to set timezone in overlay filesystem: {}", e);
+                }
             }
         }
     }

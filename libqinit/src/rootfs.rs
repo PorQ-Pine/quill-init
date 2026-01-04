@@ -219,3 +219,12 @@ pub fn run_chroot_command(command: &[&str]) -> Result<()> {
 
     Ok(())
 }
+
+pub fn set_timezone(timezone: &str) -> Result<()> {
+    info!("Setting overlay filesystem's timezone to '{}'", &timezone);
+    Ok(run_chroot_command(&[
+        "/usr/sbin/timedatectl",
+        "set-timezone",
+        &timezone,
+    ])?)
+}
