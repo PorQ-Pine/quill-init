@@ -632,8 +632,13 @@ export component AppWindow inherits Window {
                         scaling-factor: scaling-factor;
                         icon: @image-url("../../icons/recovery.svg");
                         clicked => {
-                            section-header-title = self.text;
-                            page = Page.RecoveryOptions;
+                            if battery-level >= 50 {
+                                section-header-title = self.text;
+                                page = Page.RecoveryOptions;
+                            } else {
+                                dialog-message = "Battery level too low";
+                                dialog = DialogType.Toast;
+                            }
                         }
                     }
 
