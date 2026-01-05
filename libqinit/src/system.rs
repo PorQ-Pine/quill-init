@@ -18,6 +18,7 @@ use std::sync::{
 };
 use std::{fs, process::Command, thread, time::Duration};
 use sys_mount::{Mount, UnmountFlags, unmount};
+use walkdir::WalkDir;
 
 use crate::boot_config::BootConfig;
 use crate::rootfs::run_chroot_command;
@@ -33,6 +34,14 @@ pub const QINIT_BINARIES_DIR_PATH: &str = "/qinit_binaries/";
 
 const REBOOT_BINARY_PATH: &str = "/sbin/reboot";
 const POWER_OFF_BINARY_PATH: &str = "/sbin/poweroff";
+const TIMEZONE_FILES_DIR_PATH: &str = "/usr/share/zoneinfo/";
+const EXCLUDED_TIMEZONE_FILES: [&str; 5] = [
+    "posixrules",
+    "zone.tab",
+    "zone1970.tab",
+    "iso3166.tab",
+    "leap-seconds.list",
+];
 
 #[derive(PartialEq)]
 pub enum BootCommand {
@@ -450,8 +459,28 @@ pub fn sync_time() -> Result<()> {
     Ok(())
 }
 
+pub fn get_timezones_list() -> Result<Vec<String>> {
+    let mut list: Vec<String> = Vec::new();
+
+    for entry in WalkDir::new(&TIMEZONE_FILES_DIR_PATH) {
+        let path = entry?
+            .path()
+            .strip_prefix(&TIMEZONE_FILES_DIR_PATH)?
+            .display()
+            .to_string();
+
+        if EXCLUDED_TIMEZONE_FILES.contains(&path.as_str()) {
+            continue;
+        }
+
+        list.push(path);
+    }
+
+    Ok(list)
+}
+
 pub fn set_timezone(timezone: &str) -> Result<()> {
-    let timezone_data = format!("/usr/share/zoneinfo/{}", &timezone);
+    let timezone_data = format!("{}{}", &TIMEZONE_FILES_DIR_PATH, &timezone);
     if fs::exists(&&timezone_data)? {
         symlink(&timezone_data, "/etc/localtime")
             .with_context(|| "Failed to symlink timezone data to /etc/localtime")?;

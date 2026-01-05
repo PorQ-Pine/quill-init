@@ -2555,6 +2555,7 @@ dependencies = [
  "sha256",
  "strum_macros",
  "sys-mount",
+ "walkdir",
 ]
 
 [[package]]

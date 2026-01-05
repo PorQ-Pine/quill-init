@@ -82,26 +82,47 @@ pub fn setup_gui(
         }
 
         // Splash wallpaper settings
-        let splash_wallpapers_models_vec: Vec<SharedString> = splash::WALLPAPER_MODELS_LIST
-            .iter()
-            .map(|user| SharedString::from(*user))
-            .collect();
-        gui.set_splash_wallpaper_models_list(slint::ModelRc::new(slint::VecModel::from(
-            splash_wallpapers_models_vec,
-        )));
-
-        if let Some(splash_wallpaper_model) = &boot_config_guard
-            .system
-            .splash_wallpaper_options
-            .splash_wallpaper
         {
-            // ChatGPT did help here...
-            let index = splash::WALLPAPER_MODELS_LIST
+            let splash_wallpapers_models_vec: Vec<SharedString> = splash::WALLPAPER_MODELS_LIST
                 .iter()
-                .position(|&name| name == splash_wallpaper_model)
+                .map(|user| SharedString::from(*user))
+                .collect();
+            gui.set_splash_wallpaper_models_list(slint::ModelRc::new(slint::VecModel::from(
+                splash_wallpapers_models_vec,
+            )));
+
+            if let Some(splash_wallpaper_model) = &boot_config_guard
+                .system
+                .splash_wallpaper_options
+                .splash_wallpaper
+            {
+                // ChatGPT did help here...
+                let index = splash::WALLPAPER_MODELS_LIST
+                    .iter()
+                    .position(|&name| name == splash_wallpaper_model)
+                    .map(|i| i as i32);
+                if let Some(i) = index {
+                    gui.set_splash_wallpaper_models_list_index(i);
+                }
+            }
+        }
+
+        // Timezones
+        {
+            let timezones_vec = system::get_timezones_list()?;
+            let timezones_slint_vec: Vec<SharedString> = timezones_vec
+                .iter()
+                .map(|entry| SharedString::from(entry))
+                .collect();
+            gui.set_timezones_list(slint::ModelRc::new(slint::VecModel::from(
+                timezones_slint_vec,
+            )));
+            let index = timezones_vec
+                .iter()
+                .position(|name| name == &boot_config_guard.system.timezone)
                 .map(|i| i as i32);
             if let Some(i) = index {
-                gui.set_splash_wallpaper_models_list_index(i);
+                gui.set_timezones_list_index(i);
             }
         }
     }
@@ -1010,6 +1031,14 @@ pub fn setup_gui(
                 .system
                 .splash_wallpaper_options
                 .splash_wallpaper = Some(wallpaper.to_string());
+        }
+    });
+
+    gui.on_change_timezone({
+        let boot_config_mutex = boot_config_mutex.clone();
+        move |timezone| {
+            info!("Changing timezone to '{}'", &timezone);
+            boot_config_mutex.lock().unwrap().system.timezone = timezone.to_string();
         }
     });
 

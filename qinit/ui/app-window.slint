@@ -51,6 +51,7 @@ export component AppWindow inherits Window {
     callback login(string, string);
     callback change-initial-screen-rotation(int);
     callback change-splash-wallpaper-model(string);
+    callback change-timezone(string);
     callback generate-splash-wallpaper(bool);
     callback refresh-screen(bool);
     callback launch-core-settings();
@@ -80,8 +81,10 @@ export component AppWindow inherits Window {
     in-out property <bool> sticky-toast: false;
     property <[string]> orientations-list: ["0", "90", "180", "270"];
     in property <[string]> splash-wallpaper-models-list;
+    in property <[string]> timezones-list;
     in-out property <int> orientations-list-index: 3;
     in-out property <int> splash-wallpaper-models-list-index;
+    in-out property <int> timezones-list-index;
     // Configuration properties
     in-out property <bool> persistent-rootfs;
     in property <bool> recovery-features;
@@ -775,6 +778,34 @@ export component AppWindow inherits Window {
                                 index <=> splash-wallpaper-models-list-index;
                                 index-changed(i) => {
                                     change-splash-wallpaper-model(self.current-text);
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: layout-padding;
+                            padding-right: self.padding-left;
+                            spacing: layout-spacing;
+                            Rectangle {
+                                Text {
+                                    text: "Timezone";
+                                    font-family: regular-font-family;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle { }
+
+                            HList {
+                                border-radius: radius;
+                                element-width: switch-width * 5;
+                                button-width: switch-width * 0.5 - layout-spacing * 1.35 - 2px;
+                                spacing: layout-spacing;
+                                height: switch-height;
+                                list: timezones-list;
+                                index <=> timezones-list-index;
+                                index-changed(i) => {
+                                    change-timezone(self.current-text);
                                 }
                             }
                         }
