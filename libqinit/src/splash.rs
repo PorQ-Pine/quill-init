@@ -4,7 +4,6 @@ use crate::system::{self, QINIT_BINARIES_DIR_PATH, run_command};
 use anyhow::Result;
 use log::{debug, info};
 use rand::{prelude::*, rng};
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub const DEFAULT_WALLPAPER_MODEL: &str = "random";
@@ -12,41 +11,26 @@ pub const RANDOM_WALLPAPER_MODEL: &str = DEFAULT_WALLPAPER_MODEL;
 pub const DEFAULT_FLOW_PARTICLES_AMOUNT: u64 = 5000;
 pub const WALLPAPER_OUT_FILE_PATH: &str = "/tmp/splash_wallpaper.png";
 pub const WALLPAPER_MODELS_LIST: &[&str] = &[
-    "flow",
-    "clouds",
-    "islands",
-    "lightning",
-    "nearestpoint",
-    "tangles",
-    "cellularone",
+    "flow", // 3s
+    "clouds", // 5s
+    "islands", // 5s
+    "lightning", // 1s
+    // "nearestpoint", // 12s
+    "tangles", // 6s
+    // "cellularone", // 30s
     // Too many squares
-    "squares",
+    "squares", // 0.2s
     // "squareshor",
     // "squaresver",
     // "squaresdiag",
-    "squares2",
+    "squares2", // 0.2s
     // "squares2h",
     // "squares2v",
-    "nearestgradient",
+    // "nearestgradient", // 52s
     // "pattern",
     &RANDOM_WALLPAPER_MODEL,
 ];
 const MAX_GENERATION_RETRIES: u8 = 3;
-// const hasmaps aren't possible, so we have this
-const WALLPAPER_PARTICLES_AMOUNT: &[(&str, u64)] = &[
-    ("flow", 5000),
-    ("clouds", 3000),
-    ("islands", 3000),
-    ("lightning", 5000),
-    ("nearestpoint", 5000),
-    ("tangles", 5000),
-    ("cellularone", 1000),
-    ("squares", 5000),
-    ("squares2", 5000),
-    ("nearestgradient", 1000),
-    ("random", 5000),
-];
-const FALLBACK_PARTICLES: u64 = 1000;
 
 pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<()> {
     info!("Generating procedural splash wallpaper");
@@ -80,11 +64,6 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
             }
         }
     }
-    let wallpaper_models: HashMap<&'static str, u64> =
-        WALLPAPER_PARTICLES_AMOUNT.iter().copied().collect();
-    let flow_particles_amount = *wallpaper_models
-        .get(wallpaper_type.as_str())
-        .unwrap_or(&FALLBACK_PARTICLES);
 
     system::mount_qinit_binaries()?;
 
@@ -105,7 +84,7 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
                 "-s",
                 &rand::random::<i32>().unsigned_abs().to_string(),
                 "-f",
-                &format!("{}", &flow_particles_amount),
+                &format!("{}", DEFAULT_FLOW_PARTICLES_AMOUNT),
             ],
         ) {
             if !(count + 1 < MAX_GENERATION_RETRIES) {
