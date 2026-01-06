@@ -6,14 +6,15 @@ use log::{debug, info};
 use rand::{prelude::*, rng};
 use std::sync::{Arc, Mutex};
 
-pub const DEFAULT_WALLPAPER_MODEL: &str = "random";
+pub const DEFAULT_WALLPAPER_MODEL: &str = "RANDOM";
+pub const NONE_WALLPAPER_MODEL: &str = "NONE";
 pub const RANDOM_WALLPAPER_MODEL: &str = DEFAULT_WALLPAPER_MODEL;
 pub const DEFAULT_FLOW_PARTICLES_AMOUNT: u64 = 5000;
 pub const WALLPAPER_OUT_FILE_PATH: &str = "/tmp/splash_wallpaper.png";
 pub const WALLPAPER_MODELS_LIST: &[&str] = &[
-    "flow", // 3s
-    "clouds", // 5s
-    "islands", // 5s
+    "flow",      // 3s
+    "clouds",    // 5s
+    "islands",   // 5s
     "lightning", // 1s
     // "nearestpoint", // 12s
     "tangles", // 6s
@@ -29,30 +30,39 @@ pub const WALLPAPER_MODELS_LIST: &[&str] = &[
     // "nearestgradient", // 52s
     // "pattern",
     &RANDOM_WALLPAPER_MODEL,
+    &NONE_WALLPAPER_MODEL,
 ];
 const MAX_GENERATION_RETRIES: u8 = 3;
 
-pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<()> {
+pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<bool> {
     info!("Generating procedural splash wallpaper");
 
     let mut wallpaper_type = DEFAULT_WALLPAPER_MODEL.to_string();
     {
         let boot_config_mutex = boot_config_mutex.clone();
-        let locked_boot_config = boot_config_mutex.lock().unwrap();
-        if let Some(wt) = locked_boot_config
+        if let Some(wt) = boot_config_mutex
+            .lock()
+            .unwrap()
             .system
             .splash_wallpaper_options
             .splash_wallpaper
-            .clone()
+            .as_ref()
         {
-            wallpaper_type = wt;
+            wallpaper_type = wt.clone();
+            if wallpaper_type == NONE_WALLPAPER_MODEL {
+                debug!(
+                    "No splash wallpaper to generate: selected model is '{}'",
+                    &wallpaper_type
+                );
+                return Ok(false);
+            }
         }
 
         if wallpaper_type == RANDOM_WALLPAPER_MODEL {
             let mut rng = rng();
             let available_wallpapers: Vec<&str> = WALLPAPER_MODELS_LIST
                 .iter()
-                .filter(|&w| *w != RANDOM_WALLPAPER_MODEL)
+                .filter(|&w| *w != RANDOM_WALLPAPER_MODEL && *w != NONE_WALLPAPER_MODEL)
                 .cloned()
                 .collect();
             if let Some(selected) = available_wallpapers.choose(&mut rng) {
@@ -96,5 +106,5 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
         count += 1;
     }
 
-    Ok(())
+    Ok(true)
 }

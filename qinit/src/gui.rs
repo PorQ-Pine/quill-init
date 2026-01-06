@@ -23,7 +23,7 @@ use libqinit::{battery, system};
 use libquillcom::socket::{LoginForm, PrimitiveShutDownType};
 use log::{debug, error, info};
 use qrcode_generator::QrCodeEcc;
-use slint::{Image, SharedString, Timer, TimerMode};
+use slint::{Color, Image, SharedString, Timer, TimerMode};
 use std::{fs, path::Path, thread};
 slint::include_modules!();
 
@@ -990,16 +990,24 @@ pub fn setup_gui(
             if let Some(gui) = gui_weak.upgrade() {
                 let shut_down_command = gui.get_shutdown_command();
                 if shut_down_command != RootFsShutDownCommand::Reboot {
-                    if let Err(e) = splash::generate_wallpaper(&boot_config_mutex) {
-                        error_toast(&gui, "Failed to generate wallpaper", e.into());
-                    } else {
-                        match Image::load_from_path(Path::new(splash::WALLPAPER_OUT_FILE_PATH)) {
-                            Ok(wallpaper) => {
-                                gui.set_splash_wallpaper(wallpaper);
-                                let _ = fs::remove_file(&splash::WALLPAPER_OUT_FILE_PATH);
+                    match splash::generate_wallpaper(&boot_config_mutex) {
+                        Ok(wallpaper_to_display) => match wallpaper_to_display {
+                            true => {
+                                match Image::load_from_path(Path::new(
+                                    splash::WALLPAPER_OUT_FILE_PATH,
+                                )) {
+                                    Ok(wallpaper) => {
+                                        gui.set_splash_wallpaper(wallpaper);
+                                        let _ = fs::remove_file(&splash::WALLPAPER_OUT_FILE_PATH);
+                                    }
+                                    Err(e) => {
+                                        error_toast(&gui, "Failed to load wallpaper", e.into())
+                                    }
+                                }
                             }
-                            Err(e) => error_toast(&gui, "Failed to load wallpaper", e.into()),
-                        }
+                            false => gui.invoke_set_background_color(Color::from_rgb_u8(0, 0, 0)),
+                        },
+                        Err(e) => error_toast(&gui, "Failed to generate wallpaper", e.into()),
                     }
                 }
 

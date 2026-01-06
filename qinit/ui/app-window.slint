@@ -165,6 +165,10 @@ export component AppWindow inherits Window {
         root.reboot();
     }
 
+    public function set-background-color(color: color) {
+        self.background = color;
+    }
+
     if (page == Page.ShutDownSplash): VerticalLayout {
         Image {
             source: splash-wallpaper;
