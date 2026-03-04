@@ -3627,8 +3627,10 @@ name = "pinenote-service"
 version = "1.0.1"
 dependencies = [
  "anyhow",
+ "env_logger",
  "futures-lite",
  "image",
+ "log",
  "nalgebra",
  "nix",
  "num_enum",

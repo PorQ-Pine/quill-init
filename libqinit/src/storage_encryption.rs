@@ -3,6 +3,13 @@ use log::info;
 use serde_json;
 use std::{fs, thread};
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "free_roam")] {
+        use log::warn;
+        use std::path::Path;
+    }
+}
+
 use crate::system::{bulletproof_unmount, is_mountpoint, run_command};
 
 pub const GOCRYPTFS_BINARY: &str = "/usr/bin/gocryptfs";
@@ -113,6 +120,19 @@ pub fn mount_storage(user: &str, password: &str) -> Result<()> {
             break;
         }
         thread::sleep(std::time::Duration::from_millis(250));
+    }
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "free_roam")] {
+            let problems = vec![format!("{}/.zsh_history", home_mountpoint_path), format!("{}/.zshrc", home_mountpoint_path)];
+            for problem in problems {
+                let problem_path = Path::new(&problem);
+                if Path::exists(problem_path) {
+                    warn!("Removing {:?} as it's a problem for mounting the storage", problem_path);
+                    fs::remove_file(problem_path).ok();
+                }
+            }
+        }
     }
 
     if !is_mountpoint(&home_mountpoint_path)? {
