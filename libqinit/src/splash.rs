@@ -40,22 +40,22 @@ pub fn generate_wallpaper(boot_config_mutex: &Arc<Mutex<BootConfig>>) -> Result<
     let mut wallpaper_type = DEFAULT_WALLPAPER_MODEL.to_string();
     {
         let boot_config_mutex = boot_config_mutex.clone();
-        if let Some(wt) = boot_config_mutex
-            .lock()
-            .unwrap()
+
+        let locked_boot_config = boot_config_mutex.lock().unwrap();
+        if let Some(wt) = locked_boot_config
             .system
             .splash_wallpaper_options
             .splash_wallpaper
-            .as_ref()
+            .clone()
         {
-            wallpaper_type = wt.clone();
-            if wallpaper_type == NONE_WALLPAPER_MODEL {
+            if wt == NONE_WALLPAPER_MODEL {
                 debug!(
                     "No splash wallpaper to generate: selected model is '{}'",
-                    &wallpaper_type
+                    &wt
                 );
                 return Ok(false);
             }
+            wallpaper_type = wt;
         }
 
         if wallpaper_type == RANDOM_WALLPAPER_MODEL {
