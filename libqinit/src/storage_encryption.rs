@@ -124,9 +124,10 @@ pub fn mount_storage(user: &str, password: &str) -> Result<()> {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "free_roam")] {
-            let problems = vec![format!("{}/.zsh_history", home_mountpoint_path), format!("{}/.zshrc", home_mountpoint_path)];
+            let problems = vec![".zsh_history", ".zshrc", ".bash_history", ".bash_logout"];
             for problem in problems {
-                let problem_path = Path::new(&problem);
+                let problem_path_str = format!("{}/{}", home_mountpoint_path, problem);
+                let problem_path = Path::new(&problem_path_str);
                 if Path::exists(problem_path) {
                     warn!("Removing {:?} as it's a problem for mounting the storage", problem_path);
                     fs::remove_file(problem_path).ok();
