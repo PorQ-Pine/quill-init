@@ -211,14 +211,14 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
             #[cfg(not(feature = "gui_only"))]
             {
+                eink::load_waveform()?;
+                eink::load_modules()?;
+                eink::setup_touchscreen(&mut boot_config)?;
+
                 #[cfg(feature = "debug")]
                 if let Err(e) = debug::start_debug_framework(&pubkey, &mut boot_config) {
                     error!("Failed to initialize debug framework: {}", &e);
                 }
-
-                eink::load_waveform()?;
-                eink::load_modules()?;
-                eink::setup_touchscreen(&mut boot_config)?;
 
                 set_timezone(&boot_config.system.timezone)?;
 

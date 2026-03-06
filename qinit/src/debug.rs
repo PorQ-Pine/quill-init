@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use libqinit::boot_config::BootConfig;
 use libqinit::signing::check_signature;
-use libqinit::system::{modprobe, run_command};
+use libqinit::system::{modprobe, run_command, start_service};
 use log::warn;
 use network_interface::NetworkInterface;
 use network_interface::NetworkInterfaceConfig;
@@ -9,10 +9,12 @@ use openssl::pkey::PKey;
 use openssl::pkey::Public;
 use regex::Regex;
 use std::fs;
+use std::os::unix::fs::symlink;
 use std::process::Command;
 
 const IP_ADDR: &str = "192.168.3.2";
 const IP_POOL_END: &str = "192.168.3.254";
+const REDSOCKS_PORT: u16 = 12345;
 const UDHCPD_CONF_PATH: &str = "/etc/udhcpd.conf";
 const DROPBEAR_RSA_KEY_FILE: &str = "rsa_hkey";
 const DEBUG_SETUP_SCRIPT: &str = "debug-setup.sh";
@@ -111,8 +113,10 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
     // udhcpd configuration
     let udhcpd_config = fs::read_to_string(&UDHCPD_CONF_PATH)
         .with_context(|| "Failed to read udhcpd's configuration")?;
+    let ip;
     if let Some(custom_ip_addr_r) = ip_regex.find(&udhcpd_config) {
         let custom_ip_addr = custom_ip_addr_r.as_str();
+        ip = custom_ip_addr;
         run_command("/sbin/ifconfig", &[&iface_name, &custom_ip_addr]).with_context(|| {
             format!(
                 "Failed to set custom IP address {} for {}",
@@ -120,6 +124,7 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
             )
         })?;
     } else {
+        ip = &IP_ADDR;
         run_command("/sbin/ifconfig", &[&iface_name, &IP_ADDR]).with_context(|| {
             format!("Failed to set IP address {} for {}", &IP_ADDR, &iface_name)
         })?;
@@ -133,6 +138,15 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
         .args(&["-vE", "0.0.0.0", "2221", "/usr/sbin/ftpd", "-A", "-w", "/"])
         .spawn()
         .with_context(|| "Failed to start FTP server")?;
+
+    // SSH tunneling
+    let subnet = &format!(
+        "{}.0/24",
+        ip.rsplitn(2, '.')
+            .nth(1)
+            .with_context(|| "Could not format subnet string")?
+    );
+    setup_ssh_tunneling(&subnet, &iface_name).with_context(|| "Failed to set up SSH tunneling")?;
 
     Ok(())
 }
@@ -175,6 +189,47 @@ pub fn prepare_script_login(pubkey: &PKey<Public>) -> Result<()> {
     } else {
         warn!("Could not find valid script to run upon console login");
     }
+
+    Ok(())
+}
+
+pub fn setup_ssh_tunneling(subnet: &str, iface_name: &str) -> Result<()> {
+    let nft_path = "/usr/sbin/nft";
+    
+    run_command(&nft_path, &["flush", "ruleset"])
+        .with_context(|| "Failed to flush existing nftables ruleset")?;
+
+    run_command(&nft_path, &["add", "table", "ip", "nat"])
+        .with_context(|| "Failed to create 'nat' table in ip family")?;
+
+    run_command(
+        &nft_path,
+        &["add", "chain", "ip", "nat", "output", "{ type nat hook output priority filter; }"],
+    ).with_context(|| "Failed to initialize NAT output hook chain")?;
+
+    run_command(
+        &nft_path,
+        &["add", "rule", "ip", "nat", "output", "ip", "daddr", subnet, "return"],
+    ).with_context(|| format!("Failed to exclude subnet {} from transparent proxy", subnet))?;
+
+    run_command(
+        &nft_path,
+        &["add", "rule", "ip", "nat", "output", "ip", "daddr", "127.0.0.1", "return"],
+    ).with_context(|| "Failed to exclude localhost from transparent proxy")?;
+
+    run_command(
+        &nft_path,
+        &["add", "rule", "ip", "nat", "output", "ip", "protocol", "tcp", "redirect", "to", &format!(":{}", REDSOCKS_PORT)]
+    ).with_context(|| format!("Failed to redirect TCP traffic to redsocks port {}", REDSOCKS_PORT))?;
+
+    run_command("/sbin/ip", &["route", "replace", "default", "dev", &iface_name, "via", "192.168.3.1"])
+        .with_context(|| format!("Failed to route default traffic through {} interface", &iface_name))?;
+
+    symlink("/etc/init.d/networking", "/run/openrc/started/networking")
+        .with_context(|| "Failed to create OpenRC networking symlink in /run")?;
+
+    start_service("redsocks")
+        .with_context(|| "Failed to start redsocks daemon")?;
 
     Ok(())
 }
