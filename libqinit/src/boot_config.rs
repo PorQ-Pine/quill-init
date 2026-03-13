@@ -39,6 +39,7 @@ pub struct SplashWallpaperOptions {
 pub struct Debug {
     pub usbnet_host_mac_address: Option<String>,
     pub usbnet_dev_mac_address: Option<String>,
+    pub ssh_tunnel_proxy: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
@@ -63,6 +64,12 @@ impl BootConfig {
         boot_config.system.recovery_features = true;
         boot_config.system.splash_wallpaper_options.splash_wallpaper =
             Some(crate::splash::DEFAULT_WALLPAPER_MODEL.to_string());
+
+        #[cfg(feature = "debug")]
+        {
+            boot_config.debug.ssh_tunnel_proxy = false;
+        }
+
         return boot_config;
     }
 

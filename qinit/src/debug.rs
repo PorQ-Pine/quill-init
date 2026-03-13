@@ -140,13 +140,15 @@ pub fn start_usbnet(pubkey: &PKey<Public>, boot_config: &mut BootConfig) -> Resu
         .with_context(|| "Failed to start FTP server")?;
 
     // SSH tunneling
-    let subnet = &format!(
-        "{}.0/24",
-        ip.rsplitn(2, '.')
-            .nth(1)
-            .with_context(|| "Could not format subnet string")?
-    );
-    setup_ssh_tunneling(&subnet, &iface_name).with_context(|| "Failed to set up SSH tunneling")?;
+    if boot_config.debug.ssh_tunnel_proxy {
+        let subnet = &format!(
+            "{}.0/24",
+            ip.rsplitn(2, '.')
+                .nth(1)
+                .with_context(|| "Could not format subnet string")?
+        );
+        setup_ssh_tunneling(&subnet, &iface_name).with_context(|| "Failed to set up SSH tunneling")?;
+    }
 
     Ok(())
 }

@@ -4,7 +4,7 @@ use serde_json;
 use std::{fs, thread};
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "free_roam")] {
+    if #[cfg(feature = "debug")] {
         use log::warn;
         use std::path::Path;
     }
@@ -123,7 +123,7 @@ pub fn mount_storage(user: &str, password: &str) -> Result<()> {
     }
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "free_roam")] {
+        if #[cfg(feature = "debug")] {
             let problems = vec![".zsh_history", ".zshrc", ".bash_history", ".bash_logout"];
             for problem in problems {
                 let problem_path_str = format!("{}/{}", home_mountpoint_path, problem);
