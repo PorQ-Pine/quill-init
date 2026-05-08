@@ -83,6 +83,7 @@ export component AppWindow inherits Window {
     in property <[string]> splash-wallpaper-models-list;
     in property <[string]> timezones-list;
     in-out property <int> orientations-list-index: 3;
+    property <bool> is-landscape: orientations-list-index == 0 || orientations-list-index == 2;
     in-out property <int> splash-wallpaper-models-list-index;
     in-out property <int> timezones-list-index;
     // Configuration properties
@@ -195,7 +196,7 @@ export component AppWindow inherits Window {
 
                     Image {
                         source: @image-url("../../../branding/quillos.svg");
-                        width: root.width * 0.15;
+                        width: is-landscape ? root.width * 0.085 : root.width * 0.15;
                         height: self.width;
                         y: (parent.height - self.height) / 2;
                     }
@@ -216,7 +217,7 @@ export component AppWindow inherits Window {
                         }
 
                         HLine {
-                            top-padding-multiplier: 4.5;
+                            top-padding-multiplier: is-landscape ? 3 : 4.5;
                             bottom-padding-multiplier: self.top-padding-multiplier;
                         }
 
@@ -428,7 +429,7 @@ export component AppWindow inherits Window {
                     alignment: center;
                     Image {
                         source: @image-url("../../../branding/quillos.svg");
-                        width: root.width * 0.35;
+                        width: is-landscape ? root.width * 0.3 : root.width * 0.35;
                         height: self.width;
                     }
                 }
@@ -1583,7 +1584,7 @@ export component AppWindow inherits Window {
         border-radius: radius;
         background: white;
         width: scaling-factor > 1 ? root.width * 0.65 : root.width * 0.35;
-        height: scaling-factor > 1 ? root.height * 0.15 : root.height * 0.1;
+        height: scaling-factor > 1 ? root.height * 0.15 : is-landscape ? root.height * 0.125 : root.height * 0.1;
         x: scaling-factor > 1 ? (root.width - self.width) / 2 : root.width - self.width - layout-padding;
         y: scaling-factor > 1 ? (root.height - self.height) / 2 : approx-bar-height;
         TouchArea {
