@@ -1283,6 +1283,7 @@ fn set_wallpaper_splash_text(gui: &AppWindow, shut_down_type: &PrimitiveShutDown
 fn handle_screen_refresh(prepare_shut_down: bool, can_shut_down: Arc<AtomicBool>) {
     if prepare_shut_down {
         let can_shut_down = can_shut_down.clone();
+        thread::spawn(|| brightness::set_brightness_unified(0, 0));
         thread::spawn(move || {
             thread::sleep(std::time::Duration::from_millis(2000));
             eink::full_refresh();
