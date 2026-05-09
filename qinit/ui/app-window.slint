@@ -83,7 +83,8 @@ export component AppWindow inherits Window {
     in property <[string]> splash-wallpaper-models-list;
     in property <[string]> timezones-list;
     in-out property <int> orientations-list-index: 3;
-    property <bool> is-landscape: orientations-list-index == 0 || orientations-list-index == 2;
+    in-out property <int> original-orientations-list-index: 3;
+    property <bool> is-landscape: original-orientations-list-index == 0 || original-orientations-list-index == 2;
     in-out property <int> splash-wallpaper-models-list-index;
     in-out property <int> timezones-list-index;
     // Configuration properties
@@ -526,7 +527,7 @@ export component AppWindow inherits Window {
             }
 
             if (page == Page.BootSplash): VerticalLayout {
-                padding-top: 550px;
+                padding-top: is-landscape ? 312.5px : 550px;
                 padding-bottom: self.padding-top;
                 HorizontalLayout {
                     alignment: center;

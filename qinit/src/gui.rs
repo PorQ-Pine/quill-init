@@ -80,6 +80,7 @@ pub fn setup_gui(
             ScreenRotation::Cw180 => gui.set_orientations_list_index(2),
             ScreenRotation::Cw270 => gui.set_orientations_list_index(3),
         }
+        gui.set_original_orientations_list_index(gui.get_orientations_list_index());
 
         // Splash wallpaper settings
         {
