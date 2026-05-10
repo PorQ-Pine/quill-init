@@ -18,7 +18,7 @@ import {
 import { HList } from "../../ui-common/hlist.slint";
 import { Properties as P } from "../../ui-common/properties.slint";
 
-export enum Page { None, QuillBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, UserLogin, InvalidBootConfig, Error, ShutDownSplash }
+export enum Page { None, QuillBoot, NetBoot, VersionInfo, BootSplash, Options, BootConfiguration, RecoveryOptions, UserLogin, InvalidBootConfig, Error, ShutDownSplash }
 export enum QrCodePage { QrCode, NotAvailable }
 export enum ProgressWidget { ProgressBar, MovingDots }
 export enum DialogType { None, Toast, SoftReset, WifiUI, WifiPassphrase, Brightness, BatteryStatus, PowerOptions }
@@ -171,6 +171,27 @@ export component AppWindow inherits Window {
         self.background = color;
     }
 
+    if (page == Page.NetBoot): VerticalLayout {
+        alignment: center;
+        spacing: P.layout-spacing * 5;
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../icons/earth.svg");
+                width: is-landscape ? root.width * 0.36 : root.width * 0.41;
+                height: self.width;
+            }
+        }
+
+        Text {
+            text: "NetBoot";
+            font-weight: P.bold-font-weight;
+            font-size: P.header-font-size * 1.45;
+            font-family: P.header-font-family;
+            horizontal-alignment: center;
+        }
+    }
+
     if (page == Page.ShutDownSplash): VerticalLayout {
         Image {
             source: splash-wallpaper;
@@ -278,7 +299,7 @@ export component AppWindow inherits Window {
         VerticalLayout {
             padding: layout-padding;
             spacing: layout-spacing;
-            if (page != Page.QuillBoot) && (page != Page.BootSplash) && (page != Page.ShutDownSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HorizontalLayout {
+            if (page != Page.QuillBoot) && (page != Page.NetBoot) && (page != Page.BootSplash) && (page != Page.ShutDownSplash) && (page != Page.UserLogin) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HorizontalLayout {
                 IconButton {
                     icon: @image-url("../../icons/arrow-back.svg");
                     border-radius: radius;
@@ -418,7 +439,7 @@ export component AppWindow inherits Window {
                     }
                 }
             }
-            if (page != Page.BootSplash) && (page != Page.ShutDownSplash) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
+            if (page != Page.BootSplash) && (page != Page.NetBoot) && (page != Page.ShutDownSplash) && (page != Page.None) && (page != Page.InvalidBootConfig) && (page != Page.Error): HLine {
                 top-padding-multiplier: page == Page.QuillBoot ? 0.5 : 1;
             }
 

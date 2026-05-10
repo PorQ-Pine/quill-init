@@ -167,34 +167,38 @@ pub fn setup_gui(
     gui.set_version_string(SharedString::from(version_string));
 
     let quill_recovery = get_cmdline_bool("quill_recovery")?;
+    let quill_netboot = get_cmdline_bool("quill_netboot")?;
     gui.set_quill_recovery(quill_recovery);
 
-    if !boot_config_valid {
+    if boot_config_valid {
+        if quill_recovery {
+            info!("Showing QuillBoot menu");
+            thread::spawn(|| {
+                brightness::set_brightness_unified(
+                    &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32,
+                    &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32,
+                )
+            });
+            set_page_sender.send(Page::QuillBoot)?;
+        } else if quill_netboot {
+            info!("Showing NetBoot GUI");
+            set_page_sender.send(Page::NetBoot)?;
+        } else {
+            // Trigger normal boot automatically
+            let login_credentials_sender = login_credentials_sender.clone();
+            let core_settings_sender = core_settings_sender.clone();
+            boot_normal(
+                &gui,
+                &boot_sender,
+                &set_page_sender,
+                &gui.get_default_user().to_string(),
+                first_boot_done,
+                login_credentials_sender,
+                core_settings_sender,
+            )?;
+        }
+    } else {
         set_page_sender.send(Page::InvalidBootConfig)?;
-    }
-
-    if boot_config_valid && quill_recovery {
-        info!("Showing QuillBoot menu");
-        thread::spawn(|| {
-            brightness::set_brightness_unified(
-                &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32,
-                &libqinit::brightness::MAX_BRIGHTNESS / 2 as i32,
-            )
-        });
-        set_page_sender.send(Page::QuillBoot)?;
-    } else if boot_config_valid {
-        // Trigger normal boot automatically
-        let login_credentials_sender = login_credentials_sender.clone();
-        let core_settings_sender = core_settings_sender.clone();
-        boot_normal(
-            &gui,
-            &boot_sender,
-            &set_page_sender,
-            &gui.get_default_user().to_string(),
-            first_boot_done,
-            login_credentials_sender,
-            core_settings_sender,
-        )?;
     }
 
     // Boot progress bar timer
