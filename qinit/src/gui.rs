@@ -15,8 +15,8 @@ use libqinit::recovery::soft_reset;
 use libqinit::splash;
 use libqinit::storage_encryption;
 use libqinit::system::{
-    BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, get_cmdline_bool,
-    keep_last_lines, read_kernel_buffer_singleshot, shut_down,
+    BootCommand, BootCommandForm, PowerDownMode, compress_string_to_xz, keep_last_lines,
+    read_kernel_buffer_singleshot, shut_down,
 };
 use libqinit::wifi;
 use libqinit::{battery, system};
@@ -25,6 +25,8 @@ use log::{debug, error, info};
 use qrcode_generator::QrCodeEcc;
 use slint::{Color, Image, SharedString, Timer, TimerMode};
 use std::{fs, path::Path, thread};
+
+use crate::BootSelection;
 slint::include_modules!();
 
 pub const TOAST_DURATION_MILLIS: i32 = 5000;
@@ -49,6 +51,8 @@ pub fn setup_gui(
     boot_config_mutex: Arc<Mutex<BootConfig>>,
     boot_config_valid: bool,
     login_page_trigger_receiver: Receiver<()>,
+    boot_selection: BootSelection,
+    netboot_ready_receiver: Receiver<()>,
 ) -> Result<()> {
     let gui = AppWindow::new()?;
     let gui_weak = gui.as_weak();
@@ -166,12 +170,10 @@ pub fn setup_gui(
 
     gui.set_version_string(SharedString::from(version_string));
 
-    let quill_recovery = get_cmdline_bool("quill_recovery")?;
-    let quill_netboot = get_cmdline_bool("quill_netboot")?;
-    gui.set_quill_recovery(quill_recovery);
+    gui.set_quill_recovery(boot_selection == BootSelection::Recovery);
 
     if boot_config_valid {
-        if quill_recovery {
+        if boot_selection == BootSelection::Recovery {
             info!("Showing QuillBoot menu");
             thread::spawn(|| {
                 brightness::set_brightness_unified(
@@ -180,7 +182,7 @@ pub fn setup_gui(
                 )
             });
             set_page_sender.send(Page::QuillBoot)?;
-        } else if quill_netboot {
+        } else if boot_selection == BootSelection::NetBoot {
             info!("Showing NetBoot GUI");
             set_page_sender.send(Page::NetBoot)?;
         } else {
@@ -1154,6 +1156,22 @@ pub fn setup_gui(
             }
         }
     });
+
+    let netboot_ready_timer = Timer::default();
+    netboot_ready_timer.start(
+        TimerMode::Repeated,
+        std::time::Duration::from_millis(100),
+        {
+            let gui_weak = gui_weak.clone();
+            move || {
+                if let Ok(()) = netboot_ready_receiver.try_recv() {
+                    if let Some(gui) = gui_weak.upgrade() {
+                        info!("NetBoot framework is ready for normal boot");
+                    }
+                }
+            }
+        },
+    );
 
     gui.run()?;
 

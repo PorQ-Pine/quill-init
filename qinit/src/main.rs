@@ -37,6 +37,7 @@ cfg_if::cfg_if! {
                 use libqinit::system::{mount_modules, mount_firmware, set_workdir, run_command, set_timezone};
                 use libqinit::rootfs;
                 use libqinit::systemd;
+                use libqinit::netboot;
 
                 use nix::unistd::sethostname;
                 use crossterm::event::{self, Event};
@@ -75,6 +76,13 @@ const BOOT_SOCKET_PATH: &str = "/qinit.sock";
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
     ready: bool,
+}
+
+#[derive(PartialEq, Clone)]
+enum BootSelection {
+    Normal,
+    Recovery,
+    NetBoot,
 }
 
 fn main() {
@@ -159,7 +167,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 fs::remove_file(&BOOT_SOCKET_PATH)
                     .with_context(|| "Failed to remove qinit UNIX socket file")?;
 
-                first_stage_info("Entering rootfs chroot, goodbye");
+                first_stage_info("Entering root filesystem chroot, goodbye");
                 unix::fs::chroot(&OVERLAY_MOUNTPOINT)
                     .with_context(|| "Failed to chroot to overlay filesytem's mountpoint")?;
                 std::env::set_current_dir("/")
@@ -177,6 +185,15 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
 
             // Boot info
+            let boot_selection: BootSelection;
+            if libqinit::system::get_cmdline_bool("quill_recovery")? {
+                boot_selection = BootSelection::Recovery;
+            } else if libqinit::system::get_cmdline_bool("quill_netboot")? {
+                boot_selection = BootSelection::NetBoot;
+            } else {
+                boot_selection = BootSelection::Normal;
+            }
+
             let mut kernel_version =
                 fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?;
             kernel_version.pop();
@@ -264,11 +281,13 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             ) = channel();
             let (splash_ready_sender, splash_ready_receiver): (Sender<()>, Receiver<()>) = channel();
             let (login_page_trigger_sender, login_page_trigger_receiver): (Sender<()>, Receiver<()>) = channel();
+            let (netboot_ready_sender, netboot_ready_receiver): (Sender<()>, Receiver<()>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
             thread::spawn({
                 let boot_config_mutex = boot_config_mutex.clone();
                 let toast_sender = toast_sender.clone();
+                let boot_selection = boot_selection.clone();
                 move || {
                     gui::setup_gui(
                         progress_receiver,
@@ -285,9 +304,24 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                         boot_config_mutex,
                         boot_config_valid,
                         login_page_trigger_receiver,
+                        boot_selection,
+                        netboot_ready_receiver,
                     )
                 }
             });
+
+            #[cfg(not(feature = "gui_only"))]
+            if boot_selection == BootSelection::NetBoot {
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "debug")] {
+                        if let Ok(()) = netboot::setup() {
+                            netboot_ready_sender.send(())?;
+                        }
+                    } else {
+                        return Err(anyhow::anyhow!("Incompatible kernel for NetBoot framework. You must be running a kernel that has debugging features enabled."));
+                    }
+                }
+            }
 
             // Block this function until the main thread receives a signal to continue booting (allowing a user to perform recovery tasks, for example)
             let boot_command_form = boot_receiver.recv()?;

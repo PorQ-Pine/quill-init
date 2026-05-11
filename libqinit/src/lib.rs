@@ -8,6 +8,7 @@ cfg_if::cfg_if! {
         pub mod brightness;
         pub mod battery;
         pub mod networking;
+        pub mod netboot;
     }
 }
 pub mod boot_config;
