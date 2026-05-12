@@ -8,11 +8,11 @@ cfg_if::cfg_if! {
         pub mod brightness;
         pub mod battery;
         pub mod networking;
-        pub mod netboot;
     }
 }
 pub mod boot_config;
 pub mod eink;
+pub mod netboot;
 pub mod rootfs;
 pub mod rootfs_socket;
 pub mod signing;
@@ -38,3 +38,10 @@ pub const READY_PROGRESS_VALUE: f32 = 1.0;
 pub const OPENRC_WORKDIR: &str = "/run/openrc";
 pub const SCREEN_H: u16 = 1404;
 pub const SCREEN_W: u16 = 1872;
+
+#[derive(PartialEq, Clone)]
+pub enum BootSelection {
+    Normal,
+    Recovery,
+    NetBoot,
+}

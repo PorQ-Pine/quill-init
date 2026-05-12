@@ -21,6 +21,7 @@ use sys_mount::{Mount, UnmountFlags, unmount};
 use walkdir::WalkDir;
 
 use crate::boot_config::BootConfig;
+use crate::netboot::{NETBOOT_DEVICE_NODE, NetBootStatus};
 use crate::rootfs::run_chroot_command;
 use crate::signing::check_signature;
 
@@ -167,7 +168,7 @@ pub fn modprobe(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub fn mount_base_partitions() -> Result<()> {
+pub fn mount_base_partitions(netboot_status: NetBootStatus) -> Result<()> {
     info!("Mounting boot partition");
     fs::create_dir_all(&crate::BOOT_PART_MOUNTPOINT)
         .with_context(|| "Failed to create boot partition mountpoint's directory")?;
@@ -178,26 +179,34 @@ pub fn mount_base_partitions() -> Result<()> {
         .mount(&crate::BOOT_PART, &crate::BOOT_PART_MOUNTPOINT)
         .with_context(|| "Failed to mount boot partition")?;
 
-    info!("Mounting main partition");
-    fs::create_dir_all(&crate::MAIN_PART_MOUNTPOINT)
-        .with_context(|| "Failed to create boot partition mountpoint's directory")?;
-    wait_for_path(&crate::MAIN_PART)?;
-    Mount::builder()
-        .fstype("ext4")
-        .data("rw")
-        .mount(&crate::MAIN_PART, &crate::MAIN_PART_MOUNTPOINT)
-        .with_context(|| "Failed to mount main partition")?;
+    if netboot_status == NetBootStatus::None || netboot_status == NetBootStatus::Available {
+        info!("Mounting main partition");
+        fs::create_dir_all(&crate::MAIN_PART_MOUNTPOINT)
+            .with_context(|| "Failed to create boot partition mountpoint's directory")?;
 
-    fs::create_dir_all(&format!(
-        "{}/{}",
-        &crate::MAIN_PART_MOUNTPOINT,
-        &crate::SYSTEM_DIR
-    ))?;
-    fs::create_dir_all(&format!(
-        "{}/{}",
-        &crate::MAIN_PART_MOUNTPOINT,
-        &crate::SYSTEM_HOME_DIR
-    ))?;
+        let main_part_path = match netboot_status {
+            NetBootStatus::Available => NETBOOT_DEVICE_NODE,
+            _ => &crate::MAIN_PART,
+        };
+
+        wait_for_path(&main_part_path)?;
+        Mount::builder()
+            .fstype("ext4")
+            .data("rw")
+            .mount(&main_part_path, &crate::MAIN_PART_MOUNTPOINT)
+            .with_context(|| "Failed to mount main partition")?;
+
+        fs::create_dir_all(&format!(
+            "{}/{}",
+            &crate::MAIN_PART_MOUNTPOINT,
+            &crate::SYSTEM_DIR
+        ))?;
+        fs::create_dir_all(&format!(
+            "{}/{}",
+            &crate::MAIN_PART_MOUNTPOINT,
+            &crate::SYSTEM_HOME_DIR
+        ))?;
+    }
 
     Ok(())
 }

@@ -27,7 +27,7 @@ cfg_if::cfg_if! {
         use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
         use nix::unistd::Pid;
         use libqinit::eink::ScreenRotation;
-        use libqinit::system::{mount_base_filesystems, mount_base_partitions};
+        use libqinit::system::mount_base_filesystems;
 
         pub const QINIT_PATH: &str = "/etc/init.d/qinit";
     } else {
@@ -61,7 +61,9 @@ cfg_if::cfg_if! {
 }
 
 use anyhow::{Context, Result};
-use libqinit::boot_config::BootConfig;
+use libqinit::netboot::NetBootStatus;
+use libqinit::system::mount_base_partitions;
+use libqinit::{BootSelection, boot_config::BootConfig};
 use libquillcom::socket;
 use log::{error, info};
 use postcard::{from_bytes, to_allocvec};
@@ -76,13 +78,6 @@ const BOOT_SOCKET_PATH: &str = "/qinit.sock";
 #[derive(Serialize, Deserialize)]
 struct OverlayStatus {
     ready: bool,
-}
-
-#[derive(PartialEq, Clone)]
-enum BootSelection {
-    Normal,
-    Recovery,
-    NetBoot,
 }
 
 fn main() {
@@ -111,6 +106,18 @@ fn main() {
 }
 
 fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) -> Result<()> {
+    #[cfg(feature = "init_wrapper")]
+    mount_base_filesystems()?;
+
+    let boot_selection: BootSelection;
+    if libqinit::system::get_cmdline_bool("quill_recovery")? {
+        boot_selection = BootSelection::Recovery;
+    } else if libqinit::system::get_cmdline_bool("quill_netboot")? {
+        boot_selection = BootSelection::NetBoot;
+    } else {
+        boot_selection = BootSelection::Normal;
+    }
+
     cfg_if::cfg_if! {
         if #[cfg(feature = "init_wrapper")] {
             first_stage_info("qinit binary starting");
@@ -125,8 +132,12 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
 
             let boot_unix_listener = socket::bind(&BOOT_SOCKET_PATH)?;
 
-            mount_base_filesystems()?;
-            mount_base_partitions()?;
+            if boot_selection == BootSelection::NetBoot {
+                mount_base_partitions(NetBootStatus::Pending)?;
+            } else {
+                mount_base_partitions(NetBootStatus::None)?;
+            }
+
             let rotation_env_var_base = "SLINT_KMS_ROTATION=";
             let rotation_env_var;
             let (boot_config, _) = BootConfig::read()?;
@@ -185,15 +196,6 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             }
 
             // Boot info
-            let boot_selection: BootSelection;
-            if libqinit::system::get_cmdline_bool("quill_recovery")? {
-                boot_selection = BootSelection::Recovery;
-            } else if libqinit::system::get_cmdline_bool("quill_netboot")? {
-                boot_selection = BootSelection::NetBoot;
-            } else {
-                boot_selection = BootSelection::Normal;
-            }
-
             let mut kernel_version =
                 fs::read_to_string("/proc/version").with_context(|| "Failed to read kernel version")?;
             kernel_version.pop();
@@ -281,6 +283,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
             ) = channel();
             let (splash_ready_sender, splash_ready_receiver): (Sender<()>, Receiver<()>) = channel();
             let (login_page_trigger_sender, login_page_trigger_receiver): (Sender<()>, Receiver<()>) = channel();
+            #[cfg(not(feature = "gui_only"))]
             let (netboot_ready_sender, netboot_ready_receiver): (Sender<()>, Receiver<()>) = channel();
 
             let boot_config_mutex = Arc::new(Mutex::new(boot_config.clone()));
@@ -315,6 +318,7 @@ fn init(interrupt_sender: Sender<String>, interrupt_receiver: Receiver<String>) 
                 cfg_if::cfg_if! {
                     if #[cfg(feature = "debug")] {
                         if let Ok(()) = netboot::setup() {
+                            mount_base_partitions(NetBootStatus::Available)?;
                             netboot_ready_sender.send(())?;
                         }
                     } else {
